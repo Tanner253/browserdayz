@@ -679,6 +679,8 @@ export class HUD {
    * hidden in the owner's flight it gave 6% more frames. The same marks, sizes, colours and fade, four pixels a degree.
    */
   private compass: { ctx: CanvasRenderingContext2D; k: number; ink: string; faint: string; font: string; mono: string } | null = null;
+  /** the bearings, whole degrees, of the others in the player's party (src/game/party.ts marks) */
+  compassMates: number[] = [];
   private buildCompass() {
     const strip = this.root.querySelector('.hud-compass-strip') as HTMLElement;
     const c = document.createElement('canvas');
@@ -724,6 +726,15 @@ export class HUD {
         g.fillStyle = C.faint;
         g.fillText(String(n), at, 18);
       }
+    }
+    // (the others in the party, whichever way they are: a green dot under the bearing)
+    for (const b of this.compassMates) {
+      const off = ((((b - deg) % 360) + 540) % 360) - 180;
+      if (Math.abs(off) > 52) continue;
+      g.beginPath();
+      g.arc(210 + off * 4, 25, 2.6, 0, Math.PI * 2);
+      g.fillStyle = '#86d46f';
+      g.fill();
     }
     // (faded at its ends as the mask did: clear, whole from a quarter in, clear again)
     g.shadowColor = 'transparent';
@@ -2155,7 +2166,7 @@ export class HUD {
       this.toggle(e.compass, 'show', true);
       const deg = ((s.heading % 360) + 360) % 360;
       // (moved only when it has moved a tenth of a pixel: written every frame, a still view restyled the page every frame)
-      const x = (-deg * 4).toFixed(1);
+      const x = `${(-deg * 4).toFixed(1)}|${this.compassMates.join(',')}`;
       if (this.last.compass !== x) {
         this.last.compass = x;
         this.drawCompass(deg);

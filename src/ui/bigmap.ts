@@ -191,6 +191,13 @@ export class BigMap {
       this.listPeople();
     }
   }
+  /** the others in the player's party, where they stand (src/game/party.ts marks): a green dot each and their name */
+  private mates: { x: number; z: number; name: string }[] = [];
+  setMates(list: { x: number; z: number; name: string }[]) {
+    if (!list.length && !this.mates.length) return;
+    this.mates = list;
+    this.dirty = true;
+  }
   /** what an admin does to somebody from the map (see PersonAct): null, and a dot is only a dot */
   onPerson: ((id: number, what: PersonAct) => void) | null = null;
   private admin = false;
@@ -1599,6 +1606,30 @@ export class BigMap {
     if (this.admin && ((this.adm.on && this.people.length) || this.adm.ring)) {
       g.save();
       this.drawPeople(g, sx, sy, W, Hh, u, k);
+      g.restore();
+    }
+    // the others in the player's party: green, as their dots over their heads are
+    if (this.mates.length) {
+      g.save();
+      g.font = `600 ${Math.round(13 * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+      g.textAlign = 'left';
+      g.lineJoin = 'round';
+      for (const q of this.mates) {
+        const px = sx(q.x), py = sy(q.z), r = 5 * u;
+        if (!on(px, py, 80 * u)) continue;
+        g.beginPath();
+        g.arc(px, py, r, 0, Math.PI * 2);
+        g.fillStyle = '#86d46f';
+        g.fill();
+        g.lineWidth = 1.6 * u;
+        g.strokeStyle = INK;
+        g.stroke();
+        g.lineWidth = 3 * u;
+        g.strokeStyle = 'rgba(255, 248, 224, 0.9)';
+        g.strokeText(q.name, px + r + 3 * u, py + 4 * u);
+        g.fillStyle = '#2e5a22';
+        g.fillText(q.name, px + r + 3 * u, py + 4 * u);
+      }
       g.restore();
     }
 

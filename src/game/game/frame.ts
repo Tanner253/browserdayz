@@ -237,7 +237,7 @@ export const frameMethods = {
         }
         this.minimap.setPeople(out);
       }
-    } else this.minimap.setPeople([]);
+    } else if (!this.party.marks.length) this.minimap.setPeople([]);
     if (this.map.open && this.role === 'admin' && this.online) {
       if ((this.mapAskT -= dt) <= 0) {
         this.mapAskT = 1;
@@ -504,8 +504,14 @@ export const frameMethods = {
         if (rp.pos.distanceToSquared(cam.position) < 90 * 90) this.effects.drip(_drip.set(rp.pos.x, rp.pos.y + (rp.crouched ? 0.55 : 0.95), rp.pos.z));
       }
     }
-    // (a dot over each of your party who is about)
-    this.party.update(this.remotes);
+    // (a dot over each of your party who is about, their name over it near; and twice a second where they all are, on
+    // the maps and the compass: an admin's corner map with names on shows everybody instead)
+    if (this.party.update(this.remotes, cam.position, dt)) {
+      const m = this.party.marks;
+      if (!(this.role === 'admin' && this.online && this.namesWanted)) this.minimap.setPeople(m.map((q) => ({ ...q, mate: true })));
+      this.map.setMates(m);
+      this.hud.compassMates = m.map((q) => Math.round(THREE.MathUtils.radToDeg(Math.atan2(q.x - p.pos.x, p.pos.z - q.z))));
+    }
     // your own wound leaves the same trail: it is how you are followed
     if (p.vitals.bleeding && !p.dead && this.started && (this.dripT -= dt) <= 0) {
       this.dripT = 0.3 + Math.random() * 0.35;

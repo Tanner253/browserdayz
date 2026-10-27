@@ -12,6 +12,9 @@ type Body = { pos: THREE.Vector3; alive: boolean; crouched: boolean };
 const ASKED_FOR = 120_000;
 /** the dot's size, of the view's height at a metre: about seven pixels on a 720-line screen */
 const DOT = 0.014;
+/** a name's height over its dot, of the view's (about sixteen pixels on a 720-line screen), and how near it is written */
+const NAME_H = 0.022;
+const NAMES_TO = 250;
 
 export class Party {
   members: Member[] = [];
@@ -24,6 +27,15 @@ export class Party {
   private dots = new Map<number, THREE.Sprite>();
   private material: THREE.SpriteMaterial;
   private list = document.createElement('div');
+  /**
+   * Each member's name over their dot, near enough, and where each about and alive stands, for the maps and the compass
+   * (the owner, 2026-10-27, said yes to "map/compass marks for members, names over their heads"): the names one
+   * picture each, made when first wanted; the marks made again twice a second.
+   */
+  private names = new Map<number, THREE.Sprite>();
+  private nameOf = new Map<number, string>();
+  marks: { x: number; z: number; name: string }[] = [];
+  private marksT = 0;
 
   constructor(private scene: THREE.Scene) {
     const c = document.createElement('canvas');
@@ -53,6 +65,15 @@ export class Party {
       dot.removeFromParent();
       this.dots.delete(id);
     }
+    // (the names made again when they are next wanted: a party changes seldom)
+    this.nameOf = new Map(members.flatMap((m) => (m.id !== null ? [[m.id, m.name] as const] : [])));
+    for (const tag of this.names.values()) {
+      tag.removeFromParent();
+      tag.material.map?.dispose();
+      tag.material.dispose();
+    }
+    this.names.clear();
+    this.marksT = 0;
     this.list.style.display = members.length ? 'block' : 'none';
     this.list.replaceChildren(
       ...members.map((m) => {
@@ -87,8 +108,11 @@ export class Party {
     return at !== undefined && performance.now() - at < ASKED_FOR;
   }
 
-  /** each frame: a dot over the head of each member who is about and alive */
-  update(bodies: Map<number, Body>) {
+  /**
+   * Each frame: a dot over the head of each member who is about and alive, and their name over it when near `from`.
+   * @returns whether `marks` were made again
+   */
+  update(bodies: Map<number, Body>, from: THREE.Vector3, dt: number): boolean {
     for (const id of this.ids) {
       const b = bodies.get(id);
       let dot = this.dots.get(id);
@@ -102,6 +126,49 @@ export class Party {
       }
       dot.visible = !!b?.alive;
       if (b) dot.position.set(b.pos.x, b.pos.y + (b.crouched ? 1.4 : 1.98), b.pos.z);
+      const near = dot.visible && !!b && b.pos.distanceTo(from) < NAMES_TO;
+      let tag = this.names.get(id);
+      if (!tag && near) {
+        tag = this.nameTag(this.nameOf.get(id) ?? '');
+        this.names.set(id, tag);
+        this.scene.add(tag);
+      }
+      if (!tag) continue;
+      tag.visible = near;
+      tag.position.copy(dot.position);
     }
+    if ((this.marksT -= dt) > 0) return false;
+    this.marksT = 0.5;
+    this.marks = [...this.ids].flatMap((id) => {
+      const b = bodies.get(id);
+      return b?.alive ? [{ x: b.pos.x, z: b.pos.z, name: this.nameOf.get(id) ?? '' }] : [];
+    });
+    return true;
+  }
+
+  /** a name, drawn once, standing over the dot at the same size at any distance */
+  private nameTag(name: string) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 40;
+    const g = c.getContext('2d')!;
+    g.font = "600 26px 'Barlow Condensed', 'Bahnschrift', sans-serif";
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.lineWidth = 4;
+    g.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    g.strokeText(name, 128, 21);
+    g.fillStyle = '#d6f0cc';
+    g.fillText(name, 128, 21);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false, sizeAttenuation: false, fog: false, toneMapped: false }));
+    tag.scale.set(NAME_H * (c.width / c.height), NAME_H, 1);
+    // (its foot a little over the dot's middle, on the screen, whatever the distance)
+    tag.center.set(0.5, -0.25);
+    tag.renderOrder = 999;
+    tag.frustumCulled = false;
+    return tag;
   }
 }

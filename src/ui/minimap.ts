@@ -137,9 +137,9 @@ export class Minimap {
     this.resize();
   }
 
-  /** everybody else, where an admin with names on is shown them (empty for anybody else) */
-  private people: { x: number; z: number; name: string; dead?: boolean }[] = [];
-  setPeople(list: { x: number; z: number; name: string; dead?: boolean }[]) {
+  /** everybody else, where an admin with names on is shown them; to anybody else the others in their party (`mate`) */
+  private people: { x: number; z: number; name: string; dead?: boolean; mate?: boolean }[] = [];
+  setPeople(list: { x: number; z: number; name: string; dead?: boolean; mate?: boolean }[]) {
     if (!list.length && !this.people.length) return;
     this.people = list;
     // (drawn again at the next look, though the player has not moved)
@@ -484,7 +484,7 @@ export class Minimap {
       const r = this.big ? W / 140 : W / 40;
       g.beginPath();
       g.arc(qx, qz, r, 0, Math.PI * 2);
-      g.fillStyle = q.dead ? '#8a8a82' : '#4f8fff';
+      g.fillStyle = q.dead ? '#8a8a82' : q.mate ? '#86d46f' : '#4f8fff';
       g.fill();
       g.lineWidth = Math.max(1, r * 0.35);
       g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
