@@ -339,7 +339,7 @@ export type C2S =
   /** an admin's order to the store's book (api/_lib/shop.ts, AdminAct), passed to the site */
   | { t: 'store'; act: unknown }
   /** somebody with a role has their panel open: the lists it shows are asked for */
-  | { t: 'adm' }
+  | { t: 'adm'; /** a search of everybody who has played, the panel's All players (server/roster.ts) */ find?: string }
   /** an admin's far sight wants what lies about where their view is, or about them (answered to an admin alone, and no oftener than ESP.every: server/esp.ts) */
   | { t: 'esp'; x?: number; z?: number }
   /** the same far sight wants every animal (`a`) and every one of the infected (`z`) on the map, wherever they are (answered as 'esp' is: server/esp.ts) */
@@ -786,6 +786,10 @@ export interface AdminLists {
   players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** their name and wallet are fixed (server/pinned.ts): /unlock frees them */ pinned?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** an admin's: their inventory never fills */ bottomless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true; /** the device their game runs on, its first eight characters (protocol 44): /ban dev:xxxxxxxx takes it */ dev?: string }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
+  /** an admin's search of everybody who has played (the panel's All players; server/roster.ts): their names, the latest first, minutes since they were last on, device, and `ref`, the start of their key's hash, which /ban k:ref takes */
+  found?: { names: string[]; mins: number; dev: string; on: boolean; banned: boolean; ref: string }[];
+  /** the latest reports from the death screen, an admin's (server/reports.ts): `death` is how it went, as the server knew it */
+  reports?: { n: number; mins: number; from: string; about: string | null; reason: string; text: string; death: string }[];
   /**
    * `n` is where it stands in the list now (what `/unban 3` takes straight after `/bans`). `id` is its own, and is
    * the same whatever else is banned or lifted meanwhile: `a:` and the start of the hash of the key an admin

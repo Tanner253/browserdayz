@@ -859,8 +859,14 @@ export function handle(c: Client, m: C2S) {
       if (!role || now - (ADMIN.asked.get(c.id) ?? 0) < 600) return;
       ADMIN.asked.set(c.id, now);
       const admin = role === 'admin';
+      // (the panel's All players and Reports, an admin's: server/roster.ts, server/reports.ts)
+      const q = admin && typeof m.find === 'string' ? m.find.trim().slice(0, 40) : '', dev = /^dev:[0-9a-f]{4,40}$/i.test(q) ? q.slice(4).toLowerCase() : '';
+      const onKeys = new Set([...clients.values()].map((o) => keyHash(o.key)));
+      const found = q.length > 1 ? roster.find(dev ? '' : q, dev, 40).map((p) => ({ names: p.names.slice().reverse(), mins: Math.round((now - p.last) / 60000), dev: p.fp.slice(0, 8), on: onKeys.has(p.key), banned: ADMIN.state.bans.some((b) => b.key === p.key || (!!p.fp && b.fp === p.fp)), ref: p.key.slice(0, 16) })) : undefined;
       return void send(c, {
         t: 'adm',
+        ...(found ? { found } : {}),
+        ...(admin ? { reports: reports.latest(30).map((r) => ({ n: r.n, mins: Math.round((now - r.at) / 60000), from: r.from.name, about: r.death.by?.name ?? null, reason: r.reason, text: r.text, death: reportLines(r, ago)[1].trim() })) } : {}),
         players: [...clients.values()].map((o) => ({
           id: o.id, name: o.name, role: roleOf(o), x: Math.round(o.pose[0]), z: Math.round(o.pose[2]), yaw: Math.round(o.pose[3] * 100) / 100, alive: o.alive, flags: o.check.flags, mins: Math.round((now - o.joinedAt) / 60000),
           hp: Math.round(o.vitals?.health ?? 100), kills: scores.get(o.key)?.kills ?? 0, tags: scores.get(o.key)?.tags ?? 0,

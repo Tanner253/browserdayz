@@ -44,8 +44,8 @@ import { StoreTab } from './admin-store';
 export interface AdminActions {
   /** an order, as it would be typed (`/kick #12 why`) */
   order(line: string): void;
-  /** the lists are wanted (again) */
-  ask(): void;
+  /** the lists are wanted (again); with `find`, the All players search too */
+  ask(find?: string): void;
   /** the free camera, put on or off */
   freecam(on: boolean): void;
   /** the map, opened to be right-clicked on */
@@ -140,7 +140,7 @@ export interface AdminSelf {
 }
 
 type Player = AdminPlayer;
-type View = 'who' | 'entities' | 'server' | 'bans' | 'roles' | 'store';
+type View = 'who' | 'entities' | 'server' | 'bans' | 'roles' | 'store' | 'people' | 'reports';
 type Sub = 'actions' | 'items' | 'kits' | 'pockets';
 /** where the window stands and how big it is, in pixels of the screen */
 type Box = { x: number; y: number; w: number; h: number };
@@ -250,6 +250,9 @@ export class AdminUI {
   root = el('div', 'adm');
   isOpen = false;
   private view: View = 'who';
+  /** the All players search, and its wait before it is asked */
+  private findAll = '';
+  private findT = 0;
   private sub: Sub = 'actions';
   private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, night: false, names: false, tint: null, freecam: false, x: 0, z: 0 };
   private lists: AdminLists = { players: [], gone: [], bans: [], roles: [], checks: '' };
@@ -384,14 +387,14 @@ export class AdminUI {
     if (!this.target || (self.role !== 'admin' && this.target === self.id)) this.target = self.role === 'admin' ? self.id : 0;
     if (self.role !== 'admin') {
       this.sub = 'actions';
-      if (this.view === 'entities' || this.view === 'bans' || this.view === 'roles' || this.view === 'store') this.view = 'who';
+      if (this.view === 'entities' || this.view === 'bans' || this.view === 'roles' || this.view === 'store' || this.view === 'people' || this.view === 'reports') this.view = 'who';
     }
     // (what the view is on, behind the window: asked now, while it is still what the admin was looking at)
     this.looked = self.role === 'admin' ? this.act.look() : null;
     this.draw(true);
-    this.act.ask();
+    this.askLists();
     window.clearInterval(this.timer);
-    this.timer = window.setInterval(() => this.isOpen && this.act.ask(), 2000);
+    this.timer = window.setInterval(() => this.isOpen && this.askLists(), 2000);
     this.root.focus({ preventScroll: true });
   }
 
@@ -510,7 +513,7 @@ export class AdminUI {
     const same = (Object.keys(self) as (keyof AdminSelf)[]).every((k) => k === 'x' || k === 'z' || self[k] === this.self[k]);
     this.self = self;
     // (no longer an admin: the pages that are an admin's alone are left)
-    if (self.role !== 'admin' && (this.view === 'entities' || this.view === 'bans' || this.view === 'roles' || this.view === 'store')) this.view = 'who';
+    if (self.role !== 'admin' && (this.view === 'entities' || this.view === 'bans' || this.view === 'roles' || this.view === 'store' || this.view === 'people' || this.view === 'reports')) this.view = 'who';
     if (this.isOpen && !same) this.draw();
   }
 
@@ -555,10 +558,15 @@ export class AdminUI {
     return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && inside.contains(a);
   }
 
+  /** the lists asked for, with the All players search while that is up */
+  private askLists() {
+    this.act.ask(this.view === 'people' && this.findAll.trim().length > 1 ? this.findAll.trim() : undefined);
+  }
+
   private send(line: string) {
     this.act.order(line.trim());
     // (and what it did is in the lists a moment later)
-    window.setTimeout(() => this.isOpen && this.act.ask(), 700);
+    window.setTimeout(() => this.isOpen && this.askLists(), 700);
   }
 
   // ---------------------------------------------------------------- who is picked
@@ -800,6 +808,8 @@ export class AdminUI {
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}|${JSON.stringify(this.lists.turned ?? [])}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
     if (this.view === 'store') return `${base}|${this.store.n}`;
+    if (this.view === 'people') return `${base}|${this.findAll}|${JSON.stringify(this.lists.found ?? null)}`;
+    if (this.view === 'reports') return `${base}|${JSON.stringify(this.lists.reports ?? [])}`;
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
@@ -812,6 +822,8 @@ export class AdminUI {
     if (this.view === 'bans') return this.bans();
     if (this.view === 'roles') return this.roles();
     if (this.view === 'store') return this.store.body();
+    if (this.view === 'people' && this.admin) return this.people();
+    if (this.view === 'reports' && this.admin) return this.reportsList();
     const p = this.pick();
     if (!p) return [el('div', 'adm-empty', this.lists.players.length > 1 ? 'Pick somebody on the left.' : 'Nobody else is on.')];
     const tabs = el('div', 'adm-subs');
@@ -947,6 +959,9 @@ export class AdminUI {
     };
     if (this.admin) nav.append(go('entities', 'Entities', 'car', 'Cars, the infected and animals: put them in the world, and take them out of it'));
     nav.append(go('server', 'Server', 'megaphone', 'A word to everybody, what the server is doing, and the keys'));
+    // (everybody who has played, on or not, and the reports from the death screen: the owner, 2026-10-27, "why is there
+    // no admin ui for thiis in the panel?")
+    if (this.admin) nav.append(go('people', 'All players', 'search', 'Anybody who has played in the last 90 days, on or not: find them and ban them'), go('reports', 'Reports', 'flag', 'Reports from the death screen, each with how that death went', this.lists.reports?.length ? String(this.lists.reports.length) : ''));
     if (this.admin) nav.append(go('bans', 'Bans', 'ban', 'Who is banned or kept off, and lifting it', this.lists.bans.length ? String(this.lists.bans.length) : ''), go('roles', 'Roles', 'star', 'Who is an admin or a mod'), go('store', 'Store', 'coin', 'What was bought at the store: give, revoke, refund, move', this.store.view?.looks ? String(this.store.view.looks) : ''));
     const keep = this.side.querySelector('.adm-who')?.scrollTop ?? 0;
     this.swap(this.side, [top, list, nav]);
@@ -1652,6 +1667,60 @@ export class AdminUI {
     key('Tab', 'In this window: from one button to the next (Shift and Tab, back). Enter presses it');
     grid.append(this.card('Keys', 'keys', keys));
     return [grid];
+  }
+
+  /** everybody who has played in the last 90 days, on or not, found by a name or a device, and banned from here (server/roster.ts) */
+  private people(): HTMLElement[] {
+    const find = el('div', 'adm-find');
+    find.append(icon('search'), this.input(this.findAll, 'Find anybody who has played: a name, or dev:xxxxxxxx', (v) => {
+      this.findAll = v;
+      window.clearTimeout(this.findT);
+      this.findT = window.setTimeout(() => this.askLists(), 300);
+    }, '', undefined, 'find-all'));
+    const list = el('div', 'adm-table people'), q = this.findAll.trim(), got = this.lists.found;
+    if (q.length < 2) list.append(el('div', 'adm-none', 'Two or more letters of a name, or dev: and a device: anybody who has played in the last 90 days, on or not.'));
+    else if (!got) list.append(el('div', 'adm-none', 'Looking…'));
+    else if (!got.length) list.append(el('div', 'adm-none', `Nobody who has played lately went by "${q}".`));
+    else {
+      const head = el('div', 'adm-tr head');
+      for (const h of ['Names', 'Last on', 'Device', '']) head.append(el('span', '', h));
+      list.append(head);
+      for (const p of got) {
+        const r = el('div', 'adm-tr');
+        const last = p.on ? 'playing now' : p.mins < 60 ? `${p.mins} min ago` : p.mins < 2880 ? `${Math.round(p.mins / 60)} h ago` : `${Math.round(p.mins / 1440)} days ago`;
+        for (const c of [p.names.join(' / '), last, p.dev ? `dev:${p.dev}` : '']) {
+          const cell = el('span', '', c);
+          cell.title = c;
+          r.append(cell);
+        }
+        // (by the start of their key's hash, never by a name: a name could be somebody else's on now)
+        r.append(p.banned ? el('span', 'adm-none', 'Banned') : this.grave(`ban:${p.ref}`, 'Ban', () => this.send(`/ban k:${p.ref}`), 'ban'));
+        list.append(r);
+      }
+    }
+    return [find, list];
+  }
+
+  /** the reports from the death screen, newest first, each with how that death went (server/reports.ts) */
+  private reportsList(): HTMLElement[] {
+    const got = this.lists.reports ?? [], list = el('div', 'adm-table reports');
+    if (!got.length) return [el('div', 'adm-none', 'Nobody has made a report.')];
+    for (const r of got) {
+      const row = el('div', 'adm-report');
+      const when = r.mins < 60 ? `${r.mins} min ago` : r.mins < 2880 ? `${Math.round(r.mins / 60)} h ago` : `${Math.round(r.mins / 1440)} days ago`;
+      row.append(el('b', '', `#${r.n} · ${r.from} reports ${r.about ?? 'a death'} · ${r.reason}`), el('small', '', when));
+      if (r.text) row.append(el('p', '', `“${r.text}”`));
+      row.append(el('pre', 'adm-proof', r.death));
+      // (the one reported, found in All players to ban: by key there, never by a name here)
+      if (r.about) row.append(this.button(`Find ${r.about}`, () => {
+        this.view = 'people';
+        this.findAll = r.about!;
+        this.askLists();
+        this.draw(true);
+      }, 'small', 'search'));
+      list.append(row);
+    }
+    return [list];
   }
 
   private bans(): HTMLElement[] {

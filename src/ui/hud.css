@@ -2704,3 +2704,7 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .dead-report-form button { background: rgba(217, 207, 192, 0.12); color: #e9e4d8; border: 1px solid rgba(217, 207, 192, 0.35); border-radius: 4px; padding: 5px 14px; font: 12px var(--mono); cursor: pointer; }
 .adm-tr .adm-proof { grid-column: 1 / -1; margin: 4px 0 2px; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-all; font: 10px var(--mono); color: #f0b48a; background: rgba(0, 0, 0, 0.35); padding: 4px 6px; border-radius: 3px; }
 .chat-line.over { opacity: 0.62; font-style: italic; }
+.adm-table.people .adm-tr { grid-template-columns: minmax(160px, 2fr) 120px 110px auto; }
+.adm-report { padding: 8px 10px; border-bottom: 1px solid rgba(233, 228, 216, 0.08); display: grid; gap: 4px; }
+.adm-report small { color: var(--ink-dim); }
+.adm-report p { margin: 0; font-style: italic; }

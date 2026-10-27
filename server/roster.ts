@@ -39,6 +39,11 @@ export const roster = {
     const hits = [...known.values()].filter((p) => (dev ? p.fp.startsWith(dev) : t.length > 1 && p.names.some((n) => n.toLowerCase().includes(t))));
     return hits.sort((a, b) => exact(b) - exact(a) || b.last - a.last).slice(0, most);
   },
+  /** the one whose key's hash starts so (the panel's All players bans by it: /ban k:xxxx) */
+  byKey(start: string): Known | null {
+    for (const p of known.values()) if (p.key.startsWith(start)) return p;
+    return null;
+  },
   keep(): Known[] {
     prune(Date.now());
     return [...known.values()];

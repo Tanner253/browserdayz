@@ -597,11 +597,13 @@ export async function command(c: Client, line: string) {
     case 'ban': {
       if (!admin) return need();
       // (a device, as /players and /same show it: whoever is on it now, else whoever was on it last)
+      // (or a game by the start of its key's hash, as the panel's All players gives it: k:xxxxxxxxxxxxxxxx)
+      const kp = /^k:[0-9a-f]{12,40}$/i.test(who) ? who.slice(2).toLowerCase() : '';
       const d = devOf(who);
-      const t = d ? [...clients.values()].find((o) => o.fp.startsWith(d) && o !== c) ?? null : whoIs(who);
-      const left = t ? null : d ? [...ADMIN.gone].reverse().find((g) => g.fp.startsWith(d)) : (/^#\d+$/.test(who) ? ADMIN.gone.find((g) => g.id === Number(who.slice(1))) : undefined) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
+      const t = kp ? ([...clients.values()].find((o) => keyHash(o.key).startsWith(kp)) ?? null) : d ? [...clients.values()].find((o) => o.fp.startsWith(d) && o !== c) ?? null : whoIs(who);
+      const left = t ? null : kp ? [...ADMIN.gone].reverse().find((g) => keyHash(g.key).startsWith(kp)) : d ? [...ADMIN.gone].reverse().find((g) => g.fp.startsWith(d)) : (/^#\d+$/.test(who) ? ADMIN.gone.find((g) => g.id === Number(who.slice(1))) : undefined) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
       // (and anybody who has played in the last 90 days, by the name they went by or their device: server/roster.ts)
-      const known = t || left ? null : (roster.find(d ? '' : who, d, 1)[0] ?? null);
+      const known = t || left ? null : kp ? roster.byKey(kp) : (roster.find(d ? '' : who, d, 1)[0] ?? null);
       if (!t && !left && !known) return void sys(c, d ? `Nobody who has played lately is on device ${d}: see /find.` : `Nobody who has played lately went by "${who}": see /find.`);
       if (t === c || (known && known.key === keyHash(c.key))) return void sys(c, 'That is you.');
       const name = t ? t.name : left ? left.name : known!.names[known!.names.length - 1], key = t || left ? keyHash(t ? t.key : left!.key) : known!.key, ip = t || left ? ipHash(t ? t.ip : left!.ip) : known!.ip, fp = t ? t.fp : left ? left.fp : known!.fp, sig = (t ? t.sig : left?.sig) ?? '';

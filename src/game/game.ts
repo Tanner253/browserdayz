@@ -1443,8 +1443,8 @@ export class Game {
       }).sort((a, b) => a.name.localeCompare(b.name));
       this.adminUI = new AdminUI([...named.map((s) => ({ name: s.name, x: s.x, z: s.z, kind: s.kind as string })), ...starts], {
         order: (line) => this.order(line),
-        ask: () => {
-          if (this.online && this.role) this.net.send({ t: 'adm' });
+        ask: (find) => {
+          if (this.online && this.role) this.net.send({ t: 'adm', ...(find ? { find } : {}) });
           this.adminUI.setSelf(this.adminSelf());
         },
         freecam: (on) => this.toggleFreecam(on),
