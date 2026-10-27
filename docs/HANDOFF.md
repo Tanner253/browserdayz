@@ -26,6 +26,22 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
+- **LIVE 2026-10-27 ~02:38 UTC (newest; read this first)**: site, server and `main` from `47036b92` (PROTOCOL 74, boot
+  2c3e4a1f6ef42ca4; 857 characters and 123 stashes kept), `site-live` and `hotfix` there too, battle-royale the same.
+  Since 2026-10-25 everything the side paths built is merged and live: base building (blueprints, deployables placed
+  freely by hand, F held picks them up, doors and locks as items, code locks made + key copies, code sounds and shock,
+  torches, gun racks with five bays and the Weapon Rack, claim screen like Rust's cupboard, upkeep in gathered
+  materials, hammer repair, the airlock push), crafting (traders spread with map icons, recyclers, forge burns planks,
+  F at a workbench, blueprints in any order), survivors (bodies, clothes as loot, hands rigged, feet on the ground),
+  movement (mocap body, production's hands, no false strafe), melee (knives, karambit, a real-size felling axe), the
+  infected and Reclaim, the head admin's restart, the VOID INV mark, dog tags at 10/20 (TAG_FRESH 10 min, TAG_HOLD 20),
+  no tag from a kill on or from claimed land, hunger/thirst eased at home by bench (25/35/50%), meat 3 h raw and 3 days
+  cooked with a freshness bar, foundations reaching 4.5 m to the ground. Close-up textures are 1024/512 again (at 2048
+  loot on the ground drew black: do not raise DESK_NEAR without fixing that path). The how-to guide is NOT to be
+  maintained for now (the owner: "token sink"). Open: the bear (the owner said "nonfunctional", no detail yet), gates
+  on a slope still at one height, models for cooked/rotten meat and the meat kinds, forge On/Off, admin.test's powers
+  fix (62b7f5ab, deployed, its long test not re-run). The base building and crafting sessions hit the owner's spend
+  limit (weekly resets Oct 30); the owner closed shop 2026-10-27.
 - **LIVE 2026-10-24 21:14 UTC**: site, game server and `main` all from `20fe45d4` (PROTOCOL 64, server boot ace5d1df;
   807 characters and 135 stashes kept). `site-live` and `hotfix` there too. Changelog `#hands-wheel-bears`: DayZ hands
   (a held slot of its own, two long guns on the back and one in the hands, keys 1 and 2 always the back's, bodies
