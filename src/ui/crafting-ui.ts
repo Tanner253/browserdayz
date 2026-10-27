@@ -173,13 +173,12 @@ export class CraftingScreen {
     const lv = this.h.level(), all: Recipe[] = [];
     const coin = `<i class="ic-coin" style="background-image:url(${icons[MAT.scrap] ?? ''})"></i>`;
     const rows = ([1, 2, 3] as Level[]).map((L) => {
-      let open = true;
       const nodes = TREE[L].map(([id, cost]) => {
         const r = RECIPE[id];
         if (!r) return '';
         all.push(r);
-        const known = this.h.knows(id), next = !known && open;
-        if (!known) open = false;
+        // (any not yet known is ready, in any order: the owner, 2026-10-26)
+        const known = this.h.knows(id), next = !known;
         const state = known ? 'known' : next ? 'next' : 'locked';
         return `<button data-r="${id}" class="ic-node ${state}" title="${esc(recipeName(r))}"><i class="ic-pic" style="background-image:url(${icons[r.makes] ?? ''})"></i><span>${esc(recipeName(r))}</span><b>${known ? '✓' : `${coin}${cost}`}</b></button>`;
       }).join('');

@@ -182,7 +182,7 @@ ok('blueprints: the basics known; each tree in order, at its level, for its scra
   for (const line of Object.values(TREE)) for (let i = 1; i < line.length; i++) assert.ok(line[i][1] >= line[i - 1][1], 'a tree is not cheaper first');
   const none = new Set<string>();
   assert.equal(mayUnlock('pickaxe', none, 1, 999), null);
-  assert.match(mayUnlock('hand_saw', none, 1, 999)!, /first/, 'a tree was skipped along');
+  assert.equal(mayUnlock('hand_saw', none, 1, 999), null, 'a tree is learned in any order (the owner, 2026-10-26)');
   assert.match(mayUnlock('colt', new Set(TREE[2].slice(0, 4).map(([id]) => id)), 1, 999)!, /Bench II/, 'a Bench II recipe was unlocked at a Bench I');
   assert.match(mayUnlock('pickaxe', none, 0, 999)!, /Bench I/);
   assert.match(mayUnlock('pickaxe', none, 1, 5)!, /takes/);
@@ -496,8 +496,8 @@ async function serverTest() {
     await sleep(120);
     send({ t: 'cq', r: 'pickaxe', n: 1 });
     assert.ok(await until('craft', (m) => m.r === 'pickaxe' && !m.ok && /learned/.test(m.why ?? ''), 4000, g1), 'an unlearned recipe was queued');
-    send({ t: 'learn', op: 'tree', r: 'hand_saw' });
-    assert.ok(await until('learn', (m) => !m.ok && /first/.test(m.why ?? ''), 4000, g1), 'the tree was skipped along');
+    send({ t: 'learn', op: 'tree', r: 'colt' });
+    assert.ok(await until('learn', (m) => !m.ok && /Bench/.test(m.why ?? ''), 4000, g1), 'a Bench II blueprint was unlocked at a Bench I');
     send({ t: 'learn', op: 'tree', r: 'pickaxe' });
     assert.ok(await until('known', (m) => m.r.includes('pickaxe'), 4000, g1), 'the pickaxe was not learned');
     assert.ok(await until('spent', (m) => m.items.some(([id, k]) => id === MAT.scrap && k === TREE[1][0][1]), 4000, g1), 'its scrap was not taken');

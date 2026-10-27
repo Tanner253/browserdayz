@@ -7,8 +7,8 @@
 
 import { ITEMS } from '../sim/items';
 import { most, needsOf, plan, recipeName, type Pockets } from '../sim/craft/plan';
-import { LEVEL_NAME, RECIPE, type Recipe } from '../sim/craft/recipes';
-import { TREE, type LearnWays } from '../sim/craft/learn';
+import { LEVEL_NAME, type Recipe } from '../sim/craft/recipes';
+import type { LearnWays } from '../sim/craft/learn';
 import { MAT } from '../sim/craft/materials';
 import './craft.css';
 
@@ -26,14 +26,6 @@ export interface CardHost {
 }
 
 const PLACE = { hand: 'By hand, anywhere', bench: 'At a workbench, within 4 m', forge: 'At a forge' } as const;
-/** the recipe before one in its tree (what must be learned first) */
-const before = (r: Recipe) => {
-  for (const line of Object.values(TREE)) {
-    const i = line.findIndex(([id]) => id === r.id);
-    if (i > 0) return line[i - 1][0];
-  }
-  return null;
-};
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const secs = (t: number) => (t >= 60 ? `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}` : `${Math.round(t * 10) / 10} s`);
 
@@ -140,7 +132,7 @@ export class CraftCard {
   /** a recipe not yet learned: its tree's place and its research, each with why it cannot be done now */
   private learnBlock(r: Recipe, w: LearnWays, icons: Record<string, string>) {
     const coin = `<i class="cc-coin" style="background-image:url(${icons[MAT.scrap] ?? ''})"></i>`;
-    const prev = before(r), after = prev ? `, after the ${esc(ITEMS[RECIPE[prev]?.makes]?.name ?? prev)}` : ', its first';
+    const after = '';
     const tree = w.tree
       ? `<div class="cc-way"><div><b>Tech tree</b><span>${LEVEL_NAME[w.tree.lv]}${after}</span>${w.tree.why ? `<em>${esc(w.tree.why)}</em>` : ''}</div><button data-unlock ${w.tree.why ? 'disabled' : ''}>Unlock ${coin}${w.tree.cost}</button></div>`
       : '';

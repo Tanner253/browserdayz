@@ -75,8 +75,8 @@ export function mayUnlock(id: string, known: ReadonlySet<string>, lv: Level | 0,
   if (!t || !learnable(r)) return 'Nothing to learn there';
   if (knows(known, id)) return 'You know it already';
   if (lv < t.lv) return `Learned at a Bench ${['', 'I', 'II', 'III'][t.lv]}`;
-  const before = TREE[t.lv].slice(0, t.i).find(([p]) => !knows(known, p));
-  if (before) return `Learn the ${ITEMS[RECIPE[before[0]].makes]?.name ?? before[0]} first`;
+  // (in any order: the owner, 2026-10-26, "let any blueprint of the bench's level (and below) be unlocked directly, in any
+  // order, for its scrap". It was one after another along the line)
   if (scrap < t.cost) return `It takes ${t.cost} ${ITEMS[MAT.scrap].name.toLowerCase()}`;
   return null;
 }
