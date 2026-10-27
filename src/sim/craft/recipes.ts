@@ -58,7 +58,15 @@ export const MOST = { hand: 10, queue: 5 };
 export const STILL = 0.6;
 
 /** rags cut out of each piece of clothing, by its size (the fabric ones: a helmet, a vest or a pack is not cut up) */
-export const RAGS: Readonly<Record<string, number>> = { field_jacket: 6, field_trousers: 4, fishermans_hat: 2, patrol_cap: 1, garden_gloves: 1 };
+// (the survivors' clothes too, the fabric ones, from 2026-10-27: only the first five were cut, and a survivor's own
+// clothes gave no rags, the owner: "where does cloth come from? I cut jacket into bandages? rags?". Not leather, boots,
+// helmets, vests, packs or the ghillie suit)
+export const RAGS: Readonly<Record<string, number>> = {
+  field_jacket: 6, field_trousers: 4, fishermans_hat: 2, patrol_cap: 1, garden_gloves: 1,
+  tshirt: 3, tracksuit_jacket: 4, flannel_shirt: 4, hoodie: 5, quilted_jacket: 5, parka: 6, tactical_jacket: 5, combat_shirt: 4, mountain_smock: 5,
+  tracksuit_pants: 3, jeans: 3, work_trousers: 4, cargo_pants: 4, combat_trousers: 4, mountain_trousers: 4,
+  beanie: 1, ushanka: 2, beret: 1, boonie_hat: 2, balaclava: 1, fingerless_gloves: 1, work_gloves: 1,
+};
 /** what cuts clothes: a blade, or anything with an edge (the owner: "a knife or sharp object") */
 export const BLADES = ['knife', 'bone_knife', 'machete', 'hatchet', 'stone_hatchet'] as const;
 /** powder out of ten rounds of each kind: a rifle round has more in it than a pistol's (the plan; a satchel is ten, a hundred rounds) */
