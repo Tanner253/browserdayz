@@ -20,6 +20,7 @@ import { Radial } from '../../ui/radial';
 import { mendOf, Bases, heard, heardClaim, heardPiece, heardSite, repairOf, said, type KeptBase } from '../../sim/build/bases';
 import { PLACED, PLACES, PIECES, TIERS, TIER_S, benchLevel, byHand, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
 import { HandPickup } from './pickup';
+import { BedGive } from './give';
 import { FREE_LEAN, leanAt, deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Piece, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
@@ -78,6 +79,8 @@ export interface BuildHost {
   use?: (free: boolean, t: { base: Base; id: number } | null, tap?: boolean) => string | null;
   /** the player's name, as their claim's members are listed */
   name: () => string;
+  /** the others in the player's party on the server now (a bed of theirs given: src/game/building/give.ts) */
+  mates: () => { id: number; name: string }[];
   /** the numbers of the keys carried (src/sim/build/locks.ts) */
   keys: () => number[];
   /** a panel of the building's up (the mouse freed) or put away */
@@ -191,6 +194,7 @@ export class Building {
     this.wheel = this.wheels.plan;
     this.boxes = new BoxView(h.input, h.open, h.rack);
     this.hand = new HandPickup(h.input);
+    this.give = new BedGive(h.input, h.mates, h.send);
     this.doors = new DoorView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, camera: h.camera }, () => this.store, this.draw);
     this.locks = new LockView({
       input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, who: () => this.me, keys: h.keys, count: h.count, take: h.take, give: h.give,
@@ -308,6 +312,8 @@ export class Building {
   readonly boxes: BoxView;
   /** F held at a thing set down in one's own base: picked up by hand (src/game/building/pickup.ts) */
   private hand!: HandPickup;
+  /** G at a bed or bag of one's own: given to a party member (src/game/building/give.ts) */
+  readonly give: BedGive;
   /** locks: fitted from the hands, worked with F (src/game/building/locks.ts) */
   readonly locks: LockView;
   /** beds on the death screen (src/game/building/beds.ts) */
@@ -378,7 +384,10 @@ export class Building {
     const said = mine && this.hand.frame(dt, free, `${mine.base.id}:${mine.id}`, this.boxes.frame(false, mine) ?? this.h.use?.(false, mine) ?? `<b>${PIECES[mine.base.pieces.get(mine.id)!.k].name}</b>`,
       () => (this.boxes.byCid(`bbox:${mine.base.id}:${mine.id}`) ? this.boxes.openFor(mine.base.id, mine.id) : void this.h.use?.(true, mine, true)), () => this.pickUpByHand(mine.base, mine.id));
     if (!mine) this.hand.frame(dt, false, null, null, () => {}, () => {});
-    const door = lock ?? said ?? this.doors.frame(free, t) ?? this.boxes.frame(free, t) ?? this.h.use?.(free, t) ?? null;
+    // (a bed or a bag of one's own, wherever it stands: G gives it to somebody in the party)
+    const bed = t && !lock && !plan && !hammer ? t.base.pieces.get(t.id) : undefined;
+    const gift = this.give.frame(dt, free, bed && PIECES[bed.k].sleep && bed.by === this.me ? { b: t!.base.id, p: t!.id } : null);
+    const door = lock ?? (gift ? `${said ?? `<b>${PIECES[bed!.k].name}</b>`} ${gift}` : said) ?? this.doors.frame(free, t) ?? this.boxes.frame(free, t) ?? this.h.use?.(free, t) ?? null;
     if (door && !plan && !hammer) this.prompt = door;
     this.torches.update(dt, ok && !this.wheel.isOpen);
     const ladder = this.ladders.frame(dt, ok && !this.wheel.isOpen);

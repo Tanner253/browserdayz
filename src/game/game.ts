@@ -789,6 +789,7 @@ export class Game {
         return '<kbd>F</kbd>Research';
       },
       name: () => playerName(),
+      mates: () => (this.online ? this.party.members.flatMap((m) => (m.id !== null && m.id !== this.net.id ? [{ id: m.id, name: m.name }] : [])) : []),
       keys: () => [...this.inv.everything().values()].filter((it) => it.id === 'key' && it.key).map((it) => it.key!),
       panel: (open) => {
         // (as the shop's: the mouse let go while it is up, taken again when it is put away)

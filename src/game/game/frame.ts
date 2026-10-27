@@ -94,8 +94,9 @@ export const frameMethods = {
         this.invUI.refresh(near, this.openStash);
       }
     }
-    // (looking at an empty crate of your own, G packs it up instead: see updateInteraction)
-    const gFree = playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep);
+    // (looking at an empty crate of your own, G packs it up instead: see updateInteraction; at a bed of your own with
+    // somebody in your party on, G gives it to them: src/game/building/give.ts)
+    const gFree = playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep) && !this.build.give.wantsG;
     if (this.br || this.arenaHud) {
       // (the battle royale and the arena: G held a third of a second drops what is in the hands, as it always did there)
       if (gFree && input.held('KeyG')) {
