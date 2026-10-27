@@ -41,7 +41,10 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
   4. Party: owner said yes to map/compass marks for members, names over their heads, a size cap (PARTY_MAX 6 exists);
      party dots in the world and a list exist (src/game/party.ts). Ask before turning friendly fire off.
   5. Multi-language UI + automatic chat translation: plan first with costs (a paid translation service and key in Vercel).
-  6. Still open from before: the bear ("nonfunctional", no detail), gates on slopes, meat models, forge On/Off.
+  6. Hold to keep chopping (and mining): the owner, "hold trigger to keep chopping instead of having to click". The guide
+     says holding the left button swings until the tree falls; check the melee hold repeat for axes and the pickaxe, and
+     the controller's trigger (src/core/gamepad.ts hold('Mouse0')).
+  7. Still open from before: the bear ("nonfunctional", no detail), gates on slopes, meat models, forge On/Off.
 - **LIVE 2026-10-27 ~02:38 UTC**: site, server and `main` from `47036b92` (PROTOCOL 74, boot
   2c3e4a1f6ef42ca4; 857 characters and 123 stashes kept), `site-live` and `hotfix` there too, battle-royale the same.
   Since 2026-10-25 everything the side paths built is merged and live: base building (blueprints, deployables placed
