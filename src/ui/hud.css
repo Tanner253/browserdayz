@@ -854,6 +854,8 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .inv-ground-row .inv-item.mini { background: rgba(233, 228, 216, 0.075); border-radius: 3px; }
 .inv-item .qbar { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 2px; background: rgba(0, 0, 0, 0.6); pointer-events: none; }
 .inv-item .qbar i { display: block; height: 100%; background: #c9b27c; }
+.inv-item .fbar { position: absolute; left: 3px; right: 3px; top: 2px; height: 3px; background: rgba(0, 0, 0, 0.6); pointer-events: none; }
+.inv-item .fbar i { display: block; height: 100%; }
 .inv-item.cat-drink .qbar i { background: #6fb6e6; }
 .inv-item.cat-ammo .qbar i { background: #b98c55; }
 .inv-item.cat-medical .qbar i { background: #c4523d; }

@@ -257,7 +257,9 @@ export const HEAT = {
 /** meat, of whatever animal (src/sim/items/hunt.ts) */
 // (raw, it does harm: "the raw meat says to the user that it gives them + energy and stuff when it should be -food and
 // -water and -hp", the owner, 2026-10-24. It took a quarter of the food and gave half again the water before.)
-const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: -0.25, water: -0.25, health: -10, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 2400, done: 10800 } };
+// (raw an hour, cooked a day: the owner, 2026-10-26, "cooked meat spoils too fast, it should last long time". It was forty
+// minutes and three hours)
+const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: -0.25, water: -0.25, health: -10, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 3600, done: 86400 } };
 /** what anything rotten is worth: little, and it makes you ill */
 export const ROTTEN: Worth = { energy: 0.2, water: 0, health: -15, sick: 1 };
 
@@ -317,6 +319,13 @@ export function rotten(item: ItemInstance, now: number): boolean {
   const k = own(COOKS, item.id)?.keeps, made = (item as Food).made;
   if (!k || !num(made)) return false;
   return now - made > (stageOf(item) === 'raw' ? k.raw : k.done);
+}
+
+/** how much of its keeping time is left, 1 just got to 0 gone off (null: it does not go off): DayZ's bar on a food (the owner, 2026-10-26, "it should have a hp bar like dayz to show how good it is before it goes rotten") */
+export function freshness(item: ItemInstance, now: number): number | null {
+  const k = own(COOKS, item.id)?.keeps, made = (item as Food).made;
+  if (!k || !num(made)) return null;
+  return Math.max(0, Math.min(1, 1 - (now - made) / (stageOf(item) === 'raw' ? k.raw : k.done)));
 }
 
 // (what goes off says what stage it is at in its name, wherever it is shown)

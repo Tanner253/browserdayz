@@ -40,6 +40,7 @@ import { KEY, does, kindOf, rows, type Action, type Deed, type Row, type Stat } 
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
+import { freshness } from '../sim/cooking';
 
 const CELL = 46;
 /** whether what is worn is shown under the guns, kept in this browser (see `gearOpen`) */
@@ -865,6 +866,9 @@ export class InventoryUI {
     // how full it is, as a line along its foot: a stack, a bottle, what is loaded in a gun
     const fill = d.stack ? item.qty / d.stack : d.use?.sips ? (item.left ?? d.use.sips) / d.use.sips : d.weapon ? (item.loaded ?? 0) / Math.max(1, d.weapon.mag ? magRoom(item) : capacityOf(item)) : d.mag ? (item.rounds ?? 0) / d.mag.capacity : -1;
     if (fill >= 0) t.push(`<span class="qbar${fill <= 0 ? ' none' : ''}"><i style="width:${Math.round(Math.min(1, fill) * 100)}%"></i></span>`);
+    // how fresh a food that goes off is, as a line along its top: green, then yellow, then red as it nears rotten
+    const fresh = freshness(item, Date.now() / 1000);
+    if (fresh !== null) t.push(`<span class="fbar" title="${Math.round(fresh * 100)}% fresh"><i style="width:${Math.round(fresh * 100)}%;background:${fresh > 0.5 ? '#6fbf5a' : fresh > 0.2 ? '#d9b44a' : '#c8553d'}"></i></span>`);
     // somebody else's dog tag, carried: time left until it is cashed in
     if (this.counting(item)) {
       this.clocks.set(item.uid, item);
