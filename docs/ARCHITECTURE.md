@@ -61,8 +61,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `forge.ts` | 52 | The server: forges (2026-10-25, plan-crafting; the rules are src/sim/craft/forge.ts). |
 | `gate.ts` | 774 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 143 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 1093 | The server: handle, every message a player sends, checked and acted on. |
-| `index.ts` | 1378 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
+| `handle.ts` | 1104 | The server: handle, every message a player sends, checked and acted on. |
+| `index.ts` | 1382 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 815 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `learn.ts` | 101 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
 | `locks.ts` | 147 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
@@ -70,7 +70,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
 | `plates.ts` | 121 | A store finish put on one gun (2026-10-22), Rust's way. |
-| `players.ts` | 509 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
+| `players.ts` | 511 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `queue.ts` | 149 | The server: the line to get in when it is full, and the leaderboard. |
 | `raid.ts` | 162 | The server: raiding (base building's fifth step; the rules are src/sim/build/raid.ts). |
 | `recycle.ts` | 61 | The server: recyclers (progression v3; the rules are src/sim/craft/recyclers.ts). |
@@ -80,7 +80,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `searched.ts` | 220 | Crates, bodies, stashes, drops, furniture and bags lying about, gone through by several at once (2026-10-23, the owner's list: the "Opening…" wait and "Someone else is searching that"; "We should not have cut any... |
 | `seen.ts` | 40 | Who has played lately, for the door's "N played today" (the owner, offered a true number in place of fake players to fill the count: |
 | `sight.ts` | 27 | Where everybody is, told only to those who could see them (the owner, 2026-10-27: |
-| `solid.ts` | 134 | A base's pieces as solid as the game has them, where the server judges (2026-10-24). |
+| `solid.ts` | 135 | A base's pieces as solid as the game has them, where the server judges (2026-10-24). |
 | `stash-guard.ts` | 49 | The players' stashes against what this release changed on the map (2026-10-23, the owner: |
 | `stash-list.ts` | 19 | Where every stash kept on the map lies, told to the owner alone by /stashes (server/admin.ts), so that a release that changes the map can be checked against them first (scripts/stash-guard.ts; the owner, 2026-10-23: |
 | `stash-sight.ts` | 50 | A buried stash is told to a player only once they come near it (the owner, 2026-10-23: |
@@ -88,6 +88,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `store-admin.ts` | 54 | An admin's orders to the store's book (2026-10-22), from the STORE tab of their panel (src/ui/admin-store.ts): passed to the site, which keeps the book (api/store.ts), proved as the admin lists are (api/admin.ts):... |
 | `tags.ts` | 274 | The server: cashed-in dog tags, who looted whose, and what a tag must have lived through to pay. |
 | `throws.ts` | 65 | A thing thrown from somebody's hands, as the server believes it (src/sim/throw.ts has the throw itself): told as it leaves the hand ('toss': from where, how fast, at what power), and believed where its game then says... |
+| `walls.ts` | 99 | The map's own walls, floors and rocks on the server (the owner, 2026-10-27: |
 | `west-cars.ts` | 47 | The west's car places (JEEP.refill): which stand a new car this second, and how long one of theirs may stand idle away from home. |
 | `world.ts` | 240 | The server builds the same world the clients do, from the same code and seed, so loot points, crates, doors and spawn points line up exactly without sending the map. |
 | `worn.ts` | 28 | Whether a player's own dog tag is round their neck, one a killer could take: what every game is told of each player, so that the tag is drawn on them only then (src/game/worn-tag.ts). |
@@ -468,6 +469,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `vehicles.ts` | 387 | Jeeps. A handful stand along the road and a few more out at the edge of the map, behind the outlying places; anybody can get in one and drive it, three more can ride, and it can be shot until it burns. It is the fast... |
 | `voice.ts` | 29 | Talking to whoever is near (src/game/voice.ts): what the server and the game both go by. |
 | `walkways.ts` | 44 | Walkways of boards on posts, from the pier kit (Poly Haven's modular wooden pier, src/world: pier_kit): a fishing village's piers, a swamp's boardwalks (2026-10-16). |
+| `walls-print.ts` | 11 | A print of the map's buildings: the server's walls (server/solids.bin.gz, scripts/solid-bake.mjs) carry the print of the map they were baked from, and the server holds it against its own. |
 | `watchtowers.ts` | 59 | Watchtowers: Pokrov's bell tower stood alone about the map (the owner, 2026-10-19, of the tower north of its church: "the watch tower we have in pokrov is super cool we should add those around the map i will put... |
 | `water.ts` | 262 | Lakes and rivers, as rules: where the water is, how deep, which way it runs, and what it does to whoever walks into it. |
 | `wells.ts` | 111 | Wells, and what hunger and thirst do before they kill. |
@@ -659,7 +661,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `posts.ts` | 61 | The army's field posts by the western roads (src/sim/posts.ts): each the pillbox model ("WW2 Field Bunker"), drawn and made solid triangle for triangle, as the one over Bunker 17's stair is (src/world/bunker.ts), on... |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
 | `rock-blend.ts` | 219 | Rock that meets the ground without a seam (the owner, 2026-10-16: |
-| `rock-field.ts` | 335 | A field of scanned rocks, drawn and made solid: the pass's walls and cave mouths (src/world/caves.ts) and the canyon country's outcrops (src/world/outcrops.ts). |
+| `rock-field.ts` | 344 | A field of scanned rocks, drawn and made solid: the pass's walls and cave mouths (src/world/caves.ts) and the canyon country's outcrops (src/world/outcrops.ts). |
 | `ruins-shape.ts` | 554 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
 | `ruins.ts` | 267 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |

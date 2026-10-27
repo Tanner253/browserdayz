@@ -20,7 +20,20 @@ covers it, nothing more.
 - Small fix still owed there: a remote coming back from `away` within 12 m of where it was last is walked over, not
   set down (`Remote.update`'s `tele` test). On the way back (`push` with `this.away`), set `this.pos` to the new pose.
 
-## 1. What the server knows of the world today
+## 0b. Phases 1 and 2 built (2026-10-27, on battle-royale, NOT deployed)
+- The walls: `scripts/solid-bake.mjs` (page side `scripts/solid-bake.page.js`) bakes every fixed solid of the game
+  (35,920 pieces; trees, doors, glass, the ground and owned things left out) to `server/solids.bin.gz` (6.2 MB):
+  every mesh brought to within 5 cm, every hull as faces (Rapier keeps hulls at many times the cost). `server/walls.ts`
+  reads it at start (1.5-4 s, +127 to 240 MB; the local server 545 MB in all), `roundClear` / `sightClear` at ~2.5 µs a
+  line. Its print (`src/sim/walls-print.ts`) must match the server's map, or it starts without walls and says why in
+  its log. RE-BAKE after any building, rock or prop change (CLAUDE.md's deploy list says so).
+- The shots: `case 'hit'` refuses a round whose every line (three eyes, five aims, as `walled`) to the target, where
+  they are or anywhere in their last 400 ms (`c.trail`), meets a map wall; flagged (`[check:...] shot X through a
+  wall`). Melee is not judged. `test/walls.test.ts`.
+- What the plan's Phase 1 says below about doors from the server's door list is not done: doors are left out (a shot
+  through a shut metal door is let through).
+
+## 1. What the server knew of the world before
 - The ground: `world.heights` / `heightAt`, and `hillBetween` (`server/checks.ts:286`): a round through a hill is refused.
 - Player bases: `server/solid.ts` (`BaseSolids`, shapes in `src/sim/build/solid.ts`): `walled` (shots), `blastWalled`
   (grenades, drums), `stepWalled` (moves, `server/handle.ts:109`), `wakeClear` (logging in inside a wall).
@@ -50,7 +63,7 @@ covers it, nothing more.
    cylinder; convex points; trimesh vertices + indices), translation, rotation, and its tag (surface, thin, glass).
    Leave out: the heightfield (the server has `heightAt`), players, hitboxes, items, vehicles, doors, base pieces.
 2. Store a shape table plus placements (one building model placed forty times is one trimesh and forty transforms),
-   gzipped, at `server/data/solids.bin.gz`, committed (Render builds from git). Its header carries a print of what
+   gzipped, at `server/solids.bin.gz`, committed (Render builds from git). Its header carries a print of what
    it was made from (the world's fingerprint, `scripts/split/fingerprint.ts`, and a hash of
    `public/assets/manifest.json`). `test/solids.test.ts` fails when the file is behind; re-bake after any map or
    model change (add it to CLAUDE.md's traps once it exists).

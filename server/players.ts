@@ -45,6 +45,8 @@ export interface Client {
   perkKey?: string;
   /** whether everybody was last told their own tag is round their neck (server/worn.ts) */
   tagWorn?: boolean;
+  /** where they were over the last moments, the latest last: a round is judged against these as well (server/walls.ts) */
+  trail?: { t: number; p: Pose }[];
   /** whom they were last told the whereabouts of (server/sight.ts) */
   told?: Set<number>;
   name: string;

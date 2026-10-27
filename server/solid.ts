@@ -26,14 +26,15 @@ export const zoneAt = (p: Pose, zone: string): Vec3 => [p[0], p[1] + (p[5] & F_P
 /**
  * Whether a base stands between a shooter and where their round is said to have struck: every line from their eye
  * (and a lean's width to either side) to that place (and a hand round it) goes through a wall, a floor, a shut door.
- * A wall's edge peeked round is let go; a round through the middle of one is not.
+ * A wall's edge peeked round is let go; a round through the middle of one is not. `clear` is what is traced through:
+ * a base's pieces, or the map's own walls (server/walls.ts roundClear).
  */
-export function walled(from: Pose, at: Vec3) {
+export function walled(from: Pose, at: Vec3, clear: (a: Vec3, b: Vec3) => boolean = (a, b) => solid.clear(a, b)) {
   const eye: Vec3 = [from[0], from[1] + eyeOver(from[5]), from[2]];
   const dx = at[0] - eye[0], dz = at[2] - eye[2], l = Math.hypot(dx, dz) || 1, sx = -dz / l, sz = dx / l;
   const eyes: Vec3[] = [eye, [eye[0] + sx * 0.4, eye[1], eye[2] + sz * 0.4], [eye[0] - sx * 0.4, eye[1], eye[2] - sz * 0.4]];
   const aims: Vec3[] = [at, [at[0] + sx * 0.3, at[1], at[2] + sz * 0.3], [at[0] - sx * 0.3, at[1], at[2] - sz * 0.3], [at[0], at[1] + 0.3, at[2]], [at[0], at[1] - 0.3, at[2]]];
-  for (const e of eyes) for (const a of aims) if (solid.clear(e, a)) return false;
+  for (const e of eyes) for (const a of aims) if (clear(e, a)) return false;
   return true;
 }
 

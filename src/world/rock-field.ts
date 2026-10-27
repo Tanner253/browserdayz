@@ -95,6 +95,15 @@ export class RockField {
   ) {
     this.o = { near: 70, smallReach: 160, seen: 70, solid: 60, ...o };
     this.group.name = o.name;
+    RockField.made.push(this);
+  }
+
+  /** every field made: the server's walls are baked from them all (scripts/solid-bake.mjs) */
+  static made: RockField[] = [];
+
+  /** every piece made solid at once, wherever the eye is: for the server's walls (scripts/solid-bake.mjs), never in play */
+  solidAll() {
+    for (const p of this.pieces) if (!this.solidNow.has(p)) this.solidify(p);
   }
 
   async build(o: { solid?: boolean } = {}) {

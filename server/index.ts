@@ -39,6 +39,8 @@ import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
 import { broadcast, cleanName, clients, join, num, perksChanged, records, round2, send, type Client } from './players';
 import { inSight } from './sight';
+import { loadWalls } from './walls';
+import { wallsPrint } from '../src/sim/walls-print';
 import { partyMates } from './party';
 import { perks } from './perks';
 import { tagsWorn } from './worn';
@@ -119,6 +121,8 @@ log('generating world…');
 const t0 = Date.now();
 
 export const world = buildWorldData(ROOT);
+// (the map's own walls, read while the rest starts: until they are in, a round is stopped by the ground and bases alone)
+void loadWalls(path.join(ROOT, 'server/solids.bin.gz'), wallsPrint(world.buildings), log);
 
 /** this server's print of its places for things, held against each game's as it comes in (see lootPrint) */
 export const LOOT_PRINT = lootPrint(world.lootPoints);

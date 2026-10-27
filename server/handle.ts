@@ -60,6 +60,7 @@ import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
+import { roundClear } from './walls';
 import { knock, swing } from './doors';
 import { giveBed, tellBeds, wakeAt } from './beds';
 import { code as lockCode, cutKey, fit as fitLock, lockLets, onOff as lockOnOff, unfit as unfitLock } from './locks';
@@ -113,6 +114,9 @@ export function handle(c: Client, m: C2S) {
       if (c.pose === m.p && stepWalled(c, was, m.p)) c.pose = [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       // (where they look, kept a moment for the aim's own checks: see aimwatch.ts)
       looked(c, m.p[3], m.p[4]);
+      // (and where they were, a moment back: a round fired at what its shooter saw is not refused by where they are now, see 'hit')
+      (c.trail ??= []).push({ t: Date.now(), p: c.pose });
+      if (c.trail.length > TRAIL.most) c.trail.shift();
       // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
       if (!c.alive) c.pose[5] |= F_DEAD;
       zoneCheck(c);
@@ -327,6 +331,10 @@ export function handle(c: Client, m: C2S) {
         if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
         // (nor through a base's wall, floor or shut door, nor struck through one: server/solid.ts)
         if (walled(c.pose, zoneAt(target.pose, m.zone))) return void log(`${c.name} hit ${target.name} through a base: not let through`);
+        // (nor through the map's own walls, floors and rocks, as the game has them: server/walls.ts. Refused whatever the
+        // checks' mode, the owner, 2026-10-27: "people complain being shot through walls"; flagged, to be seen. The
+        // shooter saw them where they were a moment ago: clear to any of the last TRAIL.ms of them is clear.)
+        if (!rule.melee && [target.pose, ...(target.trail ?? []).filter((q) => now - q.t < TRAIL.ms).map((q) => q.p)].every((p) => walled(c.pose, zoneAt(p, m.zone), roundClear))) return void flag(c, `shot ${target.name} through a wall at ${Math.round(d)} m`);
         c.lastHit = now;
         // (what the round left in the bodies it went through first: see PIERCE)
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
@@ -1085,6 +1093,9 @@ export function handle(c: Client, m: C2S) {
       return void baited(c, String(m.what));
   }
 }
+
+/** how far back a target's places are kept to judge a round by, ms, and the most kept (their game says where it is some 15 times a second) */
+const TRAIL = { ms: 400, most: 8 };
 
 /** economy time of the last call answered on a field radio */
 let lastCall = -1e9;
