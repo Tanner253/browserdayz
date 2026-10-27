@@ -319,7 +319,10 @@ export class Beast implements Damageable {
     const w = this.host.world(), k = this.kind;
     const fx = -Math.sin(this.yaw) * k.len * 0.45, fz = -Math.cos(this.yaw) * k.len * 0.45;
     const hf = heightAt(w.heights, this.x + fx, this.z + fz), hb = heightAt(w.heights, this.x - fx, this.z - fz);
-    const y = Math.min(hf, hb, heightAt(w.heights, this.x, this.z)) + 0.02;
+    // (at its middle's height, or its ends' between them where that is higher, and turned to the slope about it: set at the
+    // lowest of the three and turned, half the slope's rise was under the ground, its legs in the hill. The owner,
+    // 2026-10-26: "some of the animal spawns are bugged into the map")
+    const y = Math.max(heightAt(w.heights, this.x, this.z), (hf + hb) / 2) + 0.02;
     this.root.position.set(this.x, y, this.z);
     this.root.rotation.set(Math.atan2(hf - hb, k.len * 0.9), this.yaw, 0);
     // (its body moved only when it has moved: forty still bodies set where they were every frame were work for nothing)
