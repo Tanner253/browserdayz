@@ -52,19 +52,24 @@ const _cut = new THREE.Matrix4(), _cutS = new THREE.Matrix4();
 /** (put off in the sandbox, to show the walls as they were: `&trim=0`) */
 export const WALL_TRIM = { on: true };
 function trimmed(frame: THREE.Matrix4, b: Base, p: Piece) {
-  if (!WALL_TRIM.on || PIECES[p.k].role !== 'wall' || !triOf(b, p)) return frame;
-  const a = (p.r * Math.PI) / 6, ux = Math.cos(a), uz = -Math.sin(a), cut = [0, 0];
+  if (!WALL_TRIM.on || PIECES[p.k].role !== 'wall') return frame;
+  const tri = triOf(b, p), a = (p.r * Math.PI) / 6, ux = Math.cos(a), uz = -Math.sin(a), cut = [0, 0];
   [-1, 1].forEach((side, i) => {
     const [cx, , cz] = inBase(p, [(side * CELL) / 2, 0, 0]);
     for (const q of b.pieces.values()) {
-      if (q === p || PIECES[q.k].role !== 'wall' || Math.abs(q.y - p.y) > 0.05 || triOf(b, q)) continue;
-      const qa = (q.r * Math.PI) / 6, along = Math.abs(ux * Math.cos(qa) - uz * Math.sin(qa));
-      // (one at a right angle closes the corner with it, as a square's do)
-      if (along < 0.2) continue;
-      if ([-1, 1].some((qs) => {
+      if (q === p || PIECES[q.k].role !== 'wall' || Math.abs(q.y - p.y) > 0.05) continue;
+      if (![-1, 1].some((qs) => {
         const [ex, , ez] = inBase(q, [(qs * CELL) / 2, 0, 0]);
         return Math.hypot(ex - cx, ez - cz) < 0.06;
-      })) cut[i] = WALL_T / 2;
+      })) continue;
+      const qa = (q.r * Math.PI) / 6, along = Math.abs(ux * Math.cos(qa) - uz * Math.sin(qa));
+      // (one going on in a line: each ends at the corner, butted, neither reaching into the other, whose faces lay in one
+      // place and flickered, a window wall's beside a wall's most of all: the owner, 2026-10-26, "z index arguing when a
+      // window wall is next to a regular wall, in the seam")
+      if (along > 0.95) cut[i] = WALL_T / 2;
+      // (one at a right angle closes the corner with it, as a square's do; one at a slant on a square, meeting a
+      // triangle's, is met only to the corner)
+      else if (tri && along >= 0.2 && !triOf(b, q)) cut[i] = WALL_T / 2;
     }
   });
   if (!cut[0] && !cut[1]) return frame;
