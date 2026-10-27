@@ -184,7 +184,7 @@ ok('a piece taken away takes what stood only on it; what rests on more than one 
   assert.equal(bs.bases.size, 0);
 });
 
-ok('on a slope: posts reach 2.5 m down, the ground never through a foundation', () => {
+ok('on a slope: posts reach a storey and a half down, the ground never through a foundation', () => {
   // (ground falling away to the east: a metre every 6 m)
   const slope: Land = { ground: (x) => 10 - x / 6, why: () => null };
   const bs = new Bases(slope), b = start(bs);
@@ -198,10 +198,15 @@ ok('on a slope: posts reach 2.5 m down, the ground never through a foundation', 
     }
     bs.lay({ b: b.id, k: 'foundation', ...s }, ME, 0);
   }
-  assert.equal(laid, 5, `${laid} foundations down the slope`);
-  // up the slope the ground comes into the first
+  // (each 0.5 m further over the ground than the one before, from 0.75: 4.5 m of slab and skirt reach seven past the first)
+  assert.equal(laid, 8, `${laid} foundations down the slope`);
+  // up the slope the ground comes into the next a quarter of a metre at its corner, which is let be (FOUND.rise); into the
+  // one after it three quarters, which is not
   const up = nearestSpot(spots(b, 'foundation'), 'foundation', { x: -3, y: 0, z: 0 }, 1)!;
-  assert.match(blocked(b, 'foundation', up, bs.groundIn(b)) ?? '', /ground is in the way/);
+  assert.equal(blocked(b, 'foundation', up, bs.groundIn(b)), null, 'a little ground in a corner is let be');
+  bs.lay({ b: b.id, k: 'foundation', ...up }, ME, 0);
+  const up2 = nearestSpot(spots(b, 'foundation'), 'foundation', { x: -6, y: 0, z: 0 }, 1)!;
+  assert.match(blocked(b, 'foundation', up2, bs.groundIn(b)) ?? '', /ground is in the way/);
 });
 
 ok('not in a town; not on a tree; a new base not beside another', () => {

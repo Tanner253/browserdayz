@@ -12,14 +12,18 @@ export const STOREY = 3;
 /**
  * A foundation: how far it stands above its highest ground, how deep its slab is, and how far its skirt reaches below
  * the slab into the ground (as Rust's does: the navigator, 2026-10-24, of one standing over a slope, "no foundation
- * ever shows a gap under it"). It may be laid no higher over its lowest ground than slab and skirt reach.
+ * ever shows a gap under it"). It may be laid no higher over its lowest ground than slab and skirt reach: a storey and a
+ * half (the owner, 2026-10-26: "they should extend to the ground up to 1.5 stories, so that players can build on uneven
+ * ground"; it was 3.1 m). And the ground may come `rise` up into it at a corner.
  */
-export const FOUND = { lift: 0.25, deep: 0.6, skirt: 2.5 };
+export const FOUND = { lift: 0.25, deep: 0.6, skirt: 3.9, rise: 0.3 };
 /**
  * A high wall's or a gate's footing: how far its logs, its stone and its posts reach down into the ground, so that one
- * stood on a slope meets the ground at both ends; and how far over its foot the ground may rise.
+ * stood on a slope meets the ground at both ends; and how far over its foot the ground may rise. Three metres down since
+ * 2026-10-26 (the owner: "when building gates the ground is too low but the gate should shift to meet and be flush with the
+ * ground's surface"; it was 1.5).
  */
-export const FREE = { skirt: 1.5, rise: 0.6 };
+export const FREE = { skirt: 3, rise: 0.6 };
 /** a floor's thickness, under the level it makes */
 export const FLOOR_T = 0.2;
 export const WALL_T = 0.2;

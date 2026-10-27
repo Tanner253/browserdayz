@@ -472,7 +472,7 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
   if (ground && (K.ground || K.role === 'free')) {
     const pts = K.ground ? [...cornersOf(K.shape!, s.x, s.z, s.r), [s.x, s.z] as [number, number]] : [[s.x, s.z] as [number, number]];
     const hs = pts.map(([x, z]) => ground(x, z));
-    if (K.ground && Math.max(...hs) > s.y + 0.05) return 'The ground is in the way';
+    if (K.ground && Math.max(...hs) > s.y + FOUND.rise) return 'The ground is in the way';
     if (K.ground && Math.min(...hs) < s.y - FOUND.skirt - FOUND.deep) return 'Too high off the ground';
     // (a high wall or a gate: the ground at both its ends within its footing, below, and not over its foot)
     if (K.role === 'free') {
