@@ -26,6 +26,10 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
+- **ASKED 2026-10-27**: admins see every chat (others' Party and Proximity lines too), switched on and off in the admin
+  panel. The owner hoped it was a page-only change, but the server sends party and proximity lines only to their own
+  listeners, so the server has to copy them to admins who switched it on (server/handle.ts chat; a per-admin switch
+  like the other powers), and the page shows them marked.
 - **NEXT CHAT, START HERE (2026-10-27 ~09:50 UTC)**: live is `a195ca18` (PROTOCOL 74, boot dcd010cf9b3d3b5c; every knife
   skins, sharp tools cut clothes into rags incl. survivors' clothes, forge charcoal kept until room, meat 3 h / 3 days).
   On battle-royale, NOT deployed (all type-checked; the owner to test on 5173 + zona-server-local, then deploy the
