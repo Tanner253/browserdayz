@@ -26,7 +26,23 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
-- **LIVE 2026-10-27 ~02:38 UTC (newest; read this first)**: site, server and `main` from `47036b92` (PROTOCOL 74, boot
+- **NEXT CHAT, START HERE (2026-10-27 ~09:50 UTC)**: live is `a195ca18` (PROTOCOL 74, boot dcd010cf9b3d3b5c; every knife
+  skins, sharp tools cut clothes into rags incl. survivors' clothes, forge charcoal kept until room, meat 3 h / 3 days).
+  On battle-royale, NOT deployed: party chat (96d78ef5, a 'party' ChatChannel, Tab in the chat box), the server half of
+  giving a bed/bag to a party member (aaa3984e, 'bgive' in server/beds.ts giveBed). Open, in the owner's order:
+  1. LIVE CONNECTION DROPS: players kicked to the bot check (captcha), killed when flying a heli, back to the menu and
+     reconnecting. The server did NOT restart (uptime matched the deploy), so it is the socket closing: read Render's
+     logs for closes/kicks (the Render MCP needs the owner to confirm the workspace first: list_workspaces, then ask),
+     and look at the 12 s silence watchdog (live-drops-2026-10-20 note), the bot check on rejoin, and heli flight load.
+  2. RECYCLER DUPLICATION (owner report, no steps yet: ask them how). server/recycle.ts and recycleStep look atomic; the
+     page runs no recycler online; suspect item moves into/out of the recycler's box ('recy:i') while it ticks.
+  3. Bed/bag give: the game's prompt (src/game/building/index.ts: look at one's own bed/bag, tap G to pick a party member,
+     hold G to give; a host `mates()` from this.party.members), then deploy with party chat.
+  4. Party: owner said yes to map/compass marks for members, names over their heads, a size cap (PARTY_MAX 6 exists);
+     party dots in the world and a list exist (src/game/party.ts). Ask before turning friendly fire off.
+  5. Multi-language UI + automatic chat translation: plan first with costs (a paid translation service and key in Vercel).
+  6. Still open from before: the bear ("nonfunctional", no detail), gates on slopes, meat models, forge On/Off.
+- **LIVE 2026-10-27 ~02:38 UTC**: site, server and `main` from `47036b92` (PROTOCOL 74, boot
   2c3e4a1f6ef42ca4; 857 characters and 123 stashes kept), `site-live` and `hotfix` there too, battle-royale the same.
   Since 2026-10-25 everything the side paths built is merged and live: base building (blueprints, deployables placed
   freely by hand, F held picks them up, doors and locks as items, code locks made + key copies, code sounds and shock,
