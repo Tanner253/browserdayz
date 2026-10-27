@@ -70,8 +70,8 @@ covers it, nothing more.
    Stop at the first clear line. Seen stays seen 500 ms (`seenUntil` per pair). Check near pairs every tick, far
    ones (over 300 m) every third. A hard limit of rays per tick: whatever is not checked in time counts as SEEN (fail
    open: nobody pops in late, and a cheater is never worse off than today).
-2. Footsteps (on the card as the owner's call; they said yes to the card, so as drawn): someone behind a wall
-   within 30 m who is running (not walking, not crouched) is still sent, as their steps are heard.
+2. No footsteps rule (the owner, 2026-10-27, of the card's "running within ~30 m is still sent": "leave out the
+   footsteps thing"): nobody behind a wall is sent, running or not, however near.
 3. Other places positions leak, closed in the same phase:
    - `info()` in `server/players.ts` (~205) puts everybody's `pose` in the welcome and in 'join': send it only for
      those in sight; the page makes the others `away` until their first row.
