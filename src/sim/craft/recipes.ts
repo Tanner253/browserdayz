@@ -68,7 +68,7 @@ export const RAGS: Readonly<Record<string, number>> = {
   beanie: 1, ushanka: 2, beret: 1, boonie_hat: 2, balaclava: 1, fingerless_gloves: 1, work_gloves: 1,
 };
 /** what cuts clothes: a blade, or anything with an edge (the owner: "a knife or sharp object") */
-export const BLADES = ['knife', 'bone_knife', 'machete', 'hatchet', 'stone_hatchet'] as const;
+export const BLADES = ['knife', 'hunting_knife', 'bayonet', 'karambit', 'bone_knife', 'machete', 'hatchet', 'stone_hatchet', 'felling_axe', 'hand_saw'] as const;
 /** powder out of ten rounds of each kind: a rifle round has more in it than a pistol's (the plan; a satchel is ten, a hundred rounds) */
 export const POWDER: Readonly<Record<string, number>> = {
   ammo_9mm: 1, ammo_45: 1, ammo_12: 1, ammo_50: 2,

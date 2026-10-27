@@ -39,5 +39,6 @@ export function bandagesFrom(it: ItemInstance): number {
 }
 
 /** whether it can be cut up: a piece of clothing with nothing in it, and a blade carried to do it with */
-export const BLADES = ['knife', 'machete', 'hatchet'];
+// (every sharp thing, the owner, 2026-10-27: "ensure all sharp objects can cut clothing like hatchet and machete etc")
+export const BLADES = ['knife', 'hunting_knife', 'bayonet', 'karambit', 'bone_knife', 'machete', 'hatchet', 'stone_hatchet', 'felling_axe', 'hand_saw'];
 export const cuttable = (it: ItemInstance) => ITEMS[it.id]?.category === 'clothing' && !!ITEMS[it.id]?.dress && !it.cargo?.length;

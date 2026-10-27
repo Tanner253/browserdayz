@@ -312,7 +312,9 @@ export function smellReach(kind: Kind, ax: number, az: number, px: number, pz: n
  * The blades that gut and skin, and what share of what is there each gets (Rust: a better blade, more). Nothing
  * else will do it (DayZ). The combat knife is the bayonet-knife.
  */
-export const BLADES: Record<string, number> = { knife: 1, machete: 0.85, hatchet: 0.75 };
+// (every knife, the axes and the machete: the hunting knife would not skin, the owner, 2026-10-27, "hunting knife won't
+// work to process dead animal")
+export const BLADES: Record<string, number> = { knife: 1, hunting_knife: 1, bayonet: 0.95, karambit: 0.9, bone_knife: 0.85, machete: 0.85, hatchet: 0.75, stone_hatchet: 0.65, felling_axe: 0.6 };
 
 /**
  * what a body gives to a blade: [item, how many] for each thing it gives at all. One a wolf pack has eaten gives less
