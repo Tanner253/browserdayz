@@ -112,7 +112,7 @@ export interface RangeLayout { flip: boolean; shift: number[]; mover: number; ci
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
-export type ChatChannel = 'global' | 'near' | 'staff';
+export type ChatChannel = 'global' | 'near' | 'staff' | 'party';
 /** how far proximity chat carries, metres */
 export const CHAT_RANGE = 50;
 

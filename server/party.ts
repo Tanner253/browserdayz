@@ -26,6 +26,12 @@ const online = (key: string) => {
   return null;
 };
 
+/** the members of somebody's party who are on the server, themselves among them (none: in no party) */
+export function partyMates(c: Client): Client[] {
+  const pid = partyOf.get(c.key), keys = pid === undefined ? undefined : parties.get(pid);
+  return keys ? keys.map(online).filter((o): o is Client => !!o) : [];
+}
+
 /** every member on the server told who is in their party; and, said, one who has left it told that they are in none */
 function tell(pid: number | undefined, left?: Client) {
   if (left) send(left, { t: 'party', members: [] });

@@ -40,7 +40,7 @@ import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, pidOf, releaseLoc
 import { cameTo, holdsTag, keepToTheirs, payingTags, wentFrom } from './custody';
 import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, reclaimBody, refusedNow, shutIt } from './searched';
 import { scores } from './queue';
-import { partyAct, partyCommand } from './party';
+import { partyAct, partyCommand, partyMates } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { pinned } from './pinned';
@@ -765,6 +765,14 @@ export function handle(c: Client, m: C2S) {
         if (!roleOf(c)) return;
         const out: S2C = { t: 'chat', ch: 'staff', from: c.name, text, role: roleOf(c) ?? undefined, ...(worn && worn !== 'off' ? { tint: worn } : {}), ...crown };
         for (const o of clients.values()) if (roleOf(o)) send(o, out);
+        return;
+      }
+      if (m.ch === 'party') {
+        // the party's: its members wherever they are, and nobody else (the owner, 2026-10-27, "a team/party chat")
+        const mates = partyMates(c);
+        if (!mates.length) return void sys(c, 'You are in no party: look at somebody and press F to ask them into one.');
+        const out: S2C = { t: 'chat', ch: 'party', from: c.name, text, ...badge };
+        for (const o of mates) send(o, out);
         return;
       }
       if (m.ch === 'near') {

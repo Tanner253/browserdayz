@@ -60,8 +60,9 @@ const MIX_ROWS: Record<Group, [name: string, turns: string]> = {
   vehicles: ['Vehicles', 'Jeeps and helicopters'],
 };
 
-const CHANNELS: ChatChannel[] = ['global', 'near'];
-const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', staff: 'Staff', system: '', pm: 'To you' };
+// (and the party's, to its members wherever they are: the owner, 2026-10-27, "as well as a team/party chat")
+const CHANNELS: ChatChannel[] = ['global', 'near', 'party'];
+const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', staff: 'Staff', party: 'Party', system: '', pm: 'To you' };
 
 /** A mark on the menu's map: where it is in the world, what it is called, and what is said of it when it is pointed at. */
 export interface MenuSpot {

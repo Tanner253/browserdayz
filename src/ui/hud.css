@@ -468,6 +468,10 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .chat-ch { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 .chat-ch[data-ch='global'] { color: #7fb4ee; }
 .chat-ch[data-ch='near'] { color: #e9d98a; }
+.chat-ch[data-ch='party'] { color: #7fd38a; }
+.chat-line[data-ch='party'] i, .chat-line[data-ch='party'] b { color: #7fd38a; }
+.chat-line[data-ch='party'] span { color: #e2f5e4; }
+.chat-entry:has(.chat-ch[data-ch='party']) { border-left-color: #7fd38a; }
 .chat-ch[data-ch='staff'] { color: #c8a8ff; }
 .chat-line[data-ch='staff'] i, .chat-line[data-ch='staff'] b { color: #c8a8ff; }
 .chat-line[data-ch='staff'] span { color: #ece2ff; }
