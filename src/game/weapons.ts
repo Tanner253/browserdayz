@@ -1654,6 +1654,8 @@ export class Weapons {
   onStruck: (owner: unknown, weapon: string) => void = () => {};
   /** a swing landed on the world, not on a body: a tree, a rock (src/game/game/gather.ts); what was struck, and with what */
   onWhack: (owner: unknown, point: THREE.Vector3, weapon: string) => void = () => {};
+  /** the last swing was work on a tree or a rock (set by whoever hears onWhack): the left button held swings again */
+  keepSwinging = false;
   /** a punch or a melee swing has started */
   /** a punch has been thrown, or what is held swung (which takes this many seconds) */
   onSwing: (seconds?: number) => void = () => {};
@@ -3358,7 +3360,9 @@ export class Weapons {
         // put up across the body to stop a blow (the other button), or swung
         this.guardHeld = input.held('Mouse2') && !this.action;
         if (this.guardHeld) this.guardHold = 0.12;
-        if (input.pressed('Mouse0') && !this.action && this.fireCooldown <= 0) this.swing(def.melee, camera);
+        // (and held, swung again while the last blow was work on a tree or a rock: until it falls or breaks, the owner,
+        // 2026-10-27, "hold trigger to keep chopping instead of having to click")
+        if ((input.pressed('Mouse0') || (this.keepSwinging && input.held('Mouse0'))) && !this.action && this.fireCooldown <= 0) this.swing(def.melee, camera);
         if (input.pressed('KeyI') && !this.action && this.sprintT < 0.2 && KNIVES.includes(item.id)) {
           this.start('check', KNIFE_LOOK.dur);
           this.onAct('check', KNIFE_LOOK.dur);
@@ -3973,6 +3977,8 @@ export class Weapons {
 
   private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera) {
     this.fireCooldown = melee.rate;
+    // (what this blow lands on says whether the button held swings again: see onWhack)
+    this.keepSwinging = false;
     this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
     // the heavier the thing, the lower and longer it cuts the air
     audio.whoosh(THREE.MathUtils.clamp((melee.rate - 0.4) / 0.45, 0, 1));

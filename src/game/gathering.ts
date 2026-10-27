@@ -64,21 +64,30 @@ export class Gathering {
     this.woods = new Woods(h.world.trees, h.world.rocks);
   }
 
-  /** a swing that landed on the world (Weapons.onWhack): a tree or a rock, with something that works it */
-  whack(owner: unknown, weapon: string) {
+  /**
+   * A swing that landed on the world (Weapons.onWhack): a tree or a rock, with something that works it.
+   * @returns whether it was work, so that the button held swings again (Weapons.keepSwinging)
+   */
+  whack(owner: unknown, weapon: string): boolean {
     const it = this.h.held();
-    if (!it || it.id !== weapon) return;
+    if (!it || it.id !== weapon) return false;
     if (owner instanceof TreeRef) {
-      if (!CHOPS[weapon]) return;
-      if (this.ruined(it)) return;
-      if (this.h.online()) return void this.h.send({ t: 'chop', i: owner.i, u: it.uid });
-      this.chopAlone(owner.i, it);
-    } else if (owner instanceof RockRef) {
-      if (!MINES[weapon]) return void (CHOPS[weapon] && this.h.note('An axe is no use on stone: a pickaxe breaks it', 'info'));
-      if (this.ruined(it)) return;
-      if (this.h.online()) return void this.h.send({ t: 'mine', i: owner.i, u: it.uid });
-      this.mineAlone(owner.i, it);
+      if (!CHOPS[weapon] || this.ruined(it)) return false;
+      if (this.h.online()) this.h.send({ t: 'chop', i: owner.i, u: it.uid });
+      else this.chopAlone(owner.i, it);
+      return true;
     }
+    if (owner instanceof RockRef) {
+      if (!MINES[weapon]) {
+        if (CHOPS[weapon]) this.h.note('An axe is no use on stone: a pickaxe breaks it', 'info');
+        return false;
+      }
+      if (this.ruined(it)) return false;
+      if (this.h.online()) this.h.send({ t: 'mine', i: owner.i, u: it.uid });
+      else this.mineAlone(owner.i, it);
+      return true;
+    }
+    return false;
   }
 
   private ruined(it: ItemInstance) {

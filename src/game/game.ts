@@ -979,7 +979,7 @@ export class Game {
     // a punch or a swing: your own body throws it, and everyone near you sees it
     // (a swing that lands on a tree or a rock: src/game/gathering.ts)
     this.weapons.onWhack = (owner, at, w) => {
-      this.gather.whack(owner, w);
+      this.weapons.keepSwinging = this.gather.whack(owner, w);
       // (or on a piece of a base: a raid, src/game/building/raid.ts)
       if (owner instanceof PieceRef) return this.build.raid.whack(owner, at, w);
       // (or on a wreck, a drum, a heap of junk: src/game/craft-salvage.ts)
