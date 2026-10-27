@@ -53,6 +53,11 @@ export class BedsView {
     this.list = m.list.map(([b, p, k, x, z, s, left]) => ({ b, p, k, x, z, ready: now + s * 1000, left: left ?? (s > 0 ? 0 : 1) }));
   }
 
+  /** the next ready bed along, or the one before (A and D on the death screen) */
+  step(by: 1 | -1) {
+    this.map?.step(by);
+  }
+
   /** the bed picked on the death screen's map, if any (null: the map's edge) */
   chosen(): { b: number; p: number } | null {
     const key = this.map?.picked;

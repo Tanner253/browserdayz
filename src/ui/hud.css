@@ -2690,3 +2690,16 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .dead-bed { padding: 7px 22px; font-family: var(--font); font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); background: rgba(18, 20, 19, 0.7); border: 1px solid var(--accent); cursor: pointer; }
 .dead-bed small { margin-left: 8px; letter-spacing: 0.04em; text-transform: none; color: rgba(233, 228, 216, 0.6); }
 .dead-bed:disabled { opacity: 0.5; cursor: default; border-color: var(--line); }
+
+/* the death screen's Report (src/ui/report.ts) */
+.dead-report { margin-top: 10px; pointer-events: auto; }
+.dead-report-btn { background: none; border: 1px solid rgba(217, 207, 192, 0.35); color: var(--ink-dim); font: 12px var(--mono); letter-spacing: 0.08em; padding: 5px 12px; border-radius: 4px; cursor: pointer; }
+.dead-report-btn:hover { color: #d9cfc0; border-color: #d9cfc0; }
+.dead-report-btn small { margin-left: 8px; padding: 0 5px; border: 1px solid currentColor; border-radius: 3px; font-size: 10px; opacity: 0.7; }
+.dead-report-form { display: grid; gap: 8px; width: min(420px, 90vw); margin: 0 auto; text-align: left; }
+.dead-report-form[hidden] { display: none; }
+.dead-report-form select, .dead-report-form textarea { background: rgba(10, 10, 10, 0.75); color: #e9e4d8; border: 1px solid rgba(217, 207, 192, 0.35); border-radius: 4px; padding: 6px 8px; font: 13px var(--mono); }
+.dead-report-form textarea { min-height: 70px; resize: vertical; }
+.dead-report-form div { display: flex; gap: 8px; justify-content: flex-end; }
+.dead-report-form button { background: rgba(217, 207, 192, 0.12); color: #e9e4d8; border: 1px solid rgba(217, 207, 192, 0.35); border-radius: 4px; padding: 5px 14px; font: 12px var(--mono); cursor: pointer; }
+.adm-tr .adm-proof { grid-column: 1 / -1; margin: 4px 0 2px; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-all; font: 10px var(--mono); color: #f0b48a; background: rgba(0, 0, 0, 0.35); padding: 4px 6px; border-radius: 3px; }

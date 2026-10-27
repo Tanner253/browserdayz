@@ -6,7 +6,9 @@
 // (The console's preview as a name is typed runs nothing that writes, so it never springs this.)
 
 let read: string | null = null;
-let tell: ((what: string) => void) | null = null;
+/** what it was sprung by: the stack of whatever read it (a pasted script's lines, an extension's or a userscript's name), or the code that hooked the game */
+let proof = '';
+let tell: ((what: string, proof: string) => void) | null = null;
 
 /** These names on window, laid as traps. */
 export function layBait(names: string[]) {
@@ -26,14 +28,15 @@ export function layBait(names: string[]) {
 }
 
 /** a trap sprung: the first only is told (src/net/hook-trap.ts springs one of its own) */
-export function spring(name: string) {
+export function spring(name: string, by = new Error().stack ?? '') {
   if (read) return;
   read = name;
-  tell?.(name);
+  proof = by.slice(0, 900);
+  tell?.(name, proof);
 }
 
 /** Who is told when a trap is sprung: at once if one already was (sprung before the game was connected). */
-export function onBait(f: (what: string) => void) {
+export function onBait(f: (what: string, proof: string) => void) {
   tell = f;
-  if (read) f(read);
+  if (read) f(read, proof);
 }

@@ -101,6 +101,7 @@ import '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
+import { ReportForm } from '../ui/report';
 import { TraderCamp } from './camp';
 import { CAMP, RECYCLER_MARK, STALLS, STALL_MARK } from '../sim/camp';
 import { LEVEL_NAME } from '../sim/craft/recipes';
@@ -444,6 +445,8 @@ export class Game {
   /** drops called down and not yet landed: where, when they land, and the smoke that marks the place meanwhile */
   calls: { at: THREE.Vector3; until: number; smoke: { owed: number } }[] = [];
   shop!: ShopUI;
+  /** the death screen's Report (src/ui/report.ts) */
+  report!: ReportForm;
   /** what is written against this player in the trader's book: kept by the browser */
   /** seconds G has been held (drop what is in the hands), and whether that press has done its work */
   dropHeld = 0;
@@ -1290,6 +1293,16 @@ export class Game {
     );
     this.hud.onStart(() => this.resume());
     this.hud.onRespawn(() => this.respawn());
+    // (and its Report, under Respawn: what they say goes to the server's admins with how they died, server/reports.ts)
+    this.report = new ReportForm((reason, text) => {
+      if (!this.online) {
+        this.hud.note('Reports go to a server’s admins: play online to make one', 'warn');
+        return false;
+      }
+      this.net.send({ t: 'report', reason, text });
+      return true;
+    });
+    this.hud.root.querySelector('.hud-dead .dead-btn')?.after(this.report.root);
     if (TOUCH) {
       this.input.touch = true;
       const inPlay = () => this.started && !this.paused && !this.player.dead;
@@ -1593,7 +1606,9 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.guide.isOpen && !this.build.locks.padOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      } else if (!this.input.uiMode && !this.shop?.isOpen && !this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.guide.isOpen && !this.build.locks.padOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      // (nor a panel that let the mouse go itself, the trader's among them: 2026-10-27, "when i open the trader shop it
+      // should not cause my main menu to pop up")
       // (an Arena match over: the mouse is let go for its result's card, which is no pause, and nothing takes it
       // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
       // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")
@@ -1615,9 +1630,16 @@ export class Game {
     keepKeysInFullScreen();
     // Dead, Space is the Respawn button. (Not in the first second: whoever died with a thumb on it, jumping, is
     // shown what killed them before they are somewhere else.)
+    // (and A and D, or the arrows, step through the beds on its map: the mouse may be held by the game behind it)
     window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Space' || e.repeat || !this.started || !this.player.dead || !this.deathSent) return;
-      if ((e.target as HTMLElement | null)?.tagName === 'INPUT' || this.hud.chatOpen || this.adminUI?.isOpen) return;
+      const step = e.code === 'KeyA' || e.code === 'ArrowLeft' ? -1 : e.code === 'KeyD' || e.code === 'ArrowRight' ? 1 : 0;
+      if ((e.code !== 'Space' && e.code !== 'KeyR' && !step) || e.repeat || !this.started || !this.player.dead || !this.deathSent || this.report.isOpen) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT' || (e.target as HTMLElement | null)?.tagName === 'TEXTAREA' || this.hud.chatOpen || this.adminUI?.isOpen) return;
+      if (step) return void this.build.beds.step(step);
+      if (e.code === 'KeyR') {
+        e.preventDefault();
+        return void this.report.open();
+      }
       if (performance.now() - this.diedAt < 1000) return;
       e.preventDefault();
       this.respawn();

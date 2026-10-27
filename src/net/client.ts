@@ -422,7 +422,7 @@ export class Net {
             this.send({ t: 'ping', n });
           }, 4000) as unknown as number;
           // (a script that read window.__game, before this connection or after it: src/net/bait.ts)
-          onBait((what) => this.send({ t: 'bait', what }));
+          onBait((what, proof) => this.send({ t: 'bait', what, proof }));
           // (from this word on, what is said is kept for the game until it listens)
           this.held = [];
           if (this.heldTill) clearTimeout(this.heldTill);

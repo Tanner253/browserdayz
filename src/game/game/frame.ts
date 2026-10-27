@@ -601,6 +601,7 @@ export const frameMethods = {
     if (p.dead && !this.deathSent) {
       this.deathSent = true;
       this.diedAt = performance.now();
+      this.report.reset();
       audio.death();
       // Which way the body goes: away from what killed it. With nothing to throw it (blood
       // loss, a fall, hunger) it folds up where it stands.
@@ -622,6 +623,10 @@ export const frameMethods = {
         this.weapons.validate();
       }
     } else if (!p.dead) this.deathSent = false;
+    // (dead, the mouse stays free for the death screen's map: a panel shut as they died, or a click caught on its way,
+    // took it back, 2026-10-27: "when the respawn map shows up sometimes my mouse is not free and i cant select where i
+    // want to spawn")
+    else if (this.deathSent && this.input.locked && now - this.diedAt > 250) this.input.unlock();
 
     // the hour: before a game has begun it is always day behind the menu
     const hour = hourAt(this.started ? this.hourNow() : DAY.menu);

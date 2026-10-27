@@ -1631,7 +1631,7 @@ export class AdminUI {
       tile(st.kept, 'characters kept', 'user');
     }
     grid.append(this.card('What the server is doing', 'server', tiles,
-      this.line('Cheat checks', el('b', '', this.lists.checks || '?'), this.button('Who has been flagged', () => this.send('/flagged'), '', 'flag'), this.button('Who left lately', () => this.send('/recent'), '', 'clock')),
+      this.line('Cheat checks', el('b', '', this.lists.checks || '?'), this.button('Who has been flagged', () => this.send('/flagged'), '', 'flag'), this.button('Who left lately', () => this.send('/recent'), '', 'clock'), this.button('Reports', () => this.send('/reports'), '', 'flag')),
       el('div', 'dim', 'What these find is listed along the bottom.'),
     ));
     const keys = el('div', 'adm-keys');
@@ -1691,6 +1691,12 @@ export class AdminUI {
         const cell = el('span', '', c);
         cell.title = c;
         r.append(cell);
+      }
+      // (a cheat script's ban: what sprang it, the script's own lines or its source, under the row; server/proofs.ts)
+      if (b.proof) {
+        const pr = el('pre', 'adm-proof', b.proof);
+        pr.title = 'What their page ran: the stack that read a trap, or the code that hooked the game';
+        r.append(pr);
       }
       // (lifted by its own id, which is the same whatever else has been banned or lifted since this list was sent:
       // by its place in the list, a press on a list two seconds old could lift somebody else's. A server from before

@@ -44,6 +44,8 @@ import { partyAct, partyCommand, partyMates } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { roster } from './roster';
+import { proofs } from './proofs';
+import { ago, reportLines, reports } from './reports';
 import { pinned } from './pinned';
 import { stashBuriedNear } from './stash-sight';
 import { hidden } from './storages';
@@ -868,7 +870,8 @@ export function handle(c: Client, m: C2S) {
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
         bans: admin
           ? [
-              ...ADMIN.state.bans.map((b, i) => ({ n: i + 1, id: banId(b), name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })),
+              // (a cheat script's ban with what sprang it, in full: server/proofs.ts)
+              ...ADMIN.state.bans.map((b, i) => ({ n: i + 1, id: banId(b), name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10), ...(proofs.get(b.key) ? { proof: proofs.get(b.key)!.text } : {}) })),
               // (and whoever is kept off for a while: lifted the same way)
               ...keptOffNow(now).map((b, i) => ({ n: ADMIN.state.bans.length + i + 1, id: offId(b), name: b.name, why: `${b.why} (for ${Math.ceil((b.until - now) / 60000)} more minutes)`, by: b.why.startsWith('timed out') ? 'a timeout' : 'the checks', at: new Date(b.until).toISOString().slice(11, 16) + ' UTC' })),
             ]
@@ -1089,8 +1092,18 @@ export function handle(c: Client, m: C2S) {
     case 'ping':
       send(c, { t: 'pong', n: m.n });
       return;
+    case 'report': {
+      // (their last death reported from the death screen: kept with how it went, and every admin on told: server/reports.ts)
+      const r = reports.make({ name: c.name, key: keyHash(c.key) }, c.lastDeath, m.reason, m.text);
+      if (typeof r === 'string') return void send(c, { t: 'tell', kind: 'warn', text: r });
+      send(c, { t: 'tell', kind: 'good', text: 'Your report is sent to the admins, with how you died' });
+      const lines = reportLines(r, ago);
+      log(`[report] ${lines.join(' |')}`);
+      for (const o of clients.values()) if (roleOf(o) === 'admin') sys(o, 'A report has come in:', ...lines);
+      return;
+    }
     case 'bait':
-      return void baited(c, String(m.what));
+      return void baited(c, String(m.what), typeof m.proof === 'string' ? m.proof : '');
   }
 }
 

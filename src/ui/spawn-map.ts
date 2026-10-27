@@ -55,6 +55,16 @@ export class SpawnMap {
     this.draw(this.spots, this.me);
   }
 
+  /**
+   * The next choice that is ready, along the list (the map's edge first), by A and D (2026-10-27, the owner: "a AND d
+   * buttons to move selected sleeping spot, space to confirm (in the event mouse is disconnected from the ui and still
+   * attached to thegame behind the ui)")
+   */
+  step(by: 1 | -1) {
+    const keys = ['', ...this.spots.filter((s) => s.ready).map((s) => s.key)];
+    this.pick(keys[(keys.indexOf(this.picked) + by + keys.length) % keys.length]);
+  }
+
   /** drawn again: the beds as they are now (a picked one no longer ready goes back to the map's edge) */
   draw(spots: SpawnSpot[], me: { x: number; z: number }) {
     this.spots = spots;

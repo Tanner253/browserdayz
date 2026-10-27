@@ -33,6 +33,8 @@ import { bodyOrder, zedLying } from './admin-bodies';
 import { payingTags, wentFrom } from './custody';
 import { goneFrom } from './searched';
 import { roster, type Known } from './roster';
+import { proofs } from './proofs';
+import { ago, reportLines, reports } from './reports';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -255,6 +257,17 @@ export async function command(c: Client, line: string) {
     case 'who':
     case 'list':
       return void sys(c, `${clients.size} online:`, ...[...clients.values()].map((o) => `${label(o)}  at ${o.pose[0].toFixed(0)}, ${o.pose[2].toFixed(0)}${o.alive ? '' : ' (dead)'}${o.check.flags ? `  ${o.check.flags} flagged` : ''}`));
+    case 'proof': {
+      // (what a cheat script's ban was for, in full: server/proofs.ts)
+      const got = proofs.find(rest.join(' ').trim()).slice(0, 3);
+      if (!got.length) return void sys(c, `No proof is kept of anybody called "${rest.join(' ')}".`);
+      return void sys(c, ...got.flatMap((p) => [`${p.name}, ${ago(Date.now() - p.at)} ago: ${p.what}`, ...p.text.split(/\r?\n/).slice(0, 14).map((l) => `   ${l.trim()}`)]));
+    }
+    case 'reports': {
+      // (the reports from the death screen, the newest first, each with the death it is about: server/reports.ts)
+      const got = reports.latest(Math.min(30, Math.max(1, Number(who) || 10)));
+      return void sys(c, got.length ? `The latest ${got.length} reports (newest first):` : 'Nobody has made a report.', ...got.flatMap((r) => reportLines(r, ago)));
+    }
     case 'find': {
       // (everybody who has played in the last 90 days, on or not: server/roster.ts)
       const d = devOf(who), q = rest.join(' ').trim(), found = roster.find(d ? '' : q, d);
@@ -992,16 +1005,19 @@ export async function login(c: Client, pw: unknown) {
 
 /**
  * Their page's window.__game was read ('bait'): a script pasted into the console, as nothing of the game reads it
- * (src/net/bait.ts; until 2026-10-20 it was the whole game, and a wallhack passed round among players used it).
+ * (src/net/bait.ts; until 2026-10-20 it was the whole game, and a wallhack passed round among players used it); or
+ * three.js's inspector hook was there, or the socket or WebGL's drawing was hooked (src/net/hook-trap.ts). What sprang
+ * it is kept in full, for the panel's ban rows and /proof (server/proofs.ts).
  * Banned as an admin's /ban bans: by their game, their address, their device and their browser (the owner,
  * 2026-10-20: "ban anyone using this exploit"). An admin is only written down.
  */
-export async function baited(c: Client, what: string) {
-  const why = `cheat script (read window.${what.slice(0, 24)})`;
+export async function baited(c: Client, what: string, proof = '') {
+  const why = what.startsWith('hooked ') ? `cheat script (${what.slice(0, 40)})` : `cheat script (read window.${what.slice(0, 24)})`;
+  proofs.set(keyHash(c.key), { at: Date.now(), name: c.name, what: what.slice(0, 60), text: proof.slice(0, 900) });
   if (roleOf(c) === 'admin') return void log(`[cheat] ${c.name} is an admin and is left alone: ${why}`);
   const key = keyHash(c.key), ip = ipHash(c.ip), fp = c.fp, sig = c.sig ?? '';
   const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, ...(fp ? { fp } : {}), ...(sig ? { sig, sigTill: Date.now() + SIG_MS } : {}), name: c.name, why, by: 'the server', at: new Date().toISOString() }] };
-  log(`[cheat] ${c.name} (#${c.id}) banned: ${why}${fp ? ` [dev ${shortDevice(fp)}]` : ''}`);
+  log(`[cheat] ${c.name} (#${c.id}) banned: ${why}${fp ? ` [dev ${shortDevice(fp)}]` : ''}${proof ? `; sprung by: ${proof.replace(/\s+/g, ' ').slice(0, 300)}` : ''}`);
   eject(c, 'You are banned from this server.');
   for (let i = ADMIN.gone.length - 1; i >= 0; i--) if (ADMIN.gone[i].key === c.key) ADMIN.gone.splice(i, 1);
   await saveAdmin(next);

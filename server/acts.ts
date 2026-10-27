@@ -16,7 +16,7 @@ import { lieAt } from './custody';
 import { shutIt } from './searched';
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, tagTime, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, dealt } from './checks';
-import { ADMIN, fellBlast, tagLock } from './gate';
+import { ADMIN, fellBlast, keyHash, tagLock } from './gate';
 import { inPlay } from '../src/world/worldgen';
 import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
 import { scoreOf, sendBoard } from './queue';
@@ -535,6 +535,9 @@ export function kill(c: Client, cause: string, v = 0) {
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
   const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
   c.died = { of: by ? `killed by ${by.name}` : `died of ${cause}`, at: now };
+  // (and as it went, for a report of it: server/reports.ts)
+  const them = by ? clients.get(by.id) : undefined;
+  c.lastDeath = { at: now, cause, by: by ? { name: by.name, key: them ? keyHash(them.key) : '', fp: them?.fp ?? '', flags: them?.check.flags ?? 0, at: them ? [them.pose[0], them.pose[1], them.pose[2]] : [0, 0, 0] } : null, w: k.w, zone: k.zone, dist: k.dist, at3: [c.pose[0], c.pose[1], c.pose[2]] };
   const corpse = makeCorpse(c, v, ride);
   for (const k of [...tagSeen.keys()]) if (k.startsWith(seenOf(c.key))) tagSeen.delete(k);
   c.inv = null;

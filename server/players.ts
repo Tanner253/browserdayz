@@ -1,6 +1,7 @@
 // The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving.
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
+import type { DeathRecord } from './reports';
 import type { WebSocket } from 'ws';
 import { BODY_GRID, type SerializedInventory, cleanItem as cleanThing, cleanInventory as cleanCarried } from '../src/sim/inventory';
 import type { ItemInstance } from '../src/sim/items';
@@ -110,6 +111,8 @@ export interface Client {
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
   /** how they last died, and when (see `kill`): told them if they come back to find they start again */
   died?: Died;
+  /** their last death as the server knew it, for a report of it from the death screen (server/reports.ts) */
+  lastDeath?: DeathRecord;
   openCid: string | null;
   /** the things lying about that hold things which this player has open with their pockets ('lopen'): theirs to set while they do */
   openLying: Set<string>;

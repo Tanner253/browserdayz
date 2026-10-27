@@ -100,7 +100,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // channel and a server of 74 hears none)
 // (76, 2026-10-27: 'ps' tells a page only of those within its sight, and with `out` who went out of it: a page of 75
 // leaves them standing where they were last)
-export const PROTOCOL = 76;
+// (77, 2026-10-27: a report from the death screen ('report'): a server of 76 hears none)
+export const PROTOCOL = 77;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -440,7 +441,9 @@ export type C2S =
   | { t: 'blight'; i: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
-  | { t: 'bait'; what: string }
+  | { t: 'bait'; what: string; /** what sprang it: the reader's stack, or the hooking code (src/net/bait.ts) */ proof?: string }
+  /** a report of their last death, from the death screen (src/sim/reports.ts) */
+  | { t: 'report'; reason: string; text: string }
   /**
    * On the bot check's course, before being let in (src/sim/course.ts): where the player's feet are and where they
    * look (the yard's own x, the height over its floor, z, the turn and the tilt), and a shot fired (from where, and
@@ -789,7 +792,7 @@ export interface AdminLists {
    * banned, `t:` and a hash of what a time off the server is kept by. The panel's Unban sends the id. (Not said by a
    * server from before 2026-10-13.)
    */
-  bans: { n: number; id?: string; name: string; why: string; by: string; at: string }[];
+  bans: { n: number; id?: string; name: string; why: string; by: string; at: string; /** a cheat script's ban: what sprang it, in full (server/proofs.ts) */ proof?: string }[];
   /** whoever was turned away at the door lately (newest first), for the panel's Pardon button (`/pardon p:<id>`): an admin's alone. Not said by a server from before protocol 44 */
   turned?: { id: number; name: string; why: string; mins: number; dev?: string }[];
   /** `id`: `r:` and the start of its key's hash, what `/demote` takes for somebody not online; `low`: this admin is above
