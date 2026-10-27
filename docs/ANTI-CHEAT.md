@@ -4,7 +4,7 @@ The owner, 2026-10-27, after a player was found running a script in their browse
 form being able to access any type of ESP and as well being able to shoot through walls"; "the server needs to keep
 track of this as well as collisions, currently walls do not exist on the server"; "yes we need to do all of these
 things to ensure people cannot cheat in our game". The plan card they said yes to: `progress/anti-esp/zona-plan-anti-esp.png`
-(source `marketing/plan-anti-esp.html`). Build it in the order below, one phase at a time; each phase is tested by the
+(source `marketing/plan-anti-esp.html`). Build it in the order below (walls, shots, sight, steps), one phase at a time; each phase is tested by the
 owner on 5173 before any deploy (CLAUDE.md). CLAUDE.md's "faster churn" rules hold: type-check, the one test that
 covers it, nothing more.
 
@@ -63,13 +63,24 @@ covers it, nothing more.
 4. Measure once on this machine (the card promised it; nothing more): file size, load ms, memory added (Render is
    1 CPU / 2 GB), µs per ray. If memory is too high, merge small props away (only what can hide a body counts).
 
-## 4. Phase 2: ESP (sent only if seen), the live problem
-1. `inSight` takes a `canSee(viewer, target)`; within range, a pair is seen if any line is clear (SIGHT group and the
-   ground): from the viewer's eye, and 0.45 m either side (a lean), and where their velocity takes them in
-   ping/2 + 100 ms; to the target's head, chest, chest 0.35 m either side, and knees, and where they are heading.
-   Stop at the first clear line. Seen stays seen 500 ms (`seenUntil` per pair). Check near pairs every tick, far
-   ones (over 300 m) every third. A hard limit of rays per tick: whatever is not checked in time counts as SEEN (fail
-   open: nobody pops in late, and a cheater is never worse off than today).
+## 4. Phase 2: no rounds through walls (first: what players complain of)
+1. In `case 'hit'`, after `walled(...)`: the same lenience as `walled` in `server/solid.ts` (three eyes a lean apart,
+   five aims round the spot hit; any clear line lets it through) against the ROUND group. Refused: `flag(c, ...)`
+   and no damage. Curtains, boards and glass pass, as in the game.
+2. The same for what else is hit: animals and infected (`server/animals.ts`, the horde), base pieces (raid), and
+   blasts (`blastWalled` takes the map walls too).
+3. Start in watch mode (log and flag only, as `CHECKS` does) for the owner's test, then refuse.
+4. Test: through a wall refused, through glass and a curtain let through, a corner peeked let through.
+
+## 5. Phase 3: ESP, a rudimentary line of sight (after the shots)
+1. Rudimentary first (the owner, 2026-10-27: "people complain being shot through walls so this is priority then we
+   can work on a rudimentary LOS detection"): `inSight` takes a `canSee(viewer, target)`; within range, a pair is seen
+   if a line from the viewer's eye, or 0.45 m either side of it (a lean), to the target's head or chest is clear
+   (SIGHT group and the ground). Stop at the first clear line. Checked about 4 times a second; seen stays seen 1 s.
+   A hard limit of rays per tick: whatever is not checked in time counts as SEEN (fail open: nobody pops in late, and a
+   cheater is never worse off than today). Finer later if it is needed: more points, where each is heading, ping.
+   ADMINS ARE NEVER JUDGED (the owner: "as admin i should eb able to see everyone"): an admin is sent everybody,
+   everywhere, as now (`inSight`'s `all`); their ESP switches are unchanged.
 2. No footsteps rule (the owner, 2026-10-27, of the card's "running within ~30 m is still sent": "leave out the
    footsteps thing"): nobody behind a wall is sent, running or not, however near.
 3. Other places positions leak, closed in the same phase:
@@ -81,15 +92,6 @@ covers it, nothing more.
      `grep -n "pose\[0\]" server/*.ts`.
 4. Test: `test/sight.test.ts` with a fake `canSee`; one server test with two players either side of a base wall
    (bases are solid on the server already, so no bake is needed for it).
-
-## 5. Phase 3: no rounds through walls
-1. In `case 'hit'`, after `walled(...)`: the same lenience as `walled` in `server/solid.ts` (three eyes a lean apart,
-   five aims round the spot hit; any clear line lets it through) against the ROUND group. Refused: `flag(c, ...)`
-   and no damage. Curtains, boards and glass pass, as in the game.
-2. The same for what else is hit: animals and infected (`server/animals.ts`, the horde), base pieces (raid), and
-   blasts (`blastWalled` takes the map walls too).
-3. Start in watch mode (log and flag only, as `CHECKS` does) for the owner's test, then refuse.
-4. Test: through a wall refused, through glass and a curtain let through, a corner peeked let through.
 
 ## 6. Phase 4: no walking through walls
 1. `handle.ts:109`: `stepWalled` also asks `stepClear` (BODY group) from the last pose to the new one at knee and
