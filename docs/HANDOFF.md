@@ -124,9 +124,10 @@ The owner's rules for all of it: visual quality first; no corners cut, but once 
 polishing or analysis); build cheap by design, and NO performance measuring (the owner optimizes in a pass of their own);
 develop single things on the stage first; never change the ground round buried stashes; never raise WORLD_REV.
 
-0. **Anti-cheat: walls on the server, no ESP, no wallbangs, no noclip** (the owner, 2026-10-27: "we need to do all of
-   these things to ensure people cannot cheat in our game"). The whole plan, its four phases and what is already on
-   the branch (c55d9105, not deployed): `docs/ANTI-CHEAT.md`.
+0. **Anti-cheat** (the owner, 2026-10-27: "we need to do all of these things to ensure people cannot cheat in our
+   game"): LIVE 2026-10-27 23:45 UTC as bb2a5908 (PROTOCOL 77): map walls on the server (no wallbangs), line of sight
+   for 'ps', cheat-script traps with proof, death-screen reports, the panel's All players and Reports. Left: noclip
+   (phase 4) and doors on the server. Everything in `docs/ANTI-CHEAT.md`.
 1. DONE on the branch (section 2): **Admin panel: a "show animals" toggle** (the owner, 2026-10-24: "admin panel needs a toggle for show animals").
    Beside "Names of players" and "Loot" in the admin panel's own powers (`src/ui/admin-ui.ts`, the `this.flip(...)` list
    near line 1085): every animal where it is, through anything, as those two show players and loot. Look at how the

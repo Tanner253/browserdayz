@@ -8,7 +8,9 @@ things to ensure people cannot cheat in our game". The plan card they said yes t
 owner on 5173 before any deploy (CLAUDE.md). CLAUDE.md's "faster churn" rules hold: type-check, the one test that
 covers it, nothing more.
 
-## 0. Already done (commit c55d9105 on battle-royale, NOT deployed, PROTOCOL 76)
+## LIVE 2026-10-27 23:45 UTC as bb2a5908 (PROTOCOL 77): sections 0, 0b and 0c below. Left: phase 4 (noclip), doors on the server.
+
+## 0. Already done (commit c55d9105)
 - `src/net/hook-trap.ts`, main.ts's first import: three.js hands every Scene and WebGLRenderer to
   `window.__THREE_DEVTOOLS__` if a page has one (the likely ESP route: a userscript sets it at document-start). It is
   taken away before three loads; a page that had one is reported (`bait`) and banned like `window.__game`
