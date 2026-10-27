@@ -42,16 +42,16 @@ ok('meat: raw it takes a quarter, water and health, and as likely as not poisons
   assert.equal(stateOf(steak, T0 + 10).word, 'cooked');
   steak.cook = COOKS.meat_venison.takes + COOKS.meat_venison.burns;
   assert.equal(mealOf(steak, T0 + 10).energy, Math.round(full * 0.25));
-  // gone off: raw after forty minutes, cooked after three hours
+  // gone off: raw after an hour, cooked after a day (the owner, 2026-10-26: "cooked meat spoils too fast")
   const old = markMade(makeItem('meat_bear'), T0);
-  assert.equal(rotten(old, T0 + 2300), false);
-  assert.equal(rotten(old, T0 + 2500), true);
-  assert.equal(mealOf(old, T0 + 2500).sick, ROTTEN.sick);
-  assert.equal(mealOf(old, T0 + 2500).health, ROTTEN.health);
+  assert.equal(rotten(old, T0 + 3500), false);
+  assert.equal(rotten(old, T0 + 3700), true);
+  assert.equal(mealOf(old, T0 + 3700).sick, ROTTEN.sick);
+  assert.equal(mealOf(old, T0 + 3700).health, ROTTEN.health);
   assert.equal(itemName(old).endsWith('(raw)') || itemName(old).endsWith('(rotten)'), true);
   old.cook = COOKS.meat_bear.takes;
-  assert.equal(rotten(old, T0 + 2500), false, 'cooked in time, it keeps');
-  assert.equal(rotten(old, T0 + 11000), true);
+  assert.equal(rotten(old, T0 + 3700), false, 'cooked in time, it keeps');
+  assert.equal(rotten(old, T0 + 86500), true);
 });
 
 ok('a game cannot keep its meat fresh or its cooking from the server: both are kept, and never fresher than now', () => {
