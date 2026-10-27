@@ -33,6 +33,19 @@ covers it, nothing more.
 - What the plan's Phase 1 says below about doors from the server's door list is not done: doors are left out (a shot
   through a shut metal door is let through).
 
+## 0c. Phase 3 (rudimentary line of sight) and the browser checks built (2026-10-27, NOT deployed, PROTOCOL 77)
+- `server/sight.ts` `Sight`: 'ps' sends a player only if a line from the viewer's eye (or a lean, or where they head)
+  reaches their head or chest (or a lean, or where they head) past the map's walls (SIGHT group: curtains and bushes
+  hide too), the bases and the ground (skipped where either end is under it: cellars, bunker, caves). Near pairs
+  (<60 m) every tick, far ones every 250 ms; seen stays seen 1 s; at most 2000 lines a tick, past that seen (fail
+  open). Admins and the party are never judged. `test/sight.test.ts`, `test/walls-hit.test.ts` (not sent behind
+  walls, sent in the open). A remote back in sight is set down where it is; a hidden one's shot draws no flash.
+- `src/net/hook-trap.ts`: every 20 s the socket, `MessageEvent.data`, `JSON.parse`, WebGL's draws and
+  `uniformMatrix4fv`/`useProgram` and `Function.toString` are checked against a clean iframe's `toString`; a wrapped
+  one is reported (`bait`, `hooked <name>`) with its source and banned. Every trap now carries the stack that sprang
+  it. The proof is kept in `server/proofs.ts` (with the world), shown under the ban's row in the panel and by
+  `/proof <name>`. Not caught: a line typed into the console that touches none of the traps or watched functions.
+
 ## 1. What the server knew of the world before
 - The ground: `world.heights` / `heightAt`, and `hillBetween` (`server/checks.ts:286`): a round through a hill is refused.
 - Player bases: `server/solid.ts` (`BaseSolids`, shapes in `src/sim/build/solid.ts`): `walled` (shots), `blastWalled`

@@ -69,6 +69,8 @@ export async function readWalls(raw: Buffer, print: string | null): Promise<stri
 
 /** The walls from server/solids.bin.gz, for the map whose print is `print`; without them every line is clear. */
 export async function loadWalls(file: string, print: string, log: (s: string) => void) {
+  // (WALLS=off: a test of something else, whose players stand where the map has a wall between them)
+  if (process.env.WALLS === 'off') return void log('[walls] none: WALLS=off');
   try {
     const why = fs.existsSync(file) ? await readWalls(gunzipSync(fs.readFileSync(file)), print) : 'no walls file';
     if (why) WALLS.why = why;

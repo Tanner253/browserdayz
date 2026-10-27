@@ -104,7 +104,7 @@ console.log('  ok  the recorded slides: ' + tracks.map((t) => `${fastest(t, 1).t
 // ---- then the server itself, enforcing
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-slides-'));
 const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'enforce' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', SIGHT: 'off', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'enforce' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';

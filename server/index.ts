@@ -29,7 +29,7 @@ import { BARREL } from '../src/sim/barrels';
 import { type VehicleInfo, POLICE_CAR, parkKind, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
 import { HELI, hpOf } from '../src/sim/heli';
 import { Director } from '../src/sim/infected';
-import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protocol';
+import { type StoredItem, type S2C, PROTOCOL, type C2S, F_CROUCH, F_PRONE } from '../src/net/protocol';
 import { Hearths } from '../src/sim/fires';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
@@ -38,8 +38,10 @@ import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
 import { broadcast, cleanName, clients, join, num, perksChanged, records, round2, send, type Client } from './players';
-import { inSight } from './sight';
-import { loadWalls } from './walls';
+import { Sight, inSight, type Body } from './sight';
+import { solid } from './solid';
+import type { Vec3 } from '../src/sim/grenades';
+import { loadWalls, sightClear } from './walls';
 import { wallsPrint } from '../src/sim/walls-print';
 import { partyMates } from './party';
 import { perks } from './perks';
@@ -643,23 +645,51 @@ setInterval(() => {
   if (clients.size < 2) return;
   // (where everybody is, each row written once: each page is sent those within its sight, server/sight.ts; the
   // vanished only to admins, who are told of everybody)
-  const rows: { id: number; x: number; z: number; hidden: boolean; json: string }[] = [];
+  const rows: { id: number; x: number; z: number; hidden: boolean; json: string; body: Body }[] = [];
+  const now = Date.now();
+  sight.tick();
+  if (now - sightPruned > 5000) {
+    sightPruned = now;
+    sight.prune(now);
+  }
   for (const c of clients.values()) {
     const p = c.pose;
     const row: Extract<S2C, { t: 'ps' }>['s'][number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m, c.n ?? null];
     // (the finish on the gun in their hands, said only of a plated one)
     if (c.f) row.push(c.f);
-    rows.push({ id: c.id, x: p[0], z: p[2], hidden: !!c.power.hidden, json: JSON.stringify(row) });
+    // (how they are going, from their last two places: where the line of sight takes them to be heading)
+    const tr = c.trail, a = tr && tr.length > 1 ? tr[tr.length - 2] : null, b = tr?.[tr.length - 1], dt = a && b ? Math.max(0.05, (b.t - a.t) / 1000) : 1;
+    const v = (k: 0 | 2) => (a && b ? Math.max(-12, Math.min(12, (b.p[k] - a.p[k]) / dt)) : 0);
+    rows.push({ id: c.id, x: p[0], z: p[2], hidden: !!c.power.hidden, json: JSON.stringify(row), body: { id: c.id, x: p[0], y: p[1], z: p[2], low: p[5] & F_PRONE ? 2 : p[5] & F_CROUCH ? 1 : 0, vx: v(0), vz: v(2) } });
   }
   const shown = rows.filter((r) => !r.hidden);
   for (const c of clients.values()) {
     if (c.ws.readyState !== 1) continue;
-    const admin = roleOf(c) === 'admin';
-    const { see, out } = inSight({ id: c.id, x: c.pose[0], z: c.pose[2] }, admin ? rows : shown, (c.told ??= new Set()), new Set(partyMates(c).map((m) => m.id)), admin);
+    const admin = roleOf(c) === 'admin', me = rows.find((r) => r.id === c.id)!.body;
+    const { see, out } = inSight({ id: c.id, x: c.pose[0], z: c.pose[2] }, admin ? rows : shown, (c.told ??= new Set()), new Set(partyMates(c).map((m) => m.id)), admin, SIGHT_OFF ? undefined : (r) => sight.sees(me, r.body, now));
     // (as JSON.stringify({ t: 'ps', s, out }) would write it, of rows already written)
     c.ws.send(`{"t":"ps","s":[${see.map((r) => r.json).join(',')}]${out.length ? `,"out":${JSON.stringify(out)}` : ''}}`);
   }
 }, 1000 / TICK_HZ);
+
+/**
+ * The line of sight for 'ps' (server/sight.ts): the map's own walls and what hides a body (server/walls.ts), the bases
+ * (server/solid.ts), and the ground, where both ends are over it (under it, in a cellar, the bunker or a cave, the
+ * walls are what hide).
+ */
+const sight = new Sight((a, b) => groundClear(a, b) && solid.clear(a, b) && sightClear(a, b));
+/** SIGHT=off: a test of something else, whose players watch each other through what is in the way */
+const SIGHT_OFF = process.env.SIGHT === 'off';
+let sightPruned = 0;
+function groundClear(a: Vec3, b: Vec3) {
+  const ground = (x: number, z: number) => world.groundAt(x, z);
+  if (a[1] < ground(a[0], a[2]) - 0.5 || b[1] < ground(b[0], b[2]) - 0.5) return true;
+  for (let k = 1; k < 8; k++) {
+    const t = k / 8;
+    if (ground(a[0] + (b[0] - a[0]) * t, a[2] + (b[2] - a[2]) * t) > a[1] + (b[1] - a[1]) * t + 0.2) return false;
+  }
+  return true;
+}
 
 setInterval(() => {
   const now = Date.now();

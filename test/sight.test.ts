@@ -1,6 +1,6 @@
 // Where everybody is, told only within sight (server/sight.ts): near, far, the edge kept, the party, an admin.
 import assert from 'node:assert/strict';
-import { SIGHT, inSight } from '../server/sight';
+import { LOOK, SIGHT, Sight, inSight, type Body } from '../server/sight';
 
 const me = { id: 1, x: 0, z: 0 };
 const at = (id: number, x: number) => ({ id, x, z: 0 });
@@ -27,4 +27,29 @@ assert.deepEqual(r.out, [], 'and said so once');
 assert.deepEqual(ids(inSight(me, rows, new Set(), new Set([4])).see), [1, 2, 4], 'a party member however far');
 assert.deepEqual(ids(inSight(me, rows, new Set(), none, true).see), [1, 2, 3, 4], 'an admin is told of everybody');
 
+// ---- the line of sight: a wall across x = 5, 3 m high, from z -2 to 2
+const wall = (a: number[], b: number[]) => {
+  if ((a[0] - 5) * (b[0] - 5) >= 0) return true;
+  const t = (5 - a[0]) / (b[0] - a[0]), y = a[1] + (b[1] - a[1]) * t, z = a[2] + (b[2] - a[2]) * t;
+  return !(y < 3 && Math.abs(z) < 2);
+};
+const body = (id: number, x: number, z: number, vx = 0): Body => ({ id, x, y: 0, z, low: 0, vx, vz: 0 });
+let s = new Sight(wall);
+s.tick();
+assert.equal(s.sees(body(1, 0, 0), body(2, 10, 0), 0), false, 'behind the wall: not seen');
+assert.equal(s.sees(body(1, 0, 0), body(3, 10, 6), 0), true, 'beside it: seen');
+assert.equal(s.sees(body(1, 0, 1.7), body(4, 10, 1.7), 0), true, 'a lean round its end: seen');
+assert.equal(s.sees(body(1, 0, 0), body(5, 10, 0, 0), 0), false);
+// (once seen, kept a while: gone behind it a moment later is still told of, and not after)
+s = new Sight(wall);
+s.tick();
+assert.equal(s.sees(body(1, 0, 0), body(6, 10, 6), 0), true);
+assert.equal(s.sees(body(1, 0, 0), body(6, 10, 0), LOOK.farMs + 1), true, 'just gone behind it: kept');
+assert.equal(s.sees(body(1, 0, 0), body(6, 10, 0), LOOK.keepMs + LOOK.farMs + 2), false, 'and then not');
+// (out of lines for the tick: seen, never late)
+s = new Sight(() => false);
+s.tick();
+let n = 0;
+for (let i = 0; i < 400; i++) if (s.sees(body(1, 0, 0), body(100 + i, 10, 0), 0)) n++;
+assert.ok(n > 0 && s.traced <= LOOK.most, 'past the most lines a tick, whoever is not looked at is seen');
 console.log('sight ok');

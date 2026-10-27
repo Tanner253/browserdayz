@@ -226,8 +226,9 @@ export class RemotePlayer implements Damageable {
    */
   push(p: Pose, now: number, stamp?: number) {
     if (this.away) {
-      // (back in sight: from where they are now, a jump and not a walk, see update)
+      // (back in sight: set down where they are now, not walked there from where they were last seen)
       this.away = false;
+      this.pos.set(p[0], p[1], p[2]);
       this.applyZones();
       this.blocker.setEnabled(this.alive && !this.sat);
       this.avatar.root.visible = this.fall < 4;
@@ -354,6 +355,11 @@ export class RemotePlayer implements Damageable {
 
   /** out of this page's sight (server/sight.ts): not drawn, and nothing of them to bump into or hit, till they are told of again */
   private away = false;
+
+  /** out of this page's sight now (server/sight.ts) */
+  get outOfSight() {
+    return this.away;
+  }
 
   /** gone out of sight: not left standing where they were last told of */
   goAway() {

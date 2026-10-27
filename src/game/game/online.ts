@@ -304,7 +304,9 @@ export const onlineMethods = {
     });
     net.on('askin', (m) => this.onSkin(m));
     net.on('shot', (m) => {
-      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle(), this.remotes.get(m.id));
+      // (one out of sight is heard, and their round flies from where it was fired: their figure is not where it was last seen)
+      const by = this.remotes.get(m.id), shown = by && !by.outOfSight ? by : undefined;
+      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, shown?.muzzle(), shown);
       this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot, m.o[1]);
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);

@@ -115,12 +115,17 @@ try {
     return gil.landed() - was;
   };
 
+  // (and behind the walls, Tom's place is not sent to Gil at all: server/sight.ts)
+  const told = () => (gil.got.filter((m) => m.t === 'ps').pop() as Extract<S2C, { t: 'ps' }> | undefined)?.s.some((r) => r[0] === tom.id);
+  assert.equal(told(), false, 'a player behind walls was sent');
+  console.log('  ok  behind the walls, his place is not sent');
   assert.equal(await shoot(5), 0, `rounds through a wall were dealt:\n${logged.slice(-800)}`);
   assert.match(logged, /Gil shot Tom through a wall/, 'the shots through the wall were not flagged');
   console.log('  ok  five rounds through a wall: none dealt, flagged');
 
   tomAt = open;
   await sleep(1200);
+  assert.equal(told(), true, 'a player in the open was not sent');
   assert.equal(await shoot(3), 3, `rounds in the open were not all dealt:\n${logged.slice(-800)}`);
   console.log('  ok  the same rounds in the open land, all three');
   clearInterval(keep);

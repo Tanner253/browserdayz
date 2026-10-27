@@ -57,7 +57,7 @@ class Player {
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-tag-cause-'));
 // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', TAG_FRESH_S: '1', TAG_MIN_LIFE_S: '1', FRESH_S: '0.2' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', WALLS: 'off', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', TAG_FRESH_S: '1', TAG_MIN_LIFE_S: '1', FRESH_S: '0.2' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';

@@ -67,7 +67,7 @@ const healthz = async () => (await (await fetch(`http://127.0.0.1:${PORT}/health
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-away-'));
 // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: String(LINGER), LOGOUT_S: String(LOGOUT),
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', WALLS: 'off', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: String(LINGER), LOGOUT_S: String(LOGOUT),
     // (a body is left only by somebody who has been in the world a while: a minute on the host, a fifth of a second here)
     FRESH_S: '0.2',
   },

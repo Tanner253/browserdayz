@@ -86,7 +86,7 @@ async function withServer(mode: string, play: (log: () => string) => Promise<voi
     // (each check's own refusals are what is watched here, a first minute's worth of them at a time: the handful that
     // sends somebody back to the bot check in their first minute would take them out of the test first. That is
     // test/probation.test.ts's.)
-    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: mode, FIRST_FLAGS: '100000', ...more },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', WALLS: 'off', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: mode, FIRST_FLAGS: '100000', ...more },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';
