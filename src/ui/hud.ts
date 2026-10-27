@@ -1803,10 +1803,15 @@ export class HUD {
   /** @param role whoever said it is an admin or a mod: it is written before their name */
   /** @param tint an admin's own colour for their tag (not said: the rainbow) */
   /** @param perk from the store: [VIP] in purple before the name, a cup after it for a week after a coffee */
-  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean, perk?: { vip?: boolean; cup?: boolean }) {
+  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean, perk?: { vip?: boolean; cup?: boolean; over?: boolean }) {
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     const n = document.createElement('div');
     n.className = 'chat-line';
+    // (a party's or a nearby chat an admin overhears, not being in it: dimmer, and said so)
+    if (perk?.over) {
+      n.classList.add('over');
+      n.title = 'Overheard: an admin sees every chat';
+    }
     n.dataset.ch = ch;
     if (ch !== 'system') {
       if (role === 'admin' || role === 'mod') {

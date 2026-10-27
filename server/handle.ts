@@ -789,6 +789,8 @@ export function handle(c: Client, m: C2S) {
         if (!mates.length) return void sys(c, 'You are in no party: look at somebody and press F to ask them into one.');
         const out: S2C = { t: 'chat', ch: 'party', from: c.name, text, ...badge };
         for (const o of mates) send(o, out);
+        // (and every admin, overheard: the owner, 2026-10-27, "can admins see all chats from all people?")
+        for (const o of clients.values()) if (roleOf(o) === 'admin' && !mates.includes(o)) send(o, { ...out, over: true });
         return;
       }
       if (m.ch === 'near') {
@@ -796,6 +798,8 @@ export function handle(c: Client, m: C2S) {
         const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, ...badge };
         for (const o of clients.values()) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
+          // (an admin out of earshot overhears it all the same)
+          else if (roleOf(o) === 'admin') send(o, { ...out, over: true });
         }
       } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, ...badge });
       return;

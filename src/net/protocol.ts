@@ -633,7 +633,7 @@ export type S2C =
   /** one's beds: [base, piece, kind, x, z, seconds until it may be woken at] */
   /** this player's beds: [base, piece, kind, x, z, seconds until it gives wakes again, wakes it has now (src/sim/build/beds.ts)] */
   | { t: 'beds'; list: [number, number, string, number, number, number, number][] }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean; /** a party's or a nearby chat an admin overhears, not being in it (server/handle.ts) */ over?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
   /** a finish put on one of this player's guns: the shop's item id */

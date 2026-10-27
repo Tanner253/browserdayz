@@ -567,7 +567,7 @@ export const onlineMethods = {
       this.meDirty = true;
       this.resume();
     });
-    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint, m.elite, { vip: m.vip, cup: m.cup }));
+    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint, m.elite, { vip: m.vip, cup: m.cup, over: m.over }));
     // everyone carrying a tag they took, shown on the map for a few seconds
     net.on('tags', (m) => {
       const me = m.p.some(([id]) => id === net.id);

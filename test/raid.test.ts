@@ -45,24 +45,24 @@ const count = (w: string, p: Piece) => Math.ceil(p.hp / chargeOf(w, p, 0));
 console.log('Raiding: blows');
 ok('tools bite into wood; a pickaxe and a sledgehammer into stone; only a sledgehammer, a little, into metal', () => {
   const { piece } = house(1), wall = piece('wall', 0, -1.5);
-  assert.equal(blowOf('felling_axe', wall), 7);
+  assert.equal(blowOf('felling_axe', wall), 1.2);
   assert.ok(blowOf('hatchet', wall) > blowOf('stone_hatchet', wall) && blowOf('stone_hatchet', wall) > 0);
   wall.t = 2;
   assert.equal(blowOf('hatchet', wall), 0, 'an axe on stone');
   assert.ok(blowOf('pickaxe', wall) > 0 && blowOf('sledgehammer', wall) > 0);
   wall.t = 3;
   assert.equal(blowOf('pickaxe', wall), 0, 'a pickaxe on metal');
-  assert.equal(blowOf('sledgehammer', wall), 2);
+  assert.equal(blowOf('sledgehammer', wall), 0.3);
   assert.equal(blowOf('hammer', wall), 0, 'the building hammer breaks nothing');
   wall.t = 0;
   assert.equal(blowOf('machete', wall), RAID.other[0], 'anything else, on a frame');
 });
-ok('far more blows than a charge: a wooden wall is dozens of axe blows, a stone wall hundreds of the sledgehammer', () => {
+ok('far more blows than a charge: a wooden wall is hundreds of axe blows, a stone wall over a thousand of the sledgehammer ("it should take a super long time")', () => {
   const { piece } = house(1), wall = piece('wall', 0, -1.5);
-  assert.ok(wall.hp / blowOf('felling_axe', wall) >= 60, `${wall.hp / blowOf('felling_axe', wall)} axe blows`);
+  assert.ok(wall.hp / blowOf('felling_axe', wall) >= 400, `${wall.hp / blowOf('felling_axe', wall)} axe blows`);
   wall.t = 2;
   wall.hp = hpOf('wall', 2);
-  assert.ok(wall.hp / blowOf('sledgehammer', wall) >= 150, `${wall.hp / blowOf('sledgehammer', wall)} sledgehammer blows`);
+  assert.ok(wall.hp / blowOf('sledgehammer', wall) >= 1200, `${wall.hp / blowOf('sledgehammer', wall)} sledgehammer blows`);
 });
 ok('every tool that raids is a thing held to strike with', () => {
   for (const id of Object.keys(RAID.blow)) assert.ok(ITEMS[id]?.melee, id);

@@ -2703,3 +2703,4 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .dead-report-form div { display: flex; gap: 8px; justify-content: flex-end; }
 .dead-report-form button { background: rgba(217, 207, 192, 0.12); color: #e9e4d8; border: 1px solid rgba(217, 207, 192, 0.35); border-radius: 4px; padding: 5px 14px; font: 12px var(--mono); cursor: pointer; }
 .adm-tr .adm-proof { grid-column: 1 / -1; margin: 4px 0 2px; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-all; font: 10px var(--mono); color: #f0b48a; background: rgba(0, 0, 0, 0.35); padding: 4px 6px; border-radius: 3px; }
+.chat-line.over { opacity: 0.62; font-style: italic; }

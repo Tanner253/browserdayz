@@ -22,18 +22,21 @@ export const HELD_BACK: ReadonlySet<string> = new Set(['c4', 'satchel']);
 export const RAID = {
   /**
    * What a blow takes off a piece, by tier (Frame, Wood, Stone, Metal, Armoured), for each tool. With health 60, 500,
-   * 1000, 2000, 4000 (pieces.ts TIER_HP): a wooden wall is some 70 blows of a felling axe, a stone wall 200 of a
-   * sledgehammer, a metal wall a thousand of it, and every blow wears the tool (src/sim/gather.ts TOOL_LIFE).
+   * 1000, 2000, 4000 (pieces.ts TIER_HP), swung without a stop: a wooden door some 210 blows of a felling axe (3.5
+   * minutes), a wooden wall 420 (7 minutes, most of an axe), a stone wall 1,250 of a sledgehammer (28 minutes), a metal
+   * wall two and a half hours of it; and every blow wears the tool (src/sim/gather.ts TOOL_LIFE). A sixth of what they
+   * were (the owner, 2026-10-27: "melee tools do too much damage to player walls currently, too easy to break into
+   * buildings. it should take a super long time"); a frame is cleared as quickly as before.
    */
   blow: {
-    felling_axe: [30, 7, 0, 0, 0],
-    hatchet: [24, 5, 0, 0, 0],
-    stone_hatchet: [18, 3, 0, 0, 0],
-    pickaxe: [24, 3, 4, 0, 0],
-    sledgehammer: [30, 6, 5, 2, 0],
+    felling_axe: [30, 1.2, 0, 0, 0],
+    hatchet: [24, 0.8, 0, 0, 0],
+    stone_hatchet: [18, 0.5, 0, 0, 0],
+    pickaxe: [24, 0.5, 0.7, 0, 0],
+    sledgehammer: [30, 1, 0.8, 0.3, 0],
   } as Record<string, number[]>,
   /** anything else swung at it: a machete, a bat, a crowbar, a fist's worth (the building hammer breaks nothing) */
-  other: [10, 1, 0, 0, 0],
+  other: [10, 0.15, 0, 0, 0],
   /** the charges: tuned in src/sim/build/charges.ts, the one place */
   charge: CHARGES as Record<string, Charge>,
   /** how far from the eye a blow is believed to land on a piece, and a charge that did not go off is lit again, metres */
