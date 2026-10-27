@@ -151,6 +151,8 @@ export class Player {
   emptyHanded = false;
   /** how fast thirst grows, from headwear */
   thirstMult = 1;
+  /** hunger and thirst at home: less in one's own base, by its best workbench (src/game/building/index.ts homeEase) */
+  needMult = 1;
   /** fall damage multiplier from footwear */
   fallMult = 1;
   /**
@@ -1255,8 +1257,8 @@ export class Player {
       return;
     }
     const exertion = this.god ? 0 : this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
-    v.energy = Math.max(0, v.energy - NEED.hunger * exertion * dt);
-    v.water = Math.max(0, v.water - NEED.thirst * exertion * this.thirstMult * dt);
+    v.energy = Math.max(0, v.energy - NEED.hunger * exertion * this.needMult * dt);
+    v.water = Math.max(0, v.water - NEED.thirst * exertion * this.thirstMult * this.needMult * dt);
     // An open wound costs blood, and no health: the two are two things (src/sim/blood.ts). Left alone it closes
     // in the end, five minutes on; a dressing closes it there and then.
     if (v.bleeding) {

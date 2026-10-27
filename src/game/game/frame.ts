@@ -281,6 +281,7 @@ export const frameMethods = {
       p.weightKg = weightFelt(this.inv.weight(), this.powers.weightless);
       p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
       p.thirstMult = this.inv.wear('thirst').reduce((a, b) => a * b, 1);
+      p.needMult = this.build.homeEase(p.pos.x, p.pos.z);
       this.hasCompass = !!this.inv.find((i) => i.id === 'compass');
     }
     this.tagT += dt;

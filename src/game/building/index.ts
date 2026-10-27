@@ -18,7 +18,7 @@ import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
 import { mendOf, Bases, heard, heardClaim, heardPiece, heardSite, repairOf, said, type KeptBase } from '../../sim/build/bases';
-import { PLACED, PLACES, PIECES, TIERS, TIER_S, byHand, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
+import { PLACED, PLACES, PIECES, TIERS, TIER_S, benchLevel, byHand, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
 import { HandPickup } from './pickup';
 import { FREE_LEAN, leanAt, deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Piece, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
@@ -233,6 +233,19 @@ export class Building {
     return this.h.online() ? this.seen : this.local;
   }
   /** the bases this game knows (crafting looks for its workbenches and forges in them) */
+  /**
+   * How much of hunger and thirst is felt at home: in a base of one's own (on its claim's ground, and one may work it),
+   * by its best workbench, a quarter less at a Bench I, a third more or less at a II, half at a III (the owner, 2026-10-26:
+   * "when in your base make hunger and water reduce by 25/35/50% depending on the workbench"); 1 anywhere else.
+   */
+  homeEase(x: number, z: number): number {
+    const b = this.store.claimAt(x, z);
+    if (!b || !this.store.mayWork(b, this.me)) return 1;
+    let best = 0;
+    for (const p of b.pieces.values()) if (p.k === 'workbench') best = Math.max(best, benchLevel(p));
+    return [1, 0.75, 0.65, 0.5][Math.min(3, best)];
+  }
+
   get known(): Bases {
     return this.store;
   }
