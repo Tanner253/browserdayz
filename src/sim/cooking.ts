@@ -257,9 +257,9 @@ export const HEAT = {
 /** meat, of whatever animal (src/sim/items/hunt.ts) */
 // (raw, it does harm: "the raw meat says to the user that it gives them + energy and stuff when it should be -food and
 // -water and -hp", the owner, 2026-10-24. It took a quarter of the food and gave half again the water before.)
-// (raw an hour, cooked a day: the owner, 2026-10-26, "cooked meat spoils too fast, it should last long time". It was forty
-// minutes and three hours)
-const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: -0.25, water: -0.25, health: -10, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 3600, done: 86400 } };
+// (raw three hours, cooked three days: the owner, 2026-10-26, "cooked meat spoils too fast, it should last long time", then
+// "meat should last longer". It was forty minutes and three hours, then an hour and a day)
+const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: -0.25, water: -0.25, health: -10, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 10800, done: 259200 } };
 /** what anything rotten is worth: little, and it makes you ill */
 export const ROTTEN: Worth = { energy: 0.2, water: 0, health: -15, sick: 1 };
 
