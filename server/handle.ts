@@ -60,7 +60,7 @@ import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './bui
 import { blow, throwCharge, stick, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
-import { tellBeds, wakeAt } from './beds';
+import { giveBed, tellBeds, wakeAt } from './beds';
 import { code as lockCode, cutKey, fit as fitLock, lockLets, onOff as lockOnOff, unfit as unfitLock } from './locks';
 import { join as joinClaim } from './claims';
 import { POISON } from '../src/sim/sickness';
@@ -434,6 +434,8 @@ export function handle(c: Client, m: C2S) {
       return stick(c, m);
     case 'blight':
       return relight(c, m);
+    case 'bgive':
+      return giveBed(c, m);
     case 'bjoin':
       return joinClaim(c, m);
     case 'mybeds':

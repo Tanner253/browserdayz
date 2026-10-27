@@ -411,6 +411,8 @@ export type C2S =
   | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean; bit?: 1 }
   /** joining a base's claim, or leaving it (stood at it) */
   | { t: 'bjoin'; b: number }
+  /** a bed or bag of one's own given to a party member (`to`: their id on this server) */
+  | { t: 'bgive'; b: number; p: number; to: number }
   /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
   | { t: 'bdoor'; b: number; p: number; open: boolean }
   | { t: 'bknock'; b: number; p: number }

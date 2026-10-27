@@ -8,10 +8,13 @@
 
 import { PIECES } from '../src/sim/build/pieces';
 import { toWorld, worldYaw } from '../src/sim/build/snap';
-import { sleepOf, sleptAt } from '../src/sim/build/beds';
-import { send, type Client } from './players';
-import { bases } from './build';
+import { bedsFull, sleepOf, sleptAt } from '../src/sim/build/beds';
+import { saidPiece } from '../src/sim/build/bases';
+import { clients, send, type Client } from './players';
+import { bases, tellBase } from './build';
 import { pidOf } from './acts';
+import { partyMates } from './party';
+import { KEPT } from './keep';
 
 /** a player's beds, wherever they are: [base, piece, kind, x, z, seconds until it gives wakes again, wakes it has now] */
 export function bedsOf(c: Client): [number, number, string, number, number, number, number][] {
@@ -40,4 +43,30 @@ export function wakeAt(c: Client, bed: { b: number; p: number }): { x: number; y
   // (on it, a hand over it: a bed's top, a bag's)
   const [x, y, z] = toWorld(b, p.x, p.y + (p.k === 'bed' ? 0.62 : 0.15), p.z);
   return { x, y, z, yaw: worldYaw(b, p.r) + Math.PI };
+}
+
+/**
+ * A bed or a bag of one's own given to somebody in one's party, Rust's way: theirs from then on, on their map when they
+ * die and not on the giver's (the owner, 2026-10-27: "I should be able to set a sleeping bag for another player that I
+ * place down, rust style"). Within their own limit of each kind.
+ */
+export function giveBed(c: Client, m: { b: unknown; p: unknown; to: unknown }) {
+  const b = typeof m.b === 'number' ? bases().bases.get(m.b) : undefined, p = typeof m.p === 'number' ? b?.pieces.get(m.p) : undefined;
+  const to = typeof m.to === 'number' ? clients.get(m.to) : undefined;
+  if (!c.alive || !b || !p || !PIECES[p.k].sleep) return;
+  const warn = (text: string) => send(c, { t: 'tell', kind: 'warn', text });
+  if (p.by !== pidOf(c.key)) return void warn('That is not yours to give');
+  if (!to || to === c || !partyMates(c).includes(to)) return void warn('Give it to somebody in your party');
+  const theirs: typeof p[] = [];
+  for (const o of bases().bases.values()) for (const q of o.pieces.values()) if (q.by === pidOf(to.key)) theirs.push(q);
+  const full = bedsFull(p.k, theirs);
+  if (full) return void warn(`${to.name} has as many as they may: ${full.split(':')[0].replace('You can', 'they can')}`);
+  p.by = pidOf(to.key);
+  KEPT.dirty = true;
+  tellBase(b.id, { t: 'bpc', b: b.id, p: saidPiece(p) });
+  tellBeds(c);
+  tellBeds(to);
+  const name = PIECES[p.k].name.toLowerCase();
+  send(c, { t: 'tell', kind: 'info', text: `Your ${name} is ${to.name}'s now` });
+  send(to, { t: 'tell', kind: 'good', text: `${c.name} gave you their ${name}: it is on your map when you die` });
 }
