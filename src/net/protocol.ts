@@ -94,7 +94,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // gun rack's bays: a page of 71 sets things down squared and shows a rack's bays as dead cells)
 // (73, 2026-10-26: a thing set down in one's own base picked up by hand, F held at it, 'bdel' with `hand`: a server of 72
 // asks for a hammer and picks nothing up)
-export const PROTOCOL = 73;
+// (74, 2026-10-26: blueprints learned in any order, foundations reaching 4.5 m down and the ground 0.3 m into a corner,
+// posts 3 m: a page of 73 refuses what a server of 74 lays, and the other way)
+export const PROTOCOL = 74;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
