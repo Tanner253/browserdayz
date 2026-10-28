@@ -250,9 +250,16 @@ export class AdminUI {
   root = el('div', 'adm');
   isOpen = false;
   private view: View = 'who';
-  /** the All players search, and its wait before it is asked */
+  /**
+   * The All players search: what is typed, the wait before it is asked, what was last asked, and what came of it. Asked
+   * only when searched (typing, Enter, the button) and kept until the next search: the lists come every two seconds,
+   * some without it, and each one drew the results away (2026-10-27: "it shows th elist of names then rerenders
+   * everything, terrible ux").
+   */
   private findAll = '';
   private findT = 0;
+  private searched = '';
+  private found: { q: string; rows: NonNullable<AdminLists['found']> } | null = null;
   private sub: Sub = 'actions';
   private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, night: false, names: false, tint: null, freecam: false, x: 0, z: 0 };
   private lists: AdminLists = { players: [], gone: [], bans: [], roles: [], checks: '' };
@@ -527,6 +534,8 @@ export class AdminUI {
 
   setLists(l: AdminLists) {
     this.lists = l;
+    // (a search's answer, kept until the next: the lists without one leave it as it is)
+    if (l.found && this.searched) this.found = { q: this.searched, rows: l.found };
     // (a mod has nobody picked until there is somebody to pick)
     if (!this.pick() && this.self.role !== 'admin') this.target = l.players.find((p) => p.id !== this.self.id)?.id ?? 0;
     if (this.isOpen) this.draw();
@@ -558,9 +567,19 @@ export class AdminUI {
     return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && inside.contains(a);
   }
 
-  /** the lists asked for, with the All players search while that is up */
+  /** the lists asked for (again) */
   private askLists() {
-    this.act.ask(this.view === 'people' && this.findAll.trim().length > 1 ? this.findAll.trim() : undefined);
+    this.act.ask();
+  }
+
+  /** the All players search asked for, as it stands */
+  private search() {
+    window.clearTimeout(this.findT);
+    const q = this.findAll.trim();
+    this.searched = q.length > 1 ? q : '';
+    if (this.searched) this.act.ask(this.searched);
+    else this.found = null;
+    this.draw(true);
   }
 
   private send(line: string) {
@@ -808,7 +827,7 @@ export class AdminUI {
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}|${JSON.stringify(this.lists.turned ?? [])}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
     if (this.view === 'store') return `${base}|${this.store.n}`;
-    if (this.view === 'people') return `${base}|${this.findAll}|${JSON.stringify(this.lists.found ?? null)}`;
+    if (this.view === 'people') return `${base}|${this.findAll}|${this.searched}|${JSON.stringify(this.found)}`;
     if (this.view === 'reports') return `${base}|${JSON.stringify(this.lists.reports ?? [])}`;
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
@@ -1675,11 +1694,11 @@ export class AdminUI {
     find.append(icon('search'), this.input(this.findAll, 'Find anybody who has played: a name, or dev:xxxxxxxx', (v) => {
       this.findAll = v;
       window.clearTimeout(this.findT);
-      this.findT = window.setTimeout(() => this.askLists(), 250);
-    }, '', () => this.askLists(), 'find-all'), this.button('Search', () => this.askLists(), 'small', 'search'));
-    const list = el('div', 'adm-table people'), q = this.findAll.trim(), got = this.lists.found;
+      this.findT = window.setTimeout(() => this.search(), 400);
+    }, '', () => this.search(), 'find-all'), this.button('Search', () => this.search(), 'small', 'search'));
+    const list = el('div', 'adm-table people'), q = this.findAll.trim(), got = this.found && this.found.q === this.searched ? this.found.rows : null;
     if (q.length < 2) list.append(el('div', 'adm-none', 'Two or more letters of a name, or dev: and a device: anybody who has played in the last 90 days, on or not.'));
-    else if (!got) list.append(el('div', 'adm-none', 'Looking…'));
+    else if (!got) list.append(el('div', 'adm-none', this.searched ? 'Looking…' : 'Press Enter or Search.'));
     else if (!got.length) list.append(el('div', 'adm-none', `Nobody who has played lately went by "${q}".`));
     else {
       const head = el('div', 'adm-tr head');
@@ -1694,7 +1713,11 @@ export class AdminUI {
           r.append(cell);
         }
         // (by the start of their key's hash, never by a name: a name could be somebody else's on now)
-        r.append(p.banned ? el('span', 'adm-none', 'Banned') : this.grave(`ban:${p.ref}`, 'Ban', () => this.send(`/ban k:${p.ref}`), 'ban'));
+        r.append(p.banned ? el('span', 'adm-none', 'Banned') : this.grave(`ban:${p.ref}`, 'Ban', () => {
+          this.send(`/ban k:${p.ref}`);
+          // (and the search again, so that the row says Banned)
+          window.setTimeout(() => this.search(), 900);
+        }, 'ban'));
         list.append(r);
       }
     }
@@ -1715,8 +1738,7 @@ export class AdminUI {
       if (r.about) row.append(this.button(`Find ${r.about}`, () => {
         this.view = 'people';
         this.findAll = r.about!;
-        this.askLists();
-        this.draw(true);
+        this.search();
       }, 'small', 'search'));
       list.append(row);
     }
