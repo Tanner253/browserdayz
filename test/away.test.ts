@@ -115,9 +115,12 @@ try {
     await sleep(900);
   }
   clearInterval(here);
-  assert.ok(!gil.sawDie(hal), 'somebody whose game was answering was said dead by the server (their own game says so; the checks only watch)');
+  // (and one whose game answers but never takes the hits is killed by the server all the same, 2026-10-28: "a player
+  // can be killed as long as their body is on the server regaurdless of client state")
+  const halDied = gil.got.find((m) => m.t === 'death' && m.k.id === hal.id) as Extract<S2C, { t: 'death' }> | undefined;
+  assert.ok(halDied && halDied.k.by === gil.id, `somebody whose game answered but took no hits was not killed by the server, or not by Gil: ${JSON.stringify(halDied?.k)}`);
   checks++;
-  console.log('  ok  somebody whose game is not answering dies of what hits them; somebody whose game is answering is left to it');
+  console.log('  ok  somebody whose game is not answering dies of what hits them; and one whose game answers but takes no hits is killed by the server');
 
   // ---- heard from again, a game is told what its player has left
   const jon = new Player('Jon');

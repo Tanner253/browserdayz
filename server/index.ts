@@ -436,22 +436,6 @@ function saveWorld() {
   }
 }
 
-/**
- * The most any worn thing takes off a hit, were everything that can be worn worn at once: nobody is hurt less
- * than that by anything. (What each player says they wear is not asked: it is their own game's word, and a
- * moment old.)
- */
-export const SOAK = (() => {
-  const best = (field: 'armor' | 'head') => {
-    const by = new Map<string, number>();
-    for (const d of Object.values(ITEMS)) {
-      const v = d.wear?.[field];
-      if (v !== undefined) by.set(d.slot ?? d.id, Math.min(by.get(d.slot ?? d.id) ?? 1, v));
-    }
-    return [...by.values()].reduce((x, y) => x * y, 1);
-  };
-  return { torso: best('armor'), head: best('head') };
-})();
 
 
 setInterval(() => keeping(Date.now()), 1000);

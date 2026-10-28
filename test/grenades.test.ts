@@ -394,7 +394,11 @@ class Player {
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-grenades-'));
 // (the site it would report to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0',
+    // (Ben, Cy and Dee, the targets, take blast after blast that would kill anybody, to measure each: the server's own
+    // kill of a body past its health leaves them up, server/gate.ts standing; Ada it does not)
+    STANDING_SPARE: ['Ben', 'Cy', 'Dee'].map((name, k) => `grenade-test-key-${name}-${String(k + 2).padStart(20, '0')}`).join(','),
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';
@@ -525,9 +529,15 @@ try {
     assert.ok(took[0].amount < WEAPON_RULES.grenade.damage * 0.6);
     // Ada's game goes on saying she stands there, unhurt: the server has counted all of it against her, through no armour
     await sleep(2400);
-    assert.match(logged.slice(logMark), /Ada is on their feet after \d+ of damage that no armour stops/, 'whoever held a grenade to the end and stood there was not found out');
+    assert.match(logged.slice(logMark), /Ada is on their feet after \d+ of damage their armour does not stop/, 'whoever held a grenade to the end and stood there was not found out');
+    // (and killed for it, whatever the checks' mode, 2026-10-28: then back, where she stood, for what comes next)
+    assert.ok(ben.got.some((m) => m.t === 'death' && m.k.id === ada.id), 'whoever held a grenade to the end and stood there was not killed by the server');
+    ada.send({ t: 'respawn' });
+    await sleep(600);
+    ada.stand(60, 0);
+    await sleep(600);
     checks++;
-    console.log(`  ok  over the wire: held to the end, it is shown going off where the server has its holder, its blast is believed from there (${took[0].amount.toFixed(0)} at 6 m), and its holder is down as having taken all of it`);
+    console.log(`  ok  over the wire: held to the end, it is shown going off where the server has its holder, its blast is believed from there (${took[0].amount.toFixed(0)} at 6 m), and its holder is killed for having taken all of it`);
   }
 
   // ---- and one whose game has stopped answering dies of it, by the server's hand
@@ -593,7 +603,16 @@ try {
   {
     const cars = ((ada.got.find((m) => m.t === 'welcome') as { vehicles?: VehicleInfo[] }).vehicles ?? []).filter((v) => !v.k && v.hp > 0);
     assert.ok(cars.length >= 2, 'no two jeeps to try it on');
+    // (a car going up three metres from Ada kills her now, as it would anybody: she is brought back before the next)
+    let since = ben.got.length;
     const beside = async (car: VehicleInfo, w: string, says: number) => {
+      // (after the server's grace for a heal, in which a body past its health is still up: server/gate.ts standing)
+      await sleep(2000);
+      if (ben.got.slice(since).some((m) => m.t === 'death' && m.k.id === ada.id)) {
+        ada.send({ t: 'respawn' });
+        await sleep(600);
+      }
+      since = ben.got.length;
       ada.stand(car.s[0] + 3, car.s[2]);
       await sleep(700);
       const mark = ben.got.length;

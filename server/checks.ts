@@ -1,13 +1,14 @@
 // The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait).
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
-import { TAG_OUT, ZONA_VOID, type ItemInstance } from '../src/sim/items';
-import { keepHotHeld } from '../src/sim/inventory';
+import { ITEMS, TAG_OUT, ZONA_VOID, type ItemInstance } from '../src/sim/items';
+import { COOKS } from '../src/sim/cooking';
+import { keepHotHeld, type SerializedInventory } from '../src/sim/inventory';
 import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
-import { BANS, SOAK, log, vehicles, world, type Box } from './index';
+import { BANS, log, things, vehicles, world, type Box } from './index';
 import { carriedTags, lootedTags, namesOf, seenOf, tagSeen, theirOwn, voided } from './tags';
-import { TURNED, forgetShooter, keep, keyHash, roleOf, stayOn, turnedAway } from './gate';
+import { TURNED, forgetShooter, keep, keyHash, roleOf, stayOn, turnedAway, worn } from './gate';
 import { KEPT } from './keep';
 import { putOff } from './admin';
 import { clients, drop, send, type Client } from './players';
@@ -67,7 +68,7 @@ export const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?
  *     this is for a game that does all the same. (Until 2026-10-15 nothing they said at all was weighed for half
  *     a minute: a program had half its first minute free. "we need to detect bots within a minute of joining".)
  */
-export const CHECK = { foot: 9.5, seat: 64, carry: 2, lag: 12, lagFor: 5000, grace: 3, owe: 30, free: 2500, fresh: 30_000, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
+export const CHECK = { foot: 9.5, seat: 64, carry: 2, lag: 12, lagFor: 5000, grace: 3, owe: 30, free: 2500, fresh: 30_000, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 1, over: 5, down: 1500, strikes: 2, ban: 6 };
 
 export let flagged = 0;
 
@@ -266,18 +267,24 @@ export function moveCheck(c: Client, to: Pose, now: number): boolean {
 }
 
 /**
- * What the server has just dealt somebody, taken off the most health they can have. That figure is never less
- * than what they do have: it starts at what they last said (or a hundred), comes back at CHECK.heal a second
- * whether they are mending or not, and loses only what the best armour there is would let through. So nobody
- * honest is ever below it, and whoever is CHECK.over past none of it and still on their feet CHECK.down later
- * has taken more than a body can (see `standing`).
+ * What the server has just dealt somebody, taken off the most health they can have: whatever their own game is
+ * doing, paused, frozen, behind another window or lying, a body the server's count says is dead is dead (the owner,
+ * 2026-10-28: "there should be no state where a player body is not killable or does not take damage when shot
+ * regaurdless of the client state since its happening on the server right?"). The count starts at what they last
+ * said (or a hundred), comes back at CHECK.heal a second (a fire mends 0.8, the body alone 0.12) and by whatever
+ * medicine or food goes from their pockets (`healingGone`), and loses what their own armour lets through (the server
+ * has their gear). It gave back 10 a second and took the best armour there is for everybody's, and a game that took
+ * no hits stood through three rifle rounds. Whoever is CHECK.over past none and still up CHECK.down later is killed
+ * (see `standing`): long enough for their own game's word of a heal, sent within 0.6 s, to come in first.
  */
 export function dealt(target: Client, amount: number, zone: string, w: string) {
   keep(target, amount, zone, w);
   stayOn(target, 'you were hit');
   if (CHECKS === 'off' || !target.alive) return;
   const now = Date.now(), k = target.check;
-  k.hp = Math.min(100, k.hp + (CHECK.heal * (now - k.hpAt)) / 1000) - amount * (w === 'crash' ? 1 : zone === 'torso' ? SOAK.torso : zone === 'head' ? SOAK.head : 1);
+  let taken = amount;
+  if (w !== 'crash') for (const m of zone === 'torso' ? worn(target, 'armor') : zone === 'head' ? worn(target, 'head') : []) taken *= m;
+  k.hp = Math.min(100, k.hp + (CHECK.heal * (now - k.hpAt)) / 1000) - taken;
   k.hpAt = now;
   if (k.hp < -CHECK.over && !k.downAt) k.downAt = now;
 }
@@ -450,3 +457,23 @@ export function touched(b: Box) {
 
 /** Is somebody out of the game for being under the ground? (past the moment that is let go) */
 export const buried = (c: Client, now = Date.now()) => c.underAt > 0 && now - c.underAt >= UNDER.grace * 1000;
+
+/**
+ * The health their own game may have put back since its last word of their pockets: each medicine, food or drink gone
+ * from them since, at the most it gives (a meal cooked at its best: COOKS), a stack counted by how many went. What was
+ * dropped or given away counts as taken: this only ever lets a body have more health, never less (see `dealt`).
+ */
+export function healingGone(had: SerializedInventory | null, now: SerializedInventory | null): number {
+  const count = (inv: SerializedInventory | null) => {
+    const n = new Map<string, number>();
+    for (const it of things(inv)) n.set(it.id, (n.get(it.id) ?? 0) + Math.max(1, it.qty ?? 1));
+    return n;
+  };
+  const before = count(had), after = count(now);
+  let heal = 0;
+  for (const [id, n] of before) {
+    const gone = n - (after.get(id) ?? 0), gives = Math.max(ITEMS[id]?.use?.health ?? 0, COOKS[id] ? 25 : 0);
+    if (gone > 0 && gives > 0) heal += gone * gives;
+  }
+  return heal;
+}

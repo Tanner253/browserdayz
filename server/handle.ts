@@ -21,7 +21,7 @@ import { FIRE } from '../src/sim/fires';
 import { FUEL } from '../src/sim/cooking';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
-import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
+import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, healingGone, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, ipHash, keptOffNow, keyHash, pockets, roleOf, stayOn } from './gate';
 import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
@@ -715,6 +715,15 @@ export function handle(c: Client, m: C2S) {
         send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
       }
       const v = m.vitals;
+      // (what healing went from their pockets since their last word goes on the server's count first, and a count back
+      // over the line calls off the kill it was waiting to make: checks.ts healingGone, `standing`)
+      if (had && c.inv) {
+        const back = healingGone(had, c.inv);
+        if (back > 0) {
+          c.check.hp = Math.min(100, c.check.hp + back);
+          if (c.check.hp >= -CHECK.over) c.check.downAt = 0;
+        }
+      }
       // (less health than the server allowed them is taken at their word; more is not)
       if (v && num(v.health)) c.check.hp = Math.min(c.check.hp, Math.max(0, v.health) + 1);
       // (and while the server is keeping their life for them, what their game says puts no health back)

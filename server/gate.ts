@@ -252,7 +252,7 @@ export async function goodSlip(slip: string, ip: string): Promise<boolean | null
 }
 
 /** what worn things do to a hit: every plate and helmet they were last seen in (as their own game reckons it: Game.takeHit) */
-const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {}).flatMap((it) => (it && ITEMS[it.id]?.wear?.[k] !== undefined ? [ITEMS[it.id].wear![k] as number] : []));
+export const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {}).flatMap((it) => (it && ITEMS[it.id]?.wear?.[k] !== undefined ? [ITEMS[it.id].wear![k] as number] : []));
 
 /** Something has hit somebody whose game is not answering: it comes off the health the server holds for them. */
 export function keep(c: Client, amount: number, zone: string, w: string) {
@@ -367,14 +367,19 @@ export function gone(c: Client, why = '') {
 }
 
 /** Twice a second: whoever ought to have been dead for a while and has not said so. Enforcing, the server says it for them. */
+/** games `standing` leaves up: the grenade test's targets, taking blast after blast that would kill anybody, to measure each (test/grenades.test.ts) */
+let spared: Set<string> | null = null;
+
 export function standing(now: number) {
   if (CHECKS === 'off') return;
   for (const c of [...clients.values()]) {
     const k = c.check;
     if (!k.downAt || now - k.downAt < CHECK.down) continue;
     k.downAt = 0;
-    if (!c.alive) continue;
-    if (!flag(c, `is on their feet after ${Math.round(100 - k.hp)} of damage that no armour stops`)) continue;
+    if (!c.alive || (spared ??= new Set(listOf(process.env.STANDING_SPARE))).has(c.key)) continue;
+    // (killed whatever the checks' mode, and an admin too unless made unhurtable: no state of a game keeps a body up
+    // that the server's count says is dead, 2026-10-28; flagged as well, to be seen)
+    flag(c, `is on their feet after ${Math.round(100 - k.hp)} of damage their armour does not stop`);
     k.hp = 0;
     kill(c, 'wounds');
   }
