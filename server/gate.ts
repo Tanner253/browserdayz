@@ -307,13 +307,16 @@ export function keeping(now: number) {
       continue;
     }
     // (2026-10-14, the owner: "players who are tabbed out for 60 seconds should get removed from the server". A
-    // minute of nothing from their game, and they go as with the proper leave, saved where they stood. A hit
-    // meanwhile starts the minute again, as a hit calls off the wait to leave: no tabbing out of a fight. Never an
-    // admin: the owner, 2026-10-19, "admins should not be kicked off the server for being tabbed out".)
+    // minute of nothing from their game, and they go; a hit meanwhile starts the minute again, as a hit calls off the
+    // wait to leave. And they go as a dropped connection does, their body left in the world for LINGER_MS, where it
+    // can be killed and searched, and taken up again if they come back in time: it went as the proper leave does,
+    // saved and gone at once, and a tab put behind another was a safe way out of the world (2026-10-28, the owner:
+    // "when ap layer tabs out of their window, they become unkillable"). Never an admin: the owner, 2026-10-19,
+    // "admins should not be kicked off the server for being tabbed out".)
     if (TABBED_MS && c.spoke && !c.asleep && roleOf(c) !== 'admin' && now - Math.max(c.heardAt, c.hitAway) >= TABBED_MS) {
-      log(`${c.name} (#${c.id}) has been tabbed out ${Math.round(TABBED_MS / 1000)} s: taken off the server${c.alive ? ', saved where they stood' : ''}`);
-      send(c, { t: 'kick', reason: `You were tabbed out for ${Math.round(TABBED_MS / 1000)} seconds, so you were taken off the server.${c.alive ? ' Your character is saved where you stood, with everything you carried.' : ''}` });
-      drop(c);
+      log(`${c.name} (#${c.id}) has been tabbed out ${Math.round(TABBED_MS / 1000)} s: taken off the server${c.alive ? ', their body left where they stood' : ''}`);
+      send(c, { t: 'kick', reason: `You were tabbed out for ${Math.round(TABBED_MS / 1000)} seconds, so you were taken off the server.${c.alive ? ` Your body stays where you stood for ${Math.round(LINGER_MS / 60_000)} minutes, where anybody can find it: come back before then to take it up again.` : ''}` });
+      gone(c, 'tabbed out');
       c.ws.close();
       continue;
     }
@@ -344,7 +347,8 @@ export function stayOn(c: Client, why: string) {
 /** A connection has gone. Dead, or with nothing kept of bodies: out of the world. Alive: the body stays, sat where it stood. */
 /** @param why how the connection ended, as the browser said (its code, and its reason if it gave one) */
 export function gone(c: Client, why = '') {
-  if (!clients.has(c.id)) return;
+  // (already left behind: taken off for being tabbed out, and its connection closed after)
+  if (!clients.has(c.id) || c.asleep) return;
   if (!c.alive || !LINGER_MS) return void drop(c);
   // (A body is left by somebody who was playing. A connection whose game never said where it stood, or one new to
   // the world that went within its first minute, was nobody to leave one: 2026-10-12, connections made by a

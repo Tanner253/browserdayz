@@ -90,12 +90,13 @@ try {
   assert.ok(!ann.shut, 'taken off well before the time');
   for (let k = 0; k < 40 && !ann.shut; k++) await sleep(100);
   assert.ok(ann.shut && /tabbed out/.test(ann.kicked()?.reason ?? ''), `a game that said nothing for ${TABBED} s was not taken off: ${JSON.stringify(ann.kicked())}`);
-  assert.ok(/saved where you stood/.test(ann.kicked()!.reason), 'not told that their character is kept');
+  assert.ok(/body stays where you stood/.test(ann.kicked()!.reason), 'not told that their body stays');
   await sleep(300);
-  assert.ok(bob.sawLeave(ann.id), 'the others were not told that she went');
-  assert.equal((await healthz()).asleep, 0, 'whoever is taken off for being tabbed out left a body behind');
+  // (her body stays, as a dropped connection's does: killable, not a safe way out, 2026-10-28)
+  assert.ok(!bob.sawLeave(ann.id), 'her body was taken out of the world');
+  assert.equal((await healthz()).asleep, 1, 'whoever is taken off for being tabbed out left no body behind');
   checks++;
-  console.log('  ok  a game that says nothing for the time has its player taken off, told why, and no body left behind');
+  console.log('  ok  a game that says nothing for the time has its player taken off, told why, and their body left where they stood');
 
   const back = new Player('Ann', ann.key);
   assert.ok(await back.join());
