@@ -140,8 +140,10 @@ export const BUILD_ITEMS: ItemDef[] = [
   },
   // (raiding, base building's fifth step: the navigator, "C4 as loot". Plan v2: "explosive loot rare; crafted later". Found
   // only where the army was, and seldom; crafting's satchel charge is the cheaper way through a door: src/sim/build/raid.ts)
-  { id: 'c4', name: 'C4 Charge', model: 'c4', w: 1, h: 2, weight: 1.2, category: 'tool',
-    desc: 'Three blocks of plastic explosive taped to a timer. In your hands, the left button sticks it to a wall, a door or a floor within reach: ten seconds later it goes off. One takes a wooden wall, two a stone one, four a metal one.',
+  // (said to be off until raiding opens, src/sim/build/raid.ts HELD_BACK: the owner, 2026-10-29, "add (DEACTIVATED) on the
+  // c4 and satchel charge names i nthe description say coming soon")
+  { id: 'c4', name: 'C4 Charge (DEACTIVATED)', model: 'c4', w: 1, h: 2, weight: 1.2, category: 'tool',
+    desc: 'Coming soon.',
     // (held back for now, src/sim/build/raid.ts HELD_BACK: none found. When raiding opens, at [0, 0, 0, 1, 2])
     loot: { pair: 'PlasticExplosive', at: [0, 0, 0, 0, 0], restock: 3600, usage: ['Military'] },
     worth: 40,

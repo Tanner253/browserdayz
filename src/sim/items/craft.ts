@@ -102,7 +102,8 @@ export const CRAFT_ITEMS: ItemDef[] = [
     worth: 6,
   },
   // ---------------------------------------------------------------- raiding (what it does as a charge is base building's raiding step)
-  { id: 'satchel', name: 'Satchel Charge', model: 'satchel_charge', w: 2, h: 2, weight: 2, category: 'misc',
-    desc: 'A tin of gunpowder in a cloth bag, tied with rope, with a fuse. Made at a workbench: a hundred rounds of powder to blow one door.',
+  // (said to be off until raiding opens: as the C4, src/sim/items/build.ts)
+  { id: 'satchel', name: 'Satchel Charge (DEACTIVATED)', model: 'satchel_charge', w: 2, h: 2, weight: 2, category: 'misc',
+    desc: 'Coming soon.',
   },
 ];
