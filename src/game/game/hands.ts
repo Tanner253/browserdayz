@@ -565,7 +565,11 @@ export const handsMethods = {
    */
   showHands(this: Game, smooth = false) {
     const it = this.inv.held(), def = it ? ITEMS[it.id] : null, armed = !!(def?.weapon || def?.melee);
-    if (this.inHand && this.inHand !== it) {
+    // (A grenade with its pin out is the hands' until it has left them: the pin out takes it from the pockets, and the
+    // last one gone left the hands empty here, its cook dropped, so that letting go threw nothing and it went off in
+    // the hand: 2026-10-29, "when i let go of left click when im cooking a grenade it is never thrown". See `cooking`.)
+    const live = !!this.cook && this.cook.live >= 0 && this.cook.item === this.inHand;
+    if (this.inHand && this.inHand !== it && !live) {
       // (what the hands were at with it is over, its grenade's pin among it)
       if (this.use) this.breakOff();
       if (this.cook?.item === this.inHand) {
