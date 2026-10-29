@@ -61,7 +61,7 @@ import { recycle } from './recycle';
 import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
-import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
+import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
 import { knock, swing } from './doors';
 import { giveBed, tellBeds, wakeAt } from './beds';
@@ -596,6 +596,8 @@ export function handle(c: Client, m: C2S) {
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       // (a base's box or claim with a lock on it opens only for whoever the lock lets in: server/locks.ts)
       if (!lockLets(c, m.cid)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is locked' });
+      // (and only from where it is reached: not through a base's wall, floor or shut door, server/solid.ts reaches)
+      if ((b.kind === 'bbox' || b.kind === 'claim') && !reaches(c.pose, [b.x, b.y, b.z])) return void send(c, { t: 'tell', kind: 'warn', text: 'Out of reach: something is in the way' });
       // (open by as many as like at once: searched.ts. Another crate they had open is shut first.)
       if (c.openCid && c.openCid !== m.cid) shutIt(c, c.openCid);
       if (!hasOpen(c, m.cid)) openIt(c, m.cid);
@@ -617,6 +619,8 @@ export function handle(c: Client, m: C2S) {
       const b = typeof m.cid === 'string' ? boxes.get(m.cid) : undefined;
       if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6 || !mayPeek(c, m.cid)) return;
+      // (a base's box or claim: as for opening it, its lock and a reach to it, never through a wall)
+      if ((b.kind === 'bbox' || b.kind === 'claim') && (!lockLets(c, m.cid) || !reaches(c.pose, [b.x, b.y, b.z]))) return;
       send(c, { t: 'cdata', cid: m.cid, items: boxItems(b) });
       return;
     }
