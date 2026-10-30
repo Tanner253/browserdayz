@@ -28,7 +28,7 @@ const ROWS: Row28[] = [];
  */
 const LINES: [number, string, number][] = [
   [1, 'coast', 0.9], [2, 'first-loot', 0.3], [3, 'wolves', 0.1], [4, 'lift-off', 0.9], [5, 'fort', 0.2], [6, 'chop', 0.5], [7, 'raiders', 0.2],
-  [8, 'zona-kill', 0.1], [9, 'hold', 0.1], [10, 'board-paid', 0.3], [11, 'end', 0.4], [12, 'end', 3.6],
+  [8, 'zona-kill', 1.6], [9, 'hold', 0.1], [10, 'board-paid', 0.3], [11, 'end', 0.4], [12, 'end', 3.6],
 ];
 const VOICE = new Map<number, AudioBuffer>();
 const LINE_AT: { n: number; at: number }[] = [];

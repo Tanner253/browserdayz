@@ -154,7 +154,7 @@ export function actWild(c: Ctx) {
   // a herd of red deer feeding on the meadow from the long lens; a shot from somebody out of the picture, a stag down, and
   // the rest away. (Nobody near: a herd stood with a player in sight of it is gone before a lens can find it.)
   {
-    const op = new Operator(BRACED, 282, 17);
+    const op = new Operator(BRACED, 282, 22);
     let deer: Any[] = [], lens = V(0, 0, 0), stag: Any = null, look0 = V(0, 0, 0);
     const LONG = BAR * 2, CRACK = 1.6;
     add(LONG, {
@@ -175,7 +175,7 @@ export function actWild(c: Ctx) {
         stag = near[0];
         lens = S.at(FIELD.x + 7, FIELD.z - 34, 1.3);
         for (const b of [...herd().beasts.values()] as Any[]) if (Math.hypot(b.x - lens.x, b.z - lens.z) < 260 && !deer.some((q) => q.i === b.i)) herd().remove(b.i);
-        look0 = V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z).add(V(-4, 0, 3));
+        look0 = V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z);
         op.reset(lens, look0);
         const gun = S.actor(3);
         gun.place(FIELD.x - 70, FIELD.z + 30, 0, 'mosin', []);
@@ -192,7 +192,7 @@ export function actWild(c: Ctx) {
           if (!stag.dead && herd().hurt(stag.i, 5000, g.wild.host.me(), Date.now())?.dead) g.wild.hp(stag.i, true);
         });
       },
-      cam: (t) => op.update(t, lens, look0.clone().lerp(stag ? V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z) : look0, 0.5)),
+      cam: (t) => op.update(t, lens, stag ? V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z) : look0),
       after: (t) => chipSay(t, 0.3, LONG - 0.1, 'RED DEER', 'WOLVES · BEARS · COWS'),
     });
   }
@@ -235,16 +235,17 @@ export function actWild(c: Ctx) {
       setup: () => {
         c.keepStood.on = false;
         lightHands();
-        const w = nearest(pack), body = () => {
-          const q = nearest(pack) ?? w;
-          return V(q.x, S.ground(q.x, q.z) + 0.55, q.z);
+        let on = nearest(pack);
+        const body = () => {
+          if (!on || !(on.hp > 0)) on = nearest(pack) ?? on;
+          return V(on.x, S.ground(on.x, on.z) + 0.55, on.z);
         };
         hand.look(-0.3, body, true, 0);
       },
       tick: (t, _S, dt) => {
         look(t, dt);
         P().vitals.bleeding = false;
-        S.key('Mouse0', (t > 0.4 && t < 0.8) || (t > 1.2 && t < 1.6) || (t > 2 && t < 2.5));
+        S.key('Mouse0', (t > 1 && t < 1.4) || (t > 1.75 && t < 2.15) || (t > 2.4 && t < 2.75));
       },
     });
   }

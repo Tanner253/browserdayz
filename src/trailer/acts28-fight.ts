@@ -183,7 +183,7 @@ export function actRaid(c: Ctx) {
         standing();
         notes(true);
         lightHands(2.2, 1.6);
-        kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
+        kit(['mosin9130', ['ammo_762', 10]], { mosin9130: ['pu_scope'] });
         S.hold('primary');
         const b = house(), me = b.at(CELL, STOREY, CELL * 2.5 - 0.75);
         await upstairs(me, 0, 0);
@@ -204,7 +204,7 @@ export function actRaid(c: Ctx) {
         when(t, 1.7, 'fire', () => S.tap('Mouse0', 80));
         when(t, 2.05, 'fell', () => {
           if (man.alive) man.die(fwdOf(man.yaw));
-          S.feedKill('Sable', man.name, 'Mosin', flat(eye(), man.pos));
+          S.feedKill('Sable', man.name, 'Mosin 91/30', flat(eye(), man.pos));
         });
       },
     });
@@ -283,8 +283,8 @@ export function actPaid(c: Ctx) {
         rival.go(rival.to.x, rival.to.z, 4.8, dt);
         rival.pos.y = floorAt(rival.pos.x, rival.pos.z, rival.pos.y + 0.6);
       }
-      S.key('Mouse0', t > 1.2 && t < 1.8 && rival.alive);
-      c.when(t, 2.05, 'fell', () => {
+      S.key('Mouse0', t > 0.75 && t < 1.25 && rival.alive);
+      c.when(t, 1.45, 'fell', () => {
         if (rival.alive) rival.die(fwdOf(rival.yaw));
         S.feedKill('Sable', rival.name, 'AK', flat(eye(), rival.pos));
       });
@@ -471,8 +471,8 @@ export function actGetIn(c: Ctx) {
       const me = at.clone().addScaledVector(f, 6.5);
       S.me(me.x, me.z, yawTo(me, at), 0, floorAt0(me));
       await run(90);
-      lensT = at.clone().addScaledVector(f, 3.6).add(V(0.5, 1.5, 0.5));
-      lookT = at.clone().add(V(0, 1.3, 0));
+      lensT = at.clone().addScaledVector(f, 4.4).add(V(0.4, 1.95, 0.4));
+      lookT = at.clone().add(V(0, 1.2, 0));
     },
     cam: (t) => ({ p: lensT.clone().add(V(0, 0, t * 0.05)), l: lookT, fov: 44 }),
     after: (t) => chipSay(t, 0.05, BAR - 0.04, 'TRADE', 'TRADERS · RECYCLERS · NO-FIGHT CAMPS'),

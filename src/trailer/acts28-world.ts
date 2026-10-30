@@ -86,6 +86,10 @@ export function actWorld(c: Ctx) {
   ] as [string, string, string, [number, number], number, number][]) flyby(name, big, small, m, line(m), up, side);
   flyby('fort', 'ORLINOYE', 'THE FORT ON THE RIM', [537, -371], Math.PI * 1.15, 58, 9);
 
+  // (shut again when the shot is over: "The bunker is shutting" has no place on the screen a minute later in Kamenka)
+  c.cleaners.push(() => {
+    if (g.bunker.open) g.bunker.setOpen(false, true);
+  });
   // Bunker 17: the reader at the foot of its stair, the card held out and pushed home, the door sliding aside on the dark
   {
     const H0 = BUNKER.hall;

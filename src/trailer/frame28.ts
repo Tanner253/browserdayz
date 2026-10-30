@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { Shot, Stage } from './director';
 import { Hand, Speeds, wrap, yawTo } from './human';
 import { Drive26, Infected26, ground26 } from './kit26';
-import { ITEMS, makeItem, stockGun } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, makeItem, stockGun } from '../sim/items';
 import { HELI } from '../sim/heli';
 import { F_DEAD } from '../net/protocol';
 import type { Kind28 } from './music28';
@@ -286,8 +286,23 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
   };
   /** what a survivor who has been at it a while has on */
   const dressed = ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack'];
+  /** the colour of each thing he wears, as its place in the item's colours: a red T-shirt on the sand, olive after */
+  const SHADE: Record<string, number> = { tshirt: 4 };
   const kit = (ids: (string | [string, number])[], mods: Record<string, string[]> = {}, wear = dressed) => {
-    S.kit([...wear, ...ids], mods);
+    S.kit([], {});
+    for (const s of GEAR_SLOTS) g.inv.slots[s] = null;
+    for (const id of wear) {
+      const it = makeItem(id) as Any;
+      if (SHADE[id]) it.c = SHADE[id];
+      else delete it.c;
+      g.inv.add(it);
+    }
+    for (const e of ids) {
+      const [id, qty] = Array.isArray(e) ? e : [e, undefined];
+      const it = makeItem(id, qty) as Any;
+      if (mods[id]) it.mods = mods[id];
+      g.inv.add(it);
+    }
     armed();
   };
   /** what a survivor has on fully drawn, for a shot that sees them from outside */
