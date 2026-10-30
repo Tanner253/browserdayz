@@ -10,7 +10,7 @@ import { TOWN, SEA_LEVEL } from '../world/worldgen';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
 
-export const PAID = { sol: '10.06' };
+export const PAID = { sol: '10.07' };
 /** the middle of Pokrov's lane (shots26.ts) */
 const LANE = 34.5;
 
@@ -174,7 +174,7 @@ export function actWild(c: Ctx) {
         const near = live(deer).sort((p, q) => Math.hypot(p.x - FIELD.x, p.z - FIELD.z) - Math.hypot(q.x - FIELD.x, q.z - FIELD.z));
         stag = near[0];
         lens = S.at(FIELD.x + 7, FIELD.z - 34, 1.3);
-        for (const b of [...herd().beasts.values()] as Any[]) if (Math.hypot(b.x - lens.x, b.z - lens.z) < 60 && !deer.some((q) => q.i === b.i)) herd().remove(b.i);
+        for (const b of [...herd().beasts.values()] as Any[]) if (Math.hypot(b.x - lens.x, b.z - lens.z) < 260 && !deer.some((q) => q.i === b.i)) herd().remove(b.i);
         look0 = V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z).add(V(-4, 0, 3));
         op.reset(lens, look0);
         const gun = S.actor(3);

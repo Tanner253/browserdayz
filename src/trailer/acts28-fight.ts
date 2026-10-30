@@ -16,7 +16,7 @@ import { PAID } from './acts28-wild';
 type Any = any;
 
 /** the figures on the board, read from /api/cashins?format=total and format=status (read again before a take) */
-export const LIVE = { sol: 10.06, tags: 849, usd: 960, since: '8 OCT', solUsd: 95.42 };
+export const LIVE = { sol: 10.07, tags: 850, usd: 965, since: '8 OCT', solUsd: 95.77 };
 const GEAR = ['tactical_jacket', 'combat_trousers', 'rubber_boots', 'chest_rig', 'balaclava'];
 
 export function actRaid(c: Ctx) {
