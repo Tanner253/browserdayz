@@ -202,12 +202,8 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
 
   // (a body in this film stays as it fell, in what it wore)
   {
-    const lay0 = g.addCorpse.bind(g);
     g.addCorpse = async (q: Any) => {
-      await lay0(q, 0);
-      const e = g.corpses.get(q.uid) as Any;
-      e?.body?.dispose();
-      if (e) e.body = undefined;
+      clock.real.setTimeout(() => g.effects.pool(q.x, q.y, q.z), 0);
     };
   }
   // ------------------------------------------------------------ the set
@@ -283,6 +279,13 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
     S.kit([...wear, ...ids], mods);
     armed();
   };
+  /** what a survivor has on fully drawn, for a shot that sees them from outside */
+  const dressedNow = async () => {
+    for (let k = 0; k < 30; k++) {
+      await run(4);
+      await wait(25);
+    }
+  };
   /** a thing laid on what is under it, as anything put down lies; its uid */
   const lie = (id: string, at: THREE.Vector3, turn = 0) => {
     const it = makeItem(id);
@@ -349,7 +352,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
 
   return {
     base: null as import('./base28').Base28 | null,
-    S, g, clock, wait, say, overlay, piece, show, chipSay, title, chip, black, notes, run, lightHands, ground, drive, infected,
+    dressedNow, S, g, clock, wait, say, overlay, piece, show, chipSay, title, chip, black, notes, run, lightHands, ground, drive, infected,
     P, eye, hand, lay, along, ahead, legs, look, heading, clearWay, pilot, seatIn, helis, dressers, cleaners, keepStood, keepZeds, keepBody, when, armed, kit, dressed, lie, shots, add, marks,
   };
 }

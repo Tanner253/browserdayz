@@ -129,7 +129,7 @@ export function actWild(c: Ctx) {
     }
     say(`not all of ${ids.length} animals were drawn`);
   };
-  const live = (ids: Any[]) => ids.map((b) => herd().beasts.get(b.i)).filter((b: Any) => b && !b.dead) as Any[];
+  const live = (ids: Any[]) => ids.map((b) => herd().beasts.get(b.i)).filter((b: Any) => b && b.hp > 0) as Any[];
   const nearest = (ids: Any[]) => {
     const p = P().pos as THREE.Vector3;
     return live(ids).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0] ?? null;
@@ -243,7 +243,6 @@ export function actWild(c: Ctx) {
       tick: (t, _S, dt) => {
         look(t, dt);
         P().vitals.bleeding = false;
-        S.key('Mouse2', true);
         S.key('Mouse0', (t > 0.4 && t < 0.8) || (t > 1.2 && t < 1.6) || (t > 2 && t < 2.5));
       },
     });
@@ -275,7 +274,7 @@ export function actWild(c: Ctx) {
       cam: (t) => op.update(t, lens, at()),
       after: (t) => chipSay(t, 0.2, BAR - 0.05, 'BROWN BEAR', 'NOTHING OUTRUNS IT'),
     });
-    add(BAR * 2, {
+    add(BAR * 1.5, {
       name: 'bear-fight',
       hud: true,
       chain: true,
@@ -291,18 +290,18 @@ export function actWild(c: Ctx) {
       tick: (t, _S, dt) => {
         look(t, dt);
         P().vitals.bleeding = false;
-        S.key('Mouse0', t > 0.45 && !bear.dead);
+        S.key('Mouse0', t > 0.45 && bear.hp > 0);
         when(t, 0.6, 'hurt', () => herd().hurt(bear.i, 60, g.wild.host.me(), Date.now()));
         const d = flat(P().pos, bear);
         when(t, 1.2, 'how', () => say(`the bear at 1.2 s: ${d.toFixed(1)} m, mode ${bear.mode}, hp ${bear.hp}`));
         // (it falls at the feet: the rounds are the game's, and this one was going to get there first)
-        if (!bear.dead && (d < 3.4 || t > 3.3)) {
+        if (bear.hp > 0 && (d < 3.4 || t > 2.5)) {
           when(t, 0, 'dropped', () => {
             const r = herd().hurt(bear.i, 5000, null, Date.now());
             if (r?.dead) g.wild.hp(bear.i, true);
             say(`the bear finished at ${d.toFixed(1)} m, ${t.toFixed(2)} s in`);
           });
-        } else if (bear.dead) when(t, 0, 'fell', () => say(`the bear fell to the rounds at ${d.toFixed(1)} m, ${t.toFixed(2)} s in`));
+        } else if (!(bear.hp > 0)) when(t, 0, 'fell', () => say(`the bear fell to the rounds at ${d.toFixed(1)} m, ${t.toFixed(2)} s in`));
       },
     });
   }
@@ -340,7 +339,8 @@ export function actWild(c: Ctx) {
         await run(50);
         lens = K(-13, 2.2);
         lens.y = ground.floorAt(lens.x, lens.z, me.y + 1) + 0.55;
-        op.reset(lens, K(-2));
+        const z0 = runners()[0];
+        op.reset(lens, z0 ? V(z0.pos.x, z0.pos.y + 1.1, z0.pos.z) : K(-2).setY(me.y + 1.1));
       },
       cam: (t) => {
         const z = runners()[0];

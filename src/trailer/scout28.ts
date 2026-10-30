@@ -15,19 +15,28 @@ export function scout(S: Stage, say: (s: string) => void): { shots: Shot[]; seco
   const helis = [...g.garage.jeeps.values()].filter((j: Any) => j.kind === HELI.kind);
   say(`helicopters: ${helis.map((j: Any) => `${Math.round(j.pos.x)},${Math.round(j.pos.y)},${Math.round(j.pos.z)}`).join(' | ')}`);
   say(`cars: ${g.garage.jeeps.size}, roads ${S.world.roads?.length}, trees ${S.world.trees?.length}`);
-  const list = pois.filter(() => false);
+  const list: typeof pois = [];
+  const halls = S.world.buildings as { x: number; z: number }[];
+  for (const name of ['Kalat', 'Zavod', 'Peski', 'Karavan', 'Aerodrom', 'Ozerki', 'Lipki', 'Mokroye', 'Pokrov', 'Kamenka', 'Mys', 'Bereg', 'Zelenaya Dolina', "Kar'yer"]) {
+    const p = pois.find((q) => q.name === name);
+    if (!p) continue;
+    const near = halls.filter((b) => Math.hypot(b.x - p.x, b.z - p.z) < p.radius + 40);
+    const mx = near.reduce((s, b) => s + b.x, 0) / Math.max(1, near.length), mz = near.reduce((s, b) => s + b.z, 0) / Math.max(1, near.length);
+    say(`${name}: ${near.length} buildings, the middle of them ${mx.toFixed(0)},${mz.toFixed(0)}`);
+    list.push({ name, x: near.length ? mx : p.x, z: near.length ? mz : p.z, radius: 40 });
+  }
   const shots: Shot[] = [];
   let t = 0;
   for (const p of list) {
     const c = S.ground(p.x, p.z), a = (p.x * 7 + p.z) % 6.28;
-    const lens = V(p.x + Math.cos(a) * (p.radius * 1.5 + 60), c + p.radius * 0.8 + 70, p.z + Math.sin(a) * (p.radius * 1.5 + 60));
+    const lens = V(p.x + Math.cos(a) * 95, c + 55, p.z + Math.sin(a) * 95);
     shots.push({
       name: `scout ${p.name}`, start: t, end: t + 1, bars: false,
       setup: () => {
-        g.hourHeld = 0.42;
-        S.parkMe();
+        g.hourHeld = 0.6;
+        S.me(p.x + 150, p.z, 0);
       },
-      cam: () => ({ p: lens, l: V(p.x, c, p.z), fov: 50 }),
+      cam: () => ({ p: lens, l: V(p.x, c, p.z), fov: 56 }),
       titles: [{ at: 0, until: 1, text: `${p.name}`, cls: 'small' }],
     });
     t += 1;
@@ -63,7 +72,7 @@ export function scout(S: Stage, say: (s: string) => void): { shots: Shot[]; seco
   const far: typeof best = [];
   for (const q of best) if (far.every((o) => Math.hypot(o.x - q.x, o.z - q.z) > 260)) far.push(q);
   say(`ground to build on: ${far.slice(0, 14).map((q) => `${q.x},${q.z} (${q.s.toFixed(0)})`).join(' | ')}`);
-  for (const q of far.slice(0, 12)) {
+  for (const q of far.slice(0, 0)) {
     shots.push({
       name: `ground ${q.x},${q.z}`, start: t, end: t + 1, bars: false,
       setup: () => {

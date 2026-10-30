@@ -140,6 +140,7 @@ export function actRaid(c: Ctx) {
         S.hold('holster');
         const b = house(), me = b.at(CELL * 1.25, 0, CELL * 1.75), door = b.at(CELL, 0, CELL * 2.5);
         await upstairs(me, yawTo(me, door), 0);
+        await c.dressedNow();
         man = S.actor(1);
         const q = b.at(CELL, 0, CELL * 3.3);
         way = b.at(CELL, 0, CELL * 2.42);
@@ -315,31 +316,55 @@ export function actPaid(c: Ctx) {
     },
     after: (t) => clockOf(t, 1, 9),
   });
-  /** at the edge of the hospital's roof, the town below him, and the lens beside him (the two shots of the wait) */
+  /** on the hill over the town: the lens beside him, the town below (the two shots of the wait). Ground with a clear view found by the trees' own places: a ray finds trunks, not boughs */
   let top: THREE.Vector3 | null = null;
   const onRoof = async (held: number) => {
     notes(true);
-    kit(['ak']);
-    S.hold('primary');
-    tag(held);
-    const r = V(667, 92, 345), to = V(TOWN.x, 0, TOWN.z), dir = to.clone().sub(r).setY(0).normalize();
+    const town = V(TOWN.x, S.ground(TOWN.x, TOWN.z) + 3, TOWN.z);
     if (!top) {
-      const p = r.clone().addScaledVector(dir, 3);
-      p.y = floorAt(p.x, p.z, r.y + 1);
-      S.me(p.x, p.z, yawTo(p, to), 0, p.y);
-      await run(10);
-      top = p.addScaledVector(dir, Math.max(0, ground.reach(p, dir, 0.6, 40) - 1.1));
-      top.y = floorAt(top.x, top.z, p.y + 1);
-      say(`on the roof: at ${top.x.toFixed(0)},${top.y.toFixed(1)},${top.z.toFixed(0)}`);
+      const trunks = ((S.world.trees ?? []) as { kind: string; x: number; z: number }[]).filter((q) => !q.kind.startsWith('bush') && Math.hypot(q.x - TOWN.x, q.z - TOWN.z) < 260);
+      let best = -1;
+      for (let a = 0; a < 6.28; a += 0.1) {
+        for (let r = 110; r <= 220; r += 10) {
+          const x = TOWN.x + Math.cos(a) * r, z = TOWN.z + Math.sin(a) * r, h = S.ground(x, z), rise = h - town.y;
+          if (rise < 8 || rise > 50 || !inZona(x, z)) continue;
+          const d = town.clone().sub(V(x, 0, z)).setY(0).normalize();
+          let room = 1e9;
+          for (let k = -6; k <= 60; k += 3) {
+            const px = x + d.x * k, pz = z + d.z * k;
+            for (const q of trunks) room = Math.min(room, Math.hypot(q.x - px, q.z - pz));
+            if (room < 3.5) break;
+          }
+          if (room < 3.5) continue;
+          const eye0 = V(x, h + 1.3, z);
+          if (!ground.sees(eye0, town)) continue;
+          const score = room + Math.min(rise, 25) * 0.4;
+          if (score > best) {
+            best = score;
+            top = V(x, h, z);
+          }
+        }
+      }
+      if (!top) throw new Error('no hill over the town');
+      say(`the hill: ${top.x.toFixed(0)},${top.z.toFixed(0)}, ${(top.y - town.y).toFixed(0)} m over the town, score ${best.toFixed(1)}`);
+      kit(['ak']);
+      S.hold('primary');
+      tag(held);
+      S.me(top.x, top.z, yawTo(top, town), -0.1, floorAt(top.x, top.z, top.y));
+      P().setCrouch(true);
+      await c.dressedNow();
+    } else {
+      const it = g.inv.find((q: Any) => q.id === 'dogtag') as Any;
+      if (it) it.held = held;
+      S.me(top.x, top.z, yawTo(top, town), -0.1, floorAt(top.x, top.z, top.y));
+      P().setCrouch(true);
     }
-    S.me(top.x, top.z, yawTo(top, to), -0.12, top.y);
-    P().setCrouch(true);
-    hand.set(P().yaw, -0.12);
+    hand.set(P().yaw, -0.1);
     await run(16);
   };
   const beside = () => {
     const f = fwdOf(P().yaw), s = rightOf(P().yaw), p = P().pos as THREE.Vector3;
-    return { p: p.clone().addScaledVector(f, -2.5).addScaledVector(s, 1.25).add(V(0, 1.55, 0)), l: p.clone().addScaledVector(f, 26).add(V(0, -7.5, 0)), fov: 50 };
+    return { p: p.clone().addScaledVector(f, -2.7).addScaledVector(s, 1.2).add(V(0, 1.35, 0)), l: V(TOWN.x, S.ground(TOWN.x, TOWN.z) + 6, TOWN.z), fov: 46 };
   };
   add(BAR, {
     name: 'hold',

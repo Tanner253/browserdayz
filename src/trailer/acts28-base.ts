@@ -42,7 +42,7 @@ export function actBuild(c: Ctx) {
         S.me(me.x, me.z, yawTo(me, tree), -0.05, me.y);
         hand.set(P().yaw, -0.05);
         g.takeUp(it);
-        await run(30);
+        await c.dressedNow();
         // (two blows left in it: the rest were struck before the lens came)
         felled = best;
         lens = V(me.x + 5.5, me.y + 1.5, me.z + 2.5);

@@ -2,7 +2,7 @@
 // towns under it, and then Bunker 17 and its keycard (the owner: "shoe horn in heli flying in there and the bunker
 // keycard swiping ... show the arial view of the towns too etc.. people wanna see content density").
 import * as THREE from 'three';
-import { Spectate } from './human';
+import { Spectate, yawTo } from './human';
 import { BAR, NOON, V, flat, fwdOf, rightOf, type Ctx } from './frame28';
 import { BUNKER, bunkerAt, levelY } from '../sim/bunker';
 
@@ -71,10 +71,19 @@ export function actWorld(c: Ctx) {
     });
   };
   c.cleaners.push(() => { stats.style.display = 'none'; });
-  flyby('kalat', 'KALAT', 'THE WALLED CITY', [-3215, 230], Math.PI * 0.3, 46, 9);
-  flyby('pokrov', 'POKROV', 'A MONASTERY AND ITS LAMPS', [-1850, -30], -Math.PI / 2, 42, -9);
-  flyby('mokroye', 'MOKROYE', 'A VILLAGE IN THE SWAMP', [-1855, 585], Math.PI * 0.75, 38, 9);
-  flyby('lipki', 'LIPKI', 'THE VALLEY', [-1180, 350], Math.PI / 2, 40, -9);
+  // (each flown toward the middle of its buildings on the line a scout chose: the desert's towns stand small on a pale
+  // plain from the air, Kalat most of all, so the map's fullest are shown)
+  const line = (m: [number, number]) => {
+    const q = (m[0] * 7 + m[1]) % 6.28;
+    return yawTo(V(m[0] + Math.cos(q) * 95, 0, m[1] + Math.sin(q) * 95), V(m[0], 0, m[1]));
+  };
+  for (const [name, big, small, m, up, side] of [
+    ['dolina', 'ZELENAYA DOLINA', 'THE OLD VALLEY', [31, 20], 44, 9],
+    ['pokrov', 'POKROV', 'A MONASTERY AND ITS LAMPS', [-1843, 0], 44, -9],
+    ['ozerki', 'OZERKI', 'THE LAKE', [-1252, -106], 44, 9],
+    ['mokroye', 'MOKROYE', 'A VILLAGE IN THE SWAMP', [-1858, 586], 44, -9],
+    ['zavod', 'ZAVOD', 'THE WORKS IN THE DESERT', [-2767, -375], 44, 9],
+  ] as [string, string, string, [number, number], number, number][]) flyby(name, big, small, m, line(m), up, side);
   flyby('fort', 'ORLINOYE', 'THE FORT ON THE RIM', [537, -371], Math.PI * 1.15, 58, 9);
 
   // Bunker 17: the reader at the foot of its stair, the card held out and pushed home, the door sliding aside on the dark
