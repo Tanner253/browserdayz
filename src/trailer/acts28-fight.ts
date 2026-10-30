@@ -4,7 +4,7 @@
 // GET IN: the game's other sides, and the end card.
 import * as THREE from 'three';
 import { BRACED, ON_FOOT, Operator, pitchTo, yawTo } from './human';
-import { BAR, DAWN, DUSK, GOLDEN, MORNING, NIGHT, SUNSET, V, ease, flat, fwdOf, type Ctx } from './frame28';
+import { BAR, DAWN, DUSK, GOLDEN, MORNING, NIGHT, SUNSET, V, ease, flat, fwdOf, rightOf, type Ctx } from './frame28';
 import { Screen, frameUrl, loadReel, type Reel } from './footage';
 import { CELL, STOREY } from '../sim/build/pieces';
 import { TAG_HOLD, makeItem, tagClock } from '../sim/items';
@@ -41,7 +41,7 @@ export function actRaid(c: Ctx) {
     a.pos.y = floorAt(a.pos.x, a.pos.z, a.pos.y + 0.6);
   };
   const three = () => [S.actor(0), S.actor(1), S.actor(2)];
-  c.cleaners.push(() => { for (const a of S.actors) if (a.pos.y > -100) a.hide(); });
+  c.cleaners.push(() => { if (!c.keepBody.on) for (const a of S.actors) if (a.pos.y > -100) a.hide(); });
 
   // from behind them, across the dark to the house and its torches
   {
@@ -258,6 +258,7 @@ export function actPaid(c: Ctx) {
     m: 'sting',
     hit: true,
     setup: async () => {
+      c.keepBody.on = true;
       notes(true);
       lightHands();
       kit(['ak', ['ammo_762', 60]]);
@@ -296,22 +297,17 @@ export function actPaid(c: Ctx) {
     m: 'sting',
     under: true,
     setup: async () => {
+      c.keepBody.on = false;
       notes(true);
       lightHands(2, 1.4);
       kit(['ak']);
       S.hold(null);
-      const q = rival?.pos?.clone() ?? K(-2, 2);
-      if (!rival || rival.alive) {
-        rival = S.actor(0);
-        rival.place(q.x, q.z, 0.8, null, GEAR);
-        rival.pos.y = floorAt(q.x, q.z, q.y + 0.8);
-        rival.die(V(0, 0, 1));
-      }
-      await run(130);
-      const me = q.clone().add(V(1.5, 0, 1.2));
+      const q = rival.pos.clone() as THREE.Vector3, f = fwdOf(rival.yaw), s = rightOf(rival.yaw);
+      const me = q.clone().addScaledVector(f, -1.3).addScaledVector(s, 1.2);
       me.y = floorAt(me.x, me.z, q.y + 0.8);
-      S.me(me.x, me.z, yawTo(me, q), -0.55, me.y);
-      hand.set(P().yaw, -0.6);
+      S.me(me.x, me.z, yawTo(me, q), -0.5, me.y);
+      await run(20);
+      hand.set(yawTo(eye(), q), pitchTo(eye(), q.clone().setY(q.y + 0.2)));
     },
     tick: (t, _S, dt) => {
       look(t, dt);
@@ -319,17 +315,31 @@ export function actPaid(c: Ctx) {
     },
     after: (t) => clockOf(t, 1, 9),
   });
-  /** the top of the hospital, by its helipad: the town below */
+  /** at the edge of the hospital's roof, the town below him, and the lens beside him (the two shots of the wait) */
+  let top: THREE.Vector3 | null = null;
   const onRoof = async (held: number) => {
     notes(true);
     kit(['ak']);
     S.hold('primary');
     tag(held);
-    const r = V(667, 92, 345), me = r.clone().add(V(5, 0, 6));
-    me.y = floorAt(me.x, me.z, r.y + 1);
-    S.me(me.x, me.z, yawTo(me, V(TOWN.x, 0, TOWN.z)), -0.12, me.y);
+    const r = V(667, 92, 345), to = V(TOWN.x, 0, TOWN.z), dir = to.clone().sub(r).setY(0).normalize();
+    if (!top) {
+      const p = r.clone().addScaledVector(dir, 3);
+      p.y = floorAt(p.x, p.z, r.y + 1);
+      S.me(p.x, p.z, yawTo(p, to), 0, p.y);
+      await run(10);
+      top = p.addScaledVector(dir, Math.max(0, ground.reach(p, dir, 0.6, 40) - 1.1));
+      top.y = floorAt(top.x, top.z, p.y + 1);
+      say(`on the roof: at ${top.x.toFixed(0)},${top.y.toFixed(1)},${top.z.toFixed(0)}`);
+    }
+    S.me(top.x, top.z, yawTo(top, to), -0.12, top.y);
+    P().setCrouch(true);
     hand.set(P().yaw, -0.12);
-    await run(8);
+    await run(16);
+  };
+  const beside = () => {
+    const f = fwdOf(P().yaw), s = rightOf(P().yaw), p = P().pos as THREE.Vector3;
+    return { p: p.clone().addScaledVector(f, -2.5).addScaledVector(s, 1.25).add(V(0, 1.55, 0)), l: p.clone().addScaledVector(f, 26).add(V(0, -7.5, 0)), fov: 50 };
   };
   add(BAR, {
     name: 'hold',
@@ -339,6 +349,7 @@ export function actPaid(c: Ctx) {
     under: true,
     setup: () => onRoof(TAG_HOLD - 700),
     tick: (t, _S, dt) => look(t, dt),
+    cam: beside,
     after: (t) => clockOf(t, 0, 9),
   });
   add(BAR * 1.5, {
@@ -348,6 +359,7 @@ export function actPaid(c: Ctx) {
     m: 'sting',
     setup: () => onRoof(TAG_HOLD - 1.2),
     tick: (t, _S, dt) => look(t, dt),
+    cam: beside,
     after: (t) => clockOf(t, 0, 9, true),
   });
   // the board: how it pays, and what it has paid
@@ -404,6 +416,7 @@ export function actGetIn(c: Ctx) {
   });
   cleaners.push(() => screen.hide());
   let lensT = V(0, 0, 0), lookT = V(0, 0, 0);
+  const floorAt0 = (q: THREE.Vector3) => c.ground.floorAt(q.x, q.z, q.y + 1);
   // the road: a jeep, driven
   add(BAR, {
     name: 'road',
@@ -428,9 +441,9 @@ export function actGetIn(c: Ctx) {
     setup: async () => {
       const st = g.traders.stands[0] as Any;
       const at = st.pos.clone() as THREE.Vector3, f = fwdOf(st.yaw ?? 0);
-      S.me(at.x + 30, at.z, 0);
-      await run(40);
-      S.parkMe();
+      const me = at.clone().addScaledVector(f, 6.5);
+      S.me(me.x, me.z, yawTo(me, at), 0, floorAt0(me));
+      await run(90);
       lensT = at.clone().addScaledVector(f, 3.6).add(V(0.5, 1.5, 0.5));
       lookT = at.clone().add(V(0, 1.3, 0));
     },

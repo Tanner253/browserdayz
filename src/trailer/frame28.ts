@@ -202,8 +202,12 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
 
   // (a body in this film stays as it fell, in what it wore)
   {
+    const lay0 = g.addCorpse.bind(g);
     g.addCorpse = async (q: Any) => {
-      clock.real.setTimeout(() => g.effects.pool(q.x, q.y, q.z), 0);
+      await lay0(q, 0);
+      const e = g.corpses.get(q.uid) as Any;
+      e?.body?.dispose();
+      if (e) e.body = undefined;
     };
   }
   // ------------------------------------------------------------ the set
@@ -237,7 +241,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
   /** kept off the screen between shots: a shot may leave things behind it for the next */
   const cleaners: (() => void)[] = [];
   /** a shot whose animals the next one goes on with */
-  const keepStood = { on: false }, keepZeds = { on: false };
+  const keepStood = { on: false }, keepZeds = { on: false }, keepBody = { on: false };
   const reset = () => {
     for (const k of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyQ', 'KeyE', 'Space', 'ShiftLeft', 'AltLeft', 'KeyF', 'Mouse0', 'Mouse2']) S.key(k, false);
     if (g.garage.ride) g.garage.out(false);
@@ -346,7 +350,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
   return {
     base: null as import('./base28').Base28 | null,
     S, g, clock, wait, say, overlay, piece, show, chipSay, title, chip, black, notes, run, lightHands, ground, drive, infected,
-    P, eye, hand, lay, along, ahead, legs, look, heading, clearWay, pilot, seatIn, helis, dressers, cleaners, keepStood, keepZeds, when, armed, kit, dressed, lie, shots, add, marks,
+    P, eye, hand, lay, along, ahead, legs, look, heading, clearWay, pilot, seatIn, helis, dressers, cleaners, keepStood, keepZeds, keepBody, when, armed, kit, dressed, lie, shots, add, marks,
   };
 }
 export type Ctx = ReturnType<typeof frame28>;

@@ -51,9 +51,9 @@ export function actNothing(c: Ctx) {
       after: (t) => show(title, t < 3.1 ? 1 : 1 - ease((t - 3.1) / 0.7)),
     });
   }
-  // a house in Pokrov: through his own eyes, a jacket off the table, a pistol, and the real inventory
+  // Pokrov's lane in the morning: through his own eyes, a pack and a pistol somebody dropped, and the real inventory
   {
-    let house: Any = null, opened = false;
+    let spot: THREE.Vector3 | null = null, side = V(0, 0, 1), opened = false;
     add(BAR * 2, {
       name: 'first-loot',
       hud: true,
@@ -68,34 +68,35 @@ export function actNothing(c: Ctx) {
         opened = false;
         S.me(-1880, LANE, Math.PI, 0);
         await run(60);
-        house = house ?? findHouse26(S, -1880, LANE, LANE, say);
-        if (!house) throw new Error('no house to loot');
-        const h = house, side = V(-h.out.z, 0, h.out.x);
-        for (const d of g.s.buildings.doors as Any[]) if (d.pivot.getWorldPosition(V(0, 0, 0)).distanceTo(h.door) < 2 && !d.open) d.setOpen(true);
-        lie('sack_pack', h.gun.clone().addScaledVector(side, 0.32), 0.4);
-        lie('m9', h.gun.clone().addScaledVector(side, -0.32), 1.1);
+        const h = findHouse26(S, -1880, LANE, LANE, say);
+        if (!h) throw new Error('no street to loot in');
+        side = h.out.clone();
+        spot = h.front.clone().addScaledVector(h.out, 1.4);
+        spot.y = floorAt(spot.x, spot.z, h.front.y + 0.5);
+        const [a, b] = [spot.clone().addScaledVector(side, 0.3), spot.clone().addScaledVector(side, -0.3)];
+        a.y = floorAt(a.x, a.z, spot.y + 0.4);
+        b.y = floorAt(b.x, b.z, spot.y + 0.4);
+        lie('sack_pack', a, 0.4);
+        lie('m9', b, 1.1);
         await run(30);
-        const dirIn = h.gun.clone().sub(h.inside).setY(0).normalize(), near = h.gun.clone().addScaledVector(dirIn, -1.6);
-        near.y = floorAt(near.x, near.z, h.inside.y + 0.3);
-        const from = h.door.clone().addScaledVector(h.out, 0.3);
-        from.y = floorAt(from.x, from.z, h.inside.y + 0.5);
-        S.me(from.x, from.z, yawTo(from, h.gun), -0.1, from.y);
+        const from = spot.clone().addScaledVector(h.street, 4.2), near = spot.clone().addScaledVector(h.street, 1.7);
+        from.y = floorAt(from.x, from.z, spot.y + 0.5);
+        near.y = floorAt(near.x, near.z, spot.y + 0.5);
+        S.me(from.x, from.z, yawTo(from, spot), -0.2, from.y);
         lay([from, near], { walk: true, stop: 0.12 });
-        hand.set(yawTo(from, h.gun), -0.1);
-        hand.look(-0.4, h.gun.clone().addScaledVector(side, 0.32).setY(h.gun.y + 0.06), true, 0);
+        hand.set(yawTo(from, spot), -0.2);
+        hand.look(0.1, spot.clone().addScaledVector(side, 0.3).setY(spot.y + 0.06), true, 0);
       },
       tick: (t, _S, dt) => {
-        const h = house;
-        if (!h) return;
+        if (!spot) return;
         legs();
         look(t, dt);
-        const side = V(-h.out.z, 0, h.out.x);
-        if (flat(P().pos, h.gun) < 2.05) {
-          when(t, 0.9, 'jacket', () => S.tap('KeyF', 90));
-          when(t, 1.35, 'look-gun', () => hand.look(t, h.gun.clone().addScaledVector(side, -0.32).setY(h.gun.y + 0.06), true, 0.05));
-          when(t, 1.95, 'pistol', () => S.tap('KeyF', 90));
+        if (flat(P().pos, spot) < 2.05) {
+          when(t, 1.5, 'pack', () => S.tap('KeyF', 90));
+          when(t, 1.9, 'look-gun', () => hand.look(t, spot!.clone().addScaledVector(side, -0.3).setY(spot!.y + 0.06), true, 0.05));
+          when(t, 2.45, 'pistol', () => S.tap('KeyF', 90));
         }
-        when(t, 2.6, 'inv', () => {
+        when(t, 2.95, 'inv', () => {
           if (!opened) g.toggleInventory(true);
           opened = true;
         });
@@ -153,9 +154,9 @@ export function actWild(c: Ctx) {
   // a herd of red deer feeding on the meadow from the long lens; a shot from somebody out of the picture, a stag down, and
   // the rest away. (Nobody near: a herd stood with a player in sight of it is gone before a lens can find it.)
   {
-    const op = new Operator(BRACED, 282, 24);
+    const op = new Operator(BRACED, 282, 17);
     let deer: Any[] = [], lens = V(0, 0, 0), stag: Any = null, look0 = V(0, 0, 0);
-    const LONG = BAR * 2.5, CRACK = 2;
+    const LONG = BAR * 2, CRACK = 1.6;
     add(LONG, {
       name: 'deer',
       hour: MORNING,
@@ -190,7 +191,7 @@ export function actWild(c: Ctx) {
           if (!stag.dead && herd().hurt(stag.i, 5000, g.wild.host.me(), Date.now())?.dead) g.wild.hp(stag.i, true);
         });
       },
-      cam: (t) => op.update(t, lens, look0.clone().lerp(stag ? V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z) : look0, 0.22)),
+      cam: (t) => op.update(t, lens, look0.clone().lerp(stag ? V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z) : look0, 0.5)),
       after: (t) => chipSay(t, 0.3, LONG - 0.1, 'RED DEER', 'WOLVES · BEARS · COWS'),
     });
   }
@@ -209,7 +210,7 @@ export function actWild(c: Ctx) {
         S.me(p.x, p.z, -Math.PI / 2, 0);
         pack = stand('wolf', p.x + 15, p.z - 9, 4);
         await seen(pack);
-        await run(330);
+        await run(130);
         hand.set(P().yaw, 0);
         say(`the pack: ${live(pack).map((w) => `${Math.hypot(w.x - p.x, w.z - p.z).toFixed(0)} m, mode ${w.mode}`).join(' | ')}`);
       },
@@ -257,6 +258,7 @@ export function actWild(c: Ctx) {
       hour: NOON,
       m: 'dread',
       setup: async () => {
+        S.clean();
         c.keepStood.on = true;
         kit(['ak', ['ammo_762', 60]]);
         S.hold('primary');
@@ -318,6 +320,7 @@ export function actWild(c: Ctx) {
       hour: NOON,
       m: 'dread',
       setup: async () => {
+        S.clean();
         c.keepZeds.on = true;
         kit(['ak', ['ammo_762', 60]]);
         S.hold('primary');

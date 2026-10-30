@@ -46,7 +46,7 @@ export function actWorld(c: Ctx) {
     const f = fwdOf(bearing), r = rightOf(bearing);
     add(len, {
       name,
-      hour: NOON + 0.04,
+      hour: 0.6,
       m: 'tour',
       setup: async () => {
         const m = V(mid[0], 0, mid[1]);
@@ -71,10 +71,10 @@ export function actWorld(c: Ctx) {
     });
   };
   c.cleaners.push(() => { stats.style.display = 'none'; });
-  flyby('kalat', 'KALAT', 'THE WALLED CITY', [-3215, 230], Math.PI * 0.3, 62, 9);
-  flyby('pokrov', 'POKROV', 'A MONASTERY AND ITS LAMPS', [-1850, -30], -Math.PI / 2, 52, -9);
-  flyby('mokroye', 'MOKROYE', 'A VILLAGE IN THE SWAMP', [-1855, 585], Math.PI * 0.75, 48, 9);
-  flyby('lipki', 'LIPKI', 'THE VALLEY', [-1180, 350], Math.PI / 2, 50, -9);
+  flyby('kalat', 'KALAT', 'THE WALLED CITY', [-3215, 230], Math.PI * 0.3, 46, 9);
+  flyby('pokrov', 'POKROV', 'A MONASTERY AND ITS LAMPS', [-1850, -30], -Math.PI / 2, 42, -9);
+  flyby('mokroye', 'MOKROYE', 'A VILLAGE IN THE SWAMP', [-1855, 585], Math.PI * 0.75, 38, 9);
+  flyby('lipki', 'LIPKI', 'THE VALLEY', [-1180, 350], Math.PI / 2, 40, -9);
   flyby('fort', 'ORLINOYE', 'THE FORT ON THE RIM', [537, -371], Math.PI * 1.15, 58, 9);
 
   // Bunker 17: the reader at the foot of its stair, the card held out and pushed home, the door sliding aside on the dark

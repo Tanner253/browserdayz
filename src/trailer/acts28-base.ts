@@ -6,7 +6,7 @@ import { BRACED, DRONE, Operator, yawTo, pitchTo } from './human';
 import { AFTERNOON, BAR, GOLDEN, SUNSET, V, ease, type Ctx } from './frame28';
 import { Base28, SITE } from './base28';
 import { assets } from '../core/assets';
-import { ITEMS } from '../sim/items';
+import { ITEMS, makeItem } from '../sim/items';
 import { CELL } from '../sim/build/pieces';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -58,7 +58,30 @@ export function actBuild(c: Ctx) {
       after: (t) => chipSay(t, 0.3, BAR * 2 - 0.1, 'GATHER', 'CHOP · MINE · SMELT · CRAFT'),
     });
   }
-  let endOfRise = () => V(SITE.x + 30, S.ground(SITE.x, SITE.z) + 10, SITE.z);
+  // the bench, the forge and the rack, the lens going along them
+  {
+    const op = new Operator(BRACED, 290, 44);
+    const LONG = BAR * 1.5;
+    const at = (t: number, z: number, y: number, ahead = 0) => base.at(-0.8 + (t / LONG) * 6.6 + ahead, y, z);
+    add(LONG, {
+      name: 'workshop',
+      hour: AFTERNOON,
+      m: 'groove',
+      setup: async () => {
+        base.workshop();
+        const st = [...g.build.boxes.racks()][0] as Any;
+        if (st) for (const id of ['ak', 'mosin', 'a91', 'vssk', 'deagle']) st.container.add(makeItem(id));
+        const me = base.at(CELL, 0, 7.5);
+        S.me(me.x, me.z, 0, 0, ground.floorAt(me.x, me.z, me.y + 0.5));
+        await run(60);
+        for (let k = 0; k < 40; k++) await wait(30);
+        op.reset(at(0, 3.1, 1.5), at(0, -0.6, 0.95, 1));
+      },
+      tick: () => { P().vitals.bleeding = false; },
+      cam: (t) => op.update(t, at(t, 3.1, 1.5), at(t, -0.6, 0.95, 1)),
+      after: (t) => chipSay(t, 0.2, LONG - 0.08, 'CRAFT', 'BENCH · FORGE · GUN RACK · BLUEPRINTS'),
+    });
+  }
   // the house going up, one lot on each beat, the lens going round it from the air as the day goes
   {
     const op = new Operator(DRONE, 284, 46);
@@ -101,7 +124,6 @@ export function actBuild(c: Ctx) {
         steps = base.batches();
         mid.y = S.ground(mid.x, mid.z) + 3.5;
         clearest();
-        endOfRise = () => want(LONG);
         op.reset(want(0), mid);
       },
       tick: (t) => {
@@ -118,7 +140,7 @@ export function actBuild(c: Ctx) {
   }
   // the flag on its pole at sunset
   {
-    const op = new Operator(BRACED, 287, 30);
+    const op = new Operator(BRACED, 287, 46);
     let lens = V(0, 0, 0), at = V(0, 0, 0);
     add(BAR, {
       name: 'flag',
@@ -127,9 +149,10 @@ export function actBuild(c: Ctx) {
       setup: () => {
         S.parkMe();
         if (!base.base) base.begin(), base.whole();
-        at = base.at(CELL * 0.1, 12.5, CELL * 1.05);
-        lens = endOfRise().clone();
-        op.reset(lens, base.at(CELL * 1.5, 7, CELL));
+        at = base.at(CELL * 0.8, 10.5, CELL * 1.2);
+        lens = base.at(CELL * 1.4, 0, CELL * 10);
+        lens.y = S.ground(lens.x, lens.z) + 1.4;
+        op.reset(lens, base.at(CELL * 1.2, 3, CELL * 2));
       },
       cam: (t) => op.update(t, lens, at),
       after: (t) => chipSay(t, 0.1, BAR - 0.04, 'CLAIM IT', 'YOUR FLAG · YOUR LAND'),

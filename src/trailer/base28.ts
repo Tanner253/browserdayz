@@ -97,6 +97,15 @@ export class Base28 {
   private floors(cells: [number, number][], y: number, k: string, t: Tier) {
     for (const [i, j] of cells) this.lay1(k, i * CELL, y, j * CELL, t);
   }
+  /** three bays of a base's first floor, a wall behind them: the bench, the forge and the rack, in the daylight */
+  workshop() {
+    this.begin();
+    for (const i of [1, 2]) this.lay1('foundation', i * CELL, 0, 0);
+    for (const i of [0, 1, 2]) this.lay1('wall', i * CELL, 0, -CELL / 2, 2);
+    this.thing('workbench', 0, 0, -0.45, 6);
+    this.thing('forge', CELL, 0, -0.5);
+    this.thing('weapon_rack', CELL * 2, 0, -0.95, 6);
+  }
   /** the whole house as batches, one for each beat of the shot that raises it */
   batches(): (() => void)[] {
     return [
