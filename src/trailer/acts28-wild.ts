@@ -129,13 +129,6 @@ export function actWild(c: Ctx) {
     say(`not all of ${ids.length} animals were drawn`);
   };
   const live = (ids: Any[]) => ids.map((b) => herd().beasts.get(b.i)).filter((b: Any) => b && !b.dead) as Any[];
-  const middle = (ids: Any[], up: number) => {
-    const l = live(ids).slice(0, 3), q = V(0, 0, 0);
-    for (const b of l) q.add(V(b.x, 0, b.z));
-    q.multiplyScalar(1 / Math.max(1, l.length));
-    q.y = S.ground(q.x, q.z) + up;
-    return q;
-  };
   const nearest = (ids: Any[]) => {
     const p = P().pos as THREE.Vector3;
     return live(ids).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0] ?? null;
@@ -157,56 +150,48 @@ export function actWild(c: Ctx) {
     }
     say(`the meadow: ${FIELD.x},${FIELD.z}, the nearest trunk ${room.toFixed(0)} m off`);
   }
-  // a herd of red deer on the meadow from the long lens; then the scope, the shot, and the rest away
+  // a herd of red deer feeding on the meadow from the long lens; a shot from somebody out of the picture, a stag down, and
+  // the rest away. (Nobody near: a herd stood with a player in sight of it is gone before a lens can find it.)
   {
-    const op = new Operator(BRACED, 282, 13);
-    let deer: Any[] = [], lens = V(0, 0, 0);
-    add(BAR, {
+    const op = new Operator(BRACED, 282, 24);
+    let deer: Any[] = [], lens = V(0, 0, 0), stag: Any = null, look0 = V(0, 0, 0);
+    const LONG = BAR * 2.5, CRACK = 2;
+    add(LONG, {
       name: 'deer',
       hour: MORNING,
       m: 'sneak',
+      hit: true,
       fadeIn: 0.3,
       setup: async () => {
-        c.keepStood.on = true;
-        kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
-        S.hold('primary');
-        S.me(FIELD.x - 26, FIELD.z, -Math.PI / 2, 0);
-        P().setCrouch(true);
+        S.hold(null);
+        S.me(FIELD.x - 330, FIELD.z, 0, 0);
         await run(6);
-        deer = stand('stag', FIELD.x + 10, FIELD.z - 3, 6);
+        deer = stand('stag', FIELD.x + 8, FIELD.z - 3, 6);
         await seen(deer);
-        say(`the deer: ${live(deer).map((b) => `${Math.round(b.x)},${Math.round(b.z)} mode ${b.mode}`).join(' | ')}`);
-        lens = S.at(FIELD.x - 14, FIELD.z + 9, 1.6);
-        op.reset(lens, middle(deer, 1));
+        await run(40);
+        say(`the deer: ${live(deer).map((q) => `${Math.round(q.x)},${Math.round(q.z)} mode ${q.mode}`).join(' | ')}`);
+        const near = live(deer).sort((p, q) => Math.hypot(p.x - FIELD.x, p.z - FIELD.z) - Math.hypot(q.x - FIELD.x, q.z - FIELD.z));
+        stag = near[0];
+        lens = S.at(FIELD.x + 7, FIELD.z - 34, 1.3);
+        look0 = V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z).add(V(-4, 0, 3));
+        op.reset(lens, look0);
+        const gun = S.actor(3);
+        gun.place(FIELD.x - 70, FIELD.z + 30, 0, 'mosin', []);
+        gun.pos.y -= 0;
       },
-      cam: (t) => op.update(t, lens, middle(deer, 1)),
-      after: (t) => chipSay(t, 0.2, BAR - 0.05, 'RED DEER', 'WOLVES · BEARS · COWS'),
-    });
-    let target: Any = null;
-    const shotAt = 0.9;
-    add(BAR * 1.5, {
-      name: 'deer-shot',
-      hud: true,
-      chain: true,
-      m: 'sneak',
-      hit: true,
-      setup: () => {
-        c.keepStood.on = false;
-        lightHands();
-        target = nearest(deer);
-        const body = () => V(target.x, S.ground(target.x, target.z) + 1, target.z);
-        hand.set(yawTo(eye(), body()), pitchTo(eye(), body()));
-        hand.look(-0.4, body, true, 0);
-      },
-      tick: (t, _S, dt) => {
-        look(t, dt);
-        S.key('Mouse2', true);
-        when(t, shotAt, 'fire', () => S.tap('Mouse0', 80));
-        when(t, shotAt + 0.12, 'drop', () => {
-          const b = herd().beasts.get(target.i);
-          if (b && !b.dead && herd().hurt(target.i, 5000, g.wild.host.me(), Date.now())?.dead) g.wild.hp(target.i, true);
+      tick: (t) => {
+        when(t, CRACK, 'crack', () => {
+          const gun = S.actor(3), to = V(stag.x, S.ground(stag.x, stag.z) + 0.95, stag.z);
+          gun.face(to);
+          gun.fireAt(to, 0);
+          g.wild.heard(gun.pos.x, gun.pos.z, [900, 2000]);
+        });
+        when(t, CRACK + 0.18, 'stag', () => {
+          if (!stag.dead && herd().hurt(stag.i, 5000, g.wild.host.me(), Date.now())?.dead) g.wild.hp(stag.i, true);
         });
       },
+      cam: (t) => op.update(t, lens, look0.clone().lerp(stag ? V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z) : look0, 0.22)),
+      after: (t) => chipSay(t, 0.3, LONG - 0.1, 'RED DEER', 'WOLVES · BEARS · COWS'),
     });
   }
   // the pack finds him at the edge of the wood and walks round him; then the first one comes in
