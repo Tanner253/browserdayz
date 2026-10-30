@@ -171,7 +171,8 @@ export class Infected26 {
   zeds: Any[] = [];
   constructor(private S: Stage, private wait: (ms: number) => Promise<void>) {}
   private get horde() { return (this.S.g as Any).horde as Any; }
-  troupe = async () => {
+  /** @param home where they lived, which says who they were (src/game/infected-kinds.ts): left out, nobody in particular */
+  troupe = async (home?: [number, number]) => {
     const horde = this.horde, zeds = this.zeds;
     if (zeds.length) return;
     horde.clear();
@@ -182,7 +183,7 @@ export class Infected26 {
     dir.tick = () => ({ added: [], gone: [], owned: [] });
     const me = horde.host.me().id;
     for (let n = 0; n < 4; n++) {
-      const i = 3100 + n, info = { i, s: [0, -300, 0, 0, 0, 0], hp: 90, own: me, h: [0, 0] };
+      const i = 3100 + n, info = { i, s: [home?.[0] ?? 0, -300, home?.[1] ?? 0, 0, 0, 0], hp: 90, own: me, h: [0, 0] };
       dir.bodies.set(i, { ...info, home: 0, diedAt: 0, heard: 0, struck: 0 });
       horde.add(info);
       zeds.push(horde.all.get(i));

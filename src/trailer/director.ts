@@ -582,7 +582,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 26 || CUT === 27) {
+  if (CUT === 28) {
+    // (the twenty-eighth is "Keep what you kill", everything since the gameplay trailer and how the money works: see shots28.ts)
+    const cut = await import('./shots28');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds();
+    ownScore = cut.score;
+  } else if (CUT === 26 || CUT === 27) {
     // (the twenty-sixth is the gameplay trailer, ZONA and the Arena played here and the battle royale laid in from the
     // twenty-seventh, a match filmed on the film's own arena server and kept as pictures: see shots26.ts, shots27.ts)
     const cut = CUT === 26 ? await import('./shots26') : await import('./shots27');

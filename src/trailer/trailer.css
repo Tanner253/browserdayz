@@ -786,3 +786,28 @@ body.tr-tall .x21-chip { left: 40px; bottom: 150px; }
 body.tr-tall .x21-chip b { font-size: 40px; }
 /* (the key hints' list at the foot of the left side: a trailer's HUD without the reminders a new player is shown) */
 body.tr-cut26 .hud-keys { visibility: hidden !important; }
+
+/* the twenty-eighth film */
+.x28-title { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.12) 70%); }
+.x28-title img { width: 84px; margin-bottom: 8px; filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.7)); }
+.x28-title b { font: 800 150px/0.9 var(--trailer-font); letter-spacing: 0.08em; color: #f2ede2; text-shadow: 0 6px 40px rgba(0, 0, 0, 0.75); }
+.x28-title u { margin-top: 10px; text-decoration: none; font: 800 34px/1 var(--trailer-font); letter-spacing: 0.26em; color: #ffd35a; text-shadow: 0 3px 18px rgba(0, 0, 0, 0.8); }
+.x28-title i { margin-top: 18px; font: 700 19px var(--trailer-font); font-style: normal; letter-spacing: 0.14em; color: #f2ede2; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85); }
+.x28-steps { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 18px; background: rgba(6, 7, 6, 0.62); }
+.x28-steps div { width: 214px; padding: 22px 8px 18px; text-align: center; border: 2px solid rgba(255, 211, 90, 0.2); border-radius: 8px; background: rgba(12, 13, 11, 0.8); opacity: 0.32; transform: scale(0.96); }
+.x28-steps div.on { opacity: 1; transform: none; border-color: #ffd35a; }
+.x28-steps i { display: block; font: 800 22px/1 var(--trailer-font); font-style: normal; color: #ffd35a; margin-bottom: 8px; }
+.x28-steps b { display: block; font: 800 30px/1.05 var(--trailer-font); letter-spacing: 0.04em; color: #f2ede2; }
+.x28-paid { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; background: rgba(6, 7, 6, 0.66); }
+.x28-paid h6 { font: 800 26px/1 var(--trailer-font); letter-spacing: 0.22em; color: #f2ede2; margin: 0 0 12px; }
+.x28-paid > b { font: 800 150px/0.95 var(--trailer-font); letter-spacing: 0.02em; color: #ffd35a; text-shadow: 0 6px 40px rgba(0, 0, 0, 0.7); font-variant-numeric: tabular-nums; }
+.x28-paid p { display: flex; gap: 44px; margin: 18px 0 22px; font: 700 22px/1 var(--trailer-font); letter-spacing: 0.08em; color: rgba(242, 237, 226, 0.75); }
+.x28-paid u { text-decoration: none; color: #f2ede2; font-weight: 800; }
+.x28-paid small { max-width: 1120px; font: 700 18px/1.35 var(--trailer-font); letter-spacing: 0.06em; color: rgba(242, 237, 226, 0.62); }
+.x28-end { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; background: rgba(6, 7, 6, 0.55); }
+.x28-end img { width: 96px; margin-bottom: 8px; }
+.x28-end b { font: 800 170px/0.9 var(--trailer-font); letter-spacing: 0.08em; color: #f2ede2; text-shadow: 0 6px 40px rgba(0, 0, 0, 0.75); }
+.x28-end u { margin-top: 8px; text-decoration: none; font: 800 34px/1 var(--trailer-font); letter-spacing: 0.26em; color: #ffd35a; }
+.x28-end h5 { margin: 24px 0 12px; font: 800 28px/1 var(--trailer-font); letter-spacing: 0.1em; color: #f2ede2; }
+.x28-end em { font: 800 40px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.06em; color: #ffd35a; }
+body.tr-cut28 .hud-claim { display: none; }
