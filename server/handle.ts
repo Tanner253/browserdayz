@@ -526,6 +526,8 @@ export function handle(c: Client, m: C2S) {
         send(c, { t: 'denied', uid: m.uid });
         return;
       }
+      // (nor through a base's wall, floor or shut door: server/solid.ts reaches)
+      if (lying && !reaches(c.pose, [lying.x, lying.y, lying.z])) return void send(c, { t: 'denied', uid: m.uid });
       if (c.seatAt || !economy.take(m.uid)) return void send(c, { t: 'denied', uid: m.uid });
       // (a tag in what was picked up is theirs from now on, its clock started now: custody.ts)
       if (lying) for (const t of payingTags(lying.item)) {
@@ -544,6 +546,9 @@ export function handle(c: Client, m: C2S) {
         if (typeof uid !== 'string' || c.openLying.has(uid)) continue;
         const l = economy.loot.get(uid);
         if (!l || !holds(l.item.id) || Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > LYING_REACH) continue;
+        // (nor through a base's wall, floor or shut door: server/solid.ts reaches; 2026-10-29, "i am still able to loot
+        // containers inside of other peoples bases through proximity through walls")
+        if (!reaches(c.pose, [l.x, l.y, l.z])) continue;
         openIt(c, `l:${uid}`);
         c.openLying.add(uid);
         send(c, { t: 'ldata', uid, items: laidIn(l.item) });
@@ -596,8 +601,9 @@ export function handle(c: Client, m: C2S) {
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       // (a base's box or claim with a lock on it opens only for whoever the lock lets in: server/locks.ts)
       if (!lockLets(c, m.cid)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is locked' });
-      // (and only from where it is reached: not through a base's wall, floor or shut door, server/solid.ts reaches)
-      if ((b.kind === 'bbox' || b.kind === 'claim') && !reaches(c.pose, [b.x, b.y, b.z])) return void send(c, { t: 'tell', kind: 'warn', text: 'Out of reach: something is in the way' });
+      // (and only from where it is reached: not through a base's wall, floor or shut door, whatever it is, a body or a
+      // crate inside one too: server/solid.ts reaches)
+      if (!reaches(c.pose, [b.x, b.y, b.z])) return void send(c, { t: 'tell', kind: 'warn', text: 'Out of reach: something is in the way' });
       // (open by as many as like at once: searched.ts. Another crate they had open is shut first.)
       if (c.openCid && c.openCid !== m.cid) shutIt(c, c.openCid);
       if (!hasOpen(c, m.cid)) openIt(c, m.cid);
@@ -620,7 +626,7 @@ export function handle(c: Client, m: C2S) {
       if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6 || !mayPeek(c, m.cid)) return;
       // (a base's box or claim: as for opening it, its lock and a reach to it, never through a wall)
-      if ((b.kind === 'bbox' || b.kind === 'claim') && (!lockLets(c, m.cid) || !reaches(c.pose, [b.x, b.y, b.z]))) return;
+      if (((b.kind === 'bbox' || b.kind === 'claim') && !lockLets(c, m.cid)) || !reaches(c.pose, [b.x, b.y, b.z])) return;
       send(c, { t: 'cdata', cid: m.cid, items: boxItems(b) });
       return;
     }

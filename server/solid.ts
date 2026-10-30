@@ -134,10 +134,11 @@ export function wakeClear(pid: string, at: Vec3, name = ''): Vec3 | null {
 }
 
 /**
- * Whether somebody reaches a base's box or claim from where they stand: nothing of any base that stops a body (a wall,
- * a floor, a shut door or shutters) between their eye and its middle or its top. Its distance and lock alone were asked,
- * and its things were taken through the wall it stood behind (the owner, 2026-10-29: "i can loot containers of peoples
- * bases through their walls... fix asap").
+ * Whether somebody reaches a thing from where they stand: nothing of any base that stops a body (a wall, a floor, a shut
+ * door or shutters) between their eye and its middle or its top. A box, a claim, a body, a bag or anything lying in a
+ * base was taken by its distance alone, through the wall it was behind (the owner, 2026-10-29: "i can loot containers of
+ * peoples bases through their walls... fix asap"; "i am still able to loot containers inside of other peoples bases
+ * through proximity"). Out in the world there is no base between, and nothing changes.
  */
 export function reaches(from: Pose, at: Vec3) {
   const eye: Vec3 = [from[0], from[1] + eyeOver(from[5]), from[2]];

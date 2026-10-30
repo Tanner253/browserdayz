@@ -1,3 +1,3 @@
 {
- "why": "Fix: base boxes can no longer be looted through walls. Places kept."
+ "why": "Fix: nothing inside a base can be looted through its walls. Places kept."
 }
