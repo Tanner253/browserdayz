@@ -170,19 +170,20 @@ export function actWild(c: Ctx) {
         c.keepStood.on = true;
         kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
         S.hold('primary');
-        S.me(FIELD.x - 34, FIELD.z, -Math.PI / 2, 0);
+        S.me(FIELD.x - 26, FIELD.z, -Math.PI / 2, 0);
         P().setCrouch(true);
-        deer = stand('stag', FIELD.x + 44, FIELD.z - 6, 6);
+        await run(6);
+        deer = stand('stag', FIELD.x + 10, FIELD.z - 3, 6);
         await seen(deer);
-        await run(50);
         say(`the deer: ${live(deer).map((b) => `${Math.round(b.x)},${Math.round(b.z)} mode ${b.mode}`).join(' | ')}`);
-        lens = S.at(FIELD.x - 26, FIELD.z + 12, 1.7);
+        lens = S.at(FIELD.x - 14, FIELD.z + 9, 1.6);
         op.reset(lens, middle(deer, 1));
       },
       cam: (t) => op.update(t, lens, middle(deer, 1)),
       after: (t) => chipSay(t, 0.2, BAR - 0.05, 'RED DEER', 'WOLVES · BEARS · COWS'),
     });
     let target: Any = null;
+    const shotAt = 0.9;
     add(BAR * 1.5, {
       name: 'deer-shot',
       hud: true,
@@ -200,7 +201,11 @@ export function actWild(c: Ctx) {
       tick: (t, _S, dt) => {
         look(t, dt);
         S.key('Mouse2', true);
-        when(t, 0.9, 'fire', () => S.tap('Mouse0', 80));
+        when(t, shotAt, 'fire', () => S.tap('Mouse0', 80));
+        when(t, shotAt + 0.12, 'drop', () => {
+          const b = herd().beasts.get(target.i);
+          if (b && !b.dead && herd().hurt(target.i, 5000, g.wild.host.me(), Date.now())?.dead) g.wild.hp(target.i, true);
+        });
       },
     });
   }
@@ -272,11 +277,11 @@ export function actWild(c: Ctx) {
         S.hold('primary');
         const me = S.at(FIELD.x - 14, FIELD.z, 0);
         S.me(me.x, me.z, -Math.PI / 2, 0);
-        const out = stand('bear', me.x + 25, me.z - 2, 1);
+        const out = stand('bear', me.x + 19, me.z - 2, 1);
         bear = herd().beasts.get(out[0].i);
         await seen(out);
         await run(40);
-        lens = S.at(me.x + 15, me.z + 4.5, 0.8);
+        lens = S.at(me.x + 10, me.z + 4.5, 0.8);
         op.reset(lens, at());
         say(`the bear stands ${flat(me, bear).toFixed(1)} m off, mode ${bear.mode}`);
       },

@@ -331,6 +331,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
       },
       after: (t, st) => {
         after?.(t, st);
+        for (const a of S.actors) if (!a.alive && a.pos.y > -100) a.rp.avatar.root.visible = true;
         tally(t);
         hush();
         const a = s.fadeIn ? 1 - ease(t / s.fadeIn) : 0, z = s.fadeOut ? ease((t - (len - s.fadeOut)) / s.fadeOut) : 0;

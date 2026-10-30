@@ -154,7 +154,7 @@ export function actRaid(c: Ctx) {
         await run(20);
         hand.set(yawTo(eye(), door.clone().setY(me.y + 1.3)), 0);
         hand.look(-0.2, () => (man.alive ? man.chest() : man.pos.clone()), true, 0);
-        lens = b.at(CELL * 1.62, 1.55, CELL * 1.2);
+        lens = b.at(CELL * 1.6, 1.5, CELL * 1.57);
         op.reset(lens, door.clone().setY(me.y + 1.2));
       },
       tick: (t, _S, dt) => {
@@ -184,11 +184,11 @@ export function actRaid(c: Ctx) {
         lightHands(2.2, 1.6);
         kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
         S.hold('primary');
-        const b = house(), me = b.at(CELL * 3, STOREY, CELL * 2.5 - 0.75);
+        const b = house(), me = b.at(CELL, STOREY, CELL * 2.5 - 0.75);
         await upstairs(me, 0, 0);
         man = S.actor(2);
-        const q = b.at(CELL * 1.5, 0, CELL * 13);
-        far = b.at(CELL * 6, 0, CELL * 32);
+        const q = b.at(CELL * 0.6, 0, CELL * 11);
+        far = b.at(CELL * 1.8, 0, CELL * 30);
         man.place(q.x, q.z, yawTo(q, far), 'ak', GEAR);
         man.pos.y = floorAt(q.x, q.z, q.y + 0.8);
         await run(20);
@@ -231,11 +231,11 @@ export function actPaid(c: Ctx) {
   };
   /** the tag's clock as the game keeps it, large; and what it pays */
   const big = piece('x28-clock', '<i>STAY ALIVE</i><b></b>');
-  const clockOf = (t: number, from: number, to: number) => {
+  const clockOf = (t: number, from: number, to: number, end = false) => {
     const it = g.inv.find((q: Any) => q.id === 'dogtag') as Any;
-    show(big, t >= from && t <= to ? 1 : 0);
+    show(big, t >= from && t <= to && (!!it || end) ? 1 : 0);
     if (it) big.querySelector('b')!.textContent = tagClock(it);
-    else {
+    else if (end) {
       big.querySelector('i')!.textContent = 'CASHED IN';
       big.querySelector('b')!.textContent = '+0.01 SOL';
     }
@@ -281,7 +281,6 @@ export function actPaid(c: Ctx) {
         rival.go(rival.to.x, rival.to.z, 4.8, dt);
         rival.pos.y = floorAt(rival.pos.x, rival.pos.z, rival.pos.y + 0.6);
       }
-      S.key('Mouse2', true);
       S.key('Mouse0', t > 1.2 && t < 1.8 && rival.alive);
       c.when(t, 2.05, 'fell', () => {
         if (rival.alive) rival.die(fwdOf(rival.yaw));
@@ -347,13 +346,14 @@ export function actPaid(c: Ctx) {
     hud: true,
     hour: DAWN + 0.02,
     m: 'sting',
-    setup: () => onRoof(TAG_HOLD - 2.2),
+    setup: () => onRoof(TAG_HOLD - 1.2),
     tick: (t, _S, dt) => look(t, dt),
-    after: (t) => clockOf(t, 0, 9),
+    after: (t) => clockOf(t, 0, 9, true),
   });
   // the board: how it pays, and what it has paid
   const steps = piece('x28-steps', ['DROP IN', 'LOOT', 'TAKE A TAG', 'HOLD 20:00', 'CASH IN'].map((w, k) => `<div><i>${k + 1}</i><b>${w}</b></div>`).join(''));
   const paid = piece('x28-paid', `<h6>PAID TO PLAYERS, ON CHAIN</h6><b>0.00 SOL</b><p><span><u>${LIVE.tags}</u> DOG TAGS PAID</span><span><u>≈ $${LIVE.usd}</u> AT TODAY'S PRICE</span><span><u>SINCE ${LIVE.since}</u></span></p><small>0.01 SOL A TAG, UP TO 0.025 HOLDING $ZONA · 5 TAGS A WALLET IN 24 HOURS · PAST 10 TAGS, HOLD 350,000 $ZONA · TAGS COUNT ONLY INSIDE THE ZONA</small>`);
+  c.cleaners.push(() => { steps.style.display = paid.style.display = 'none'; });
   const backdrop = (name: string, len: number, after: (t: number) => void) => add(len, {
     name,
     hour: MORNING,
