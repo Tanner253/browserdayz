@@ -243,6 +243,11 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
       }
       for (const b of out) g.wild.herd.remove(b.i);
     }
+    for (const q of g.wild.herd.groups as Any[]) {
+      q.wants = [];
+      q.owed = [];
+    }
+    for (const b of [...g.wild.herd.beasts.values()] as Any[]) g.wild.herd.remove(b.i);
     for (const d of dressers) await d();
   };
   /** kept off the screen between shots: a shot may leave things behind it for the next */

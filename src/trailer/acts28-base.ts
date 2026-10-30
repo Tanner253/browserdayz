@@ -250,7 +250,7 @@ export function actBuild(c: Ctx) {
   const g9 = () => `${ITEMS.a91?.weapon?.capacity ?? 20} ROUNDS · 7.62 · SUPPRESSED`;
   sheet('sheet-a91', 'a91', ['a91_suppressor'], '9A-91', g9());
   sheet('sheet-deagle', 'deagle', ['red_dot_1x', 'suppressor_9'], 'DESERT EAGLE', 'RED DOT · SUPPRESSOR');
-  sheet('sheet-mosin', 'mosin9130', ['pu_scope'], 'MOSIN 91/30', 'PU SCOPE · BOLT ACTION');
+  sheet('sheet-mosin', 'mosin9130', ['pu_scope'], 'MOSIN 91/30', 'BOLT ACTION · FIVE ROUNDS');
   sheet('sheet-karambit', 'karambit', [], 'KARAMBIT', 'FADE FINISH', 'fade');
   void eye; void lightHands; void pitchTo; void ease;
 }

@@ -173,8 +173,7 @@ export function actWild(c: Ctx) {
         say(`the deer: ${live(deer).map((q) => `${Math.round(q.x)},${Math.round(q.z)} mode ${q.mode}`).join(' | ')}`);
         const near = live(deer).sort((p, q) => Math.hypot(p.x - FIELD.x, p.z - FIELD.z) - Math.hypot(q.x - FIELD.x, q.z - FIELD.z));
         stag = near[0];
-        lens = S.at(FIELD.x + 7, FIELD.z - 34, 1.3);
-        for (const b of [...herd().beasts.values()] as Any[]) if (Math.hypot(b.x - lens.x, b.z - lens.z) < 260 && !deer.some((q) => q.i === b.i)) herd().remove(b.i);
+        lens = S.at(stag.x + 4, stag.z - 21, 1.2);
         look0 = V(stag.x, S.ground(stag.x, stag.z) + 0.9, stag.z);
         op.reset(lens, look0);
         const gun = S.actor(3);
