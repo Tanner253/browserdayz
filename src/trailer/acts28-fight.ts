@@ -336,9 +336,11 @@ export function actPaid(c: Ctx) {
             if (room < 3.5) break;
           }
           if (room < 3.5) continue;
+          // (level across: a hillside rising beside the lens filled half the picture)
+          const lean = Math.abs(S.ground(x - d.z * 7, z + d.x * 7) - S.ground(x + d.z * 7, z - d.x * 7));
           const eye0 = V(x, h + 1.3, z);
           if (!ground.sees(eye0, town)) continue;
-          const score = room + Math.min(rise, 25) * 0.4;
+          const score = room + Math.min(rise, 25) * 0.4 - lean * 0.8;
           if (score > best) {
             best = score;
             top = V(x, h, z);
@@ -364,7 +366,7 @@ export function actPaid(c: Ctx) {
   };
   const beside = () => {
     const f = fwdOf(P().yaw), s = rightOf(P().yaw), p = P().pos as THREE.Vector3;
-    return { p: p.clone().addScaledVector(f, -2.7).addScaledVector(s, 1.2).add(V(0, 1.35, 0)), l: V(TOWN.x, S.ground(TOWN.x, TOWN.z) + 6, TOWN.z), fov: 46 };
+    return { p: p.clone().addScaledVector(f, -3.4).addScaledVector(s, -2.1).add(V(0, 2.1, 0)), l: V(TOWN.x, S.ground(TOWN.x, TOWN.z) + 6, TOWN.z), fov: 44 };
   };
   add(BAR, {
     name: 'hold',

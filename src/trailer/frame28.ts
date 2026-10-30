@@ -68,10 +68,21 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
   let keepNotes = false;
   const hush = () => document.querySelectorAll(keepNotes ? '.hud-feed > *' : '.hud-notes > *, .hud-feed > *').forEach((e) => e.remove());
   const notes = (on: boolean) => { keepNotes = on; };
+  /** the dead stay where they fell: they say so in every pose (or they get up), and their bodies are kept (a player's is put away for the searchable one) */
+  const keepDead = () => {
+    for (const a of S.actors) {
+      if (a.alive) continue;
+      a.more |= F_DEAD;
+      const rp = a.rp as Any;
+      if (rp.fall > 3.6) rp.fall = 3.6;
+      if (a.pos.y > -100) rp.avatar.root.visible = true;
+    }
+  };
   const run = async (frames: number, each?: (k: number) => void) => {
     S.mute = true;
     for (let i = 0; i < frames; i++) {
       each?.(i);
+      keepDead();
       for (const a of S.actors) a.push();
       clock.advance(1000 / 60);
       if (i % 20 === 19) await wait(8);
@@ -331,16 +342,16 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
       lead: (t, st) => {
         const dt = lt < -0.9 ? 1 / 60 : t - lt;
         lt = t;
+        keepDead();
         tick?.(t, st, dt);
       },
       tick: (t, st, dt) => {
         lt = t;
-        for (const a of S.actors) if (!a.alive) a.more |= F_DEAD;
+        keepDead();
         tick?.(t, st, dt);
       },
       after: (t, st) => {
         after?.(t, st);
-        for (const a of S.actors) if (!a.alive && a.pos.y > -100) a.rp.avatar.root.visible = true;
         tally(t);
         hush();
         const a = s.fadeIn ? 1 - ease(t / s.fadeIn) : 0, z = s.fadeOut ? ease((t - (len - s.fadeOut)) / s.fadeOut) : 0;
