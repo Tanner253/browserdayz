@@ -20,7 +20,7 @@ export const LIVE = { sol: 10.05, tags: 848, usd: 950, since: '8 OCT', solUsd: 9
 const GEAR = ['tactical_jacket', 'combat_trousers', 'rubber_boots', 'chest_rig', 'balaclava'];
 
 export function actRaid(c: Ctx) {
-  const { S, g, add, say, chipSay, run, kit, hand, look, eye, lightHands, ground, when, notes, wearing } = c;
+  const { S, g, add, say, chipSay, run, kit, hand, look, eye, lightHands, ground, when, notes } = c;
   const { floorAt } = ground;
   const house = () => c.base!;
   /** the house standing, whole, however the film got here */
@@ -41,7 +41,6 @@ export function actRaid(c: Ctx) {
     a.pos.y = floorAt(a.pos.x, a.pos.z, a.pos.y + 0.6);
   };
   const three = () => [S.actor(0), S.actor(1), S.actor(2)];
-  for (const a of S.actors) wearing.set(a.name, GEAR);
   c.cleaners.push(() => { for (const a of S.actors) if (a.pos.y > -100) a.hide(); });
 
   // from behind them, across the dark to the house and its torches
@@ -126,39 +125,37 @@ export function actRaid(c: Ctx) {
       },
     });
   }
-  // the door: the Desert Eagle, across the room
+  // the door: over his shoulder in the front room, the Desert Eagle up, and one comes in at it
   {
-    let man: Any = null, way = V(0, 0, 0);
+    const op = new Operator(BRACED, 288, 46);
+    let man: Any = null, way = V(0, 0, 0), lens = V(0, 0, 0);
     add(BAR * 1.5, {
       name: 'door',
-      hud: true,
-      hour: DUSK,
+      hour: SUNSET,
       m: 'board',
       hit: true,
       setup: async () => {
         standing();
-        lightHands(2.2, 1.6);
-        notes(true);
         kit(['deagle', ['ammo_50', 21]]);
         S.hold('holster');
-        const b = house(), me = b.at(CELL * 1.2, 0, CELL * 1.75);
-        me.y = floorAt(me.x, me.z, me.y + 0.5);
-        const door = b.at(CELL, 0, CELL * 2.5);
-        S.me(me.x, me.z, yawTo(me, door), 0, me.y);
+        const b = house(), me = b.at(CELL * 1.25, 0, CELL * 1.75), door = b.at(CELL, 0, CELL * 2.5);
+        await upstairs(me, yawTo(me, door), 0);
         man = S.actor(1);
-        const q = b.at(CELL, 0, CELL * 3.6);
-        way = b.at(CELL, 0, CELL * 1.9);
+        const q = b.at(CELL, 0, CELL * 3.3);
+        way = b.at(CELL, 0, CELL * 1.95);
         man.place(q.x, q.z, yawTo(q, way), 'ak', GEAR);
         man.pos.y = floorAt(q.x, q.z, q.y + 0.8);
-        await run(20);
         const dp = [...b.base!.pieces.values()].find((p) => p.k === 'door_metal');
-        if (dp) {
+        if (dp && !dp.open) {
           dp.open = true;
           g.build.draw.put(b.base, dp);
           g.build.draw.swing(b.base!.id, dp.id);
         }
+        await run(20);
         hand.set(yawTo(eye(), door.clone().setY(me.y + 1.3)), 0);
         hand.look(-0.2, () => (man.alive ? man.chest() : man.pos.clone()), true, 0);
+        lens = b.at(CELL * 1.62, 1.55, CELL * 1.2);
+        op.reset(lens, door.clone().setY(me.y + 1.2));
       },
       tick: (t, _S, dt) => {
         look(t, dt);
@@ -167,10 +164,12 @@ export function actRaid(c: Ctx) {
         when(t, 0.8, 'one', () => S.tap('Mouse0', 60));
         when(t, 1.3, 'two', () => S.tap('Mouse0', 60));
         when(t, 1.8, 'three', () => S.tap('Mouse0', 60));
+        when(t, 2.2, 'down', () => { if (man.alive) man.die(fwdOf(man.yaw)); });
       },
+      cam: (t) => op.update(t, lens, eye().addScaledVector(fwdOf(c.P().yaw), 2).setY(eye().y - 0.25)),
     });
   }
-  // the last of them runs for it: the Mosin, from the tower
+  // the last of them runs for it: the Mosin, from the top floor
   {
     let man: Any = null, far = V(0, 0, 0);
     add(BAR * 2, {
@@ -185,23 +184,11 @@ export function actRaid(c: Ctx) {
         lightHands(2.2, 1.6);
         kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
         S.hold('primary');
-        const b = house(), me = b.at(CELL * 2, STOREY * 2, CELL * 1.5 - 0.75);
+        const b = house(), me = b.at(CELL * 3, STOREY, CELL * 2.5 - 0.75);
         await upstairs(me, 0, 0);
         man = S.actor(2);
-        // (the bearing out of the window with no bough across it: a ray finds trunks, so the trees' own places are asked)
-        const trunks = ((S.world.trees ?? []) as { kind: string; x: number; z: number }[]).filter((q2) => !q2.kind.startsWith('bush') && flat(q2, me) < 110);
-        const eye0 = me.clone(), out = b.at(CELL * 2, STOREY * 2, CELL * 8).sub(eye0).setY(0).normalize();
-        let best = -1, way = out.clone();
-        for (let a = -0.42; a <= 0.42; a += 0.03) {
-          const d = out.clone().applyAxisAngle(V(0, 1, 0), a);
-          let room = 1e9;
-          for (let k = 8; k <= 95; k += 3) for (const q2 of trunks) room = Math.min(room, Math.hypot(q2.x - (eye0.x + d.x * k), q2.z - (eye0.z + d.z * k)));
-          if (room > best) { best = room; way = d; }
-        }
-        say(`the way out of the tower: ${best.toFixed(1)} m clear of the trunks`);
-        const q = eye0.clone().addScaledVector(way, 42), side = V(-way.z, 0, way.x);
-        q.addScaledVector(side, -7);
-        far = eye0.clone().addScaledVector(way, 66).addScaledVector(side, 9);
+        const q = b.at(CELL * 1.5, 0, CELL * 13);
+        far = b.at(CELL * 6, 0, CELL * 32);
         man.place(q.x, q.z, yawTo(q, far), 'ak', GEAR);
         man.pos.y = floorAt(q.x, q.z, q.y + 0.8);
         await run(20);
@@ -245,7 +232,7 @@ export function actPaid(c: Ctx) {
   /** the tag's clock as the game keeps it, large; and what it pays */
   const big = piece('x28-clock', '<i>STAY ALIVE</i><b></b>');
   const clockOf = (t: number, from: number, to: number) => {
-    const it = (g.inv.find as Any) && [...g.inv.carried()].find((q: Any) => q.id === 'dogtag') as Any;
+    const it = g.inv.find((q: Any) => q.id === 'dogtag') as Any;
     show(big, t >= from && t <= to ? 1 : 0);
     if (it) big.querySelector('b')!.textContent = tagClock(it);
     else {
@@ -275,11 +262,11 @@ export function actPaid(c: Ctx) {
       lightHands();
       kit(['ak', ['ammo_762', 60]]);
       S.hold('primary');
-      const me = K(-22);
+      const me = K(-24);
       me.y = floorAt(me.x, me.z);
       S.me(me.x, me.z, yawTo(me, K(0)), 0, me.y);
       rival = S.actor(0);
-      const q = K(-8, -3), to = K(14, 2.5);
+      const q = K(-8, -7), to = K(-6, 9);
       rival.place(q.x, q.z, yawTo(q, to), 'ak', GEAR);
       rival.pos.y = floorAt(q.x, q.z, me.y + 0.8);
       rival.to = to;
@@ -295,7 +282,7 @@ export function actPaid(c: Ctx) {
         rival.pos.y = floorAt(rival.pos.x, rival.pos.z, rival.pos.y + 0.6);
       }
       S.key('Mouse2', true);
-      S.key('Mouse0', t > 1.2 && t < 1.7 && rival.alive);
+      S.key('Mouse0', t > 1.2 && t < 1.8 && rival.alive);
       c.when(t, 2.05, 'fell', () => {
         if (rival.alive) rival.die(fwdOf(rival.yaw));
         S.feedKill('Sable', rival.name, 'AK', flat(eye(), rival.pos));
@@ -416,6 +403,7 @@ export function actGetIn(c: Ctx) {
     after: (t) => chipSay(t, 0.05, len - 0.04, big, small),
   });
   cleaners.push(() => screen.hide());
+  let lensT = V(0, 0, 0), lookT = V(0, 0, 0);
   // the road: a jeep, driven
   add(BAR, {
     name: 'road',
@@ -432,7 +420,24 @@ export function actGetIn(c: Ctx) {
     tick: () => drive.wheel(),
     after: (t) => chipSay(t, 0.05, BAR - 0.04, 'DRIVE', ''),
   });
-  onScreen('br-1', 'BATTLE ROYALE', 'SOLO · DUO · SQUAD', 6, BAR);
+  // a trader's stall: the camp where nobody shoots
+  add(BAR, {
+    name: 'trader',
+    hour: GOLDEN,
+    m: 'board',
+    setup: async () => {
+      const st = g.traders.stands[0] as Any;
+      const at = st.pos.clone() as THREE.Vector3, f = fwdOf(st.yaw ?? 0);
+      S.me(at.x + 30, at.z, 0);
+      await run(40);
+      S.parkMe();
+      lensT = at.clone().addScaledVector(f, 3.6).add(V(0.5, 1.5, 0.5));
+      lookT = at.clone().add(V(0, 1.3, 0));
+    },
+    cam: (t) => ({ p: lensT.clone().add(V(0, 0, t * 0.05)), l: lookT, fov: 44 }),
+    after: (t) => chipSay(t, 0.05, BAR - 0.04, 'TRADE', 'TRADERS · RECYCLERS · NO-FIGHT CAMPS'),
+  });
+  onScreen('br-1', 'BATTLE ROYALE', 'AND THE ARENA, ON ONE PAGE', 6, BAR);
   // the end card
   const end = piece('x28-end', `<img src="/brand/zona-mark.svg" alt=""><b>ZONA</b><u>KEEP WHAT YOU KILL</u><h5>FREE · PLAYS IN YOUR BROWSER · NO DOWNLOAD</h5><em>WWW.ZONAPVP.FUN</em>`);
   add(BAR * 2.5, {

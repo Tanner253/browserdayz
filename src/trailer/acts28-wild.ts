@@ -170,12 +170,13 @@ export function actWild(c: Ctx) {
         c.keepStood.on = true;
         kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
         S.hold('primary');
-        S.me(FIELD.x - 24, FIELD.z, -Math.PI / 2, 0);
-        deer = stand('stag', FIELD.x + 22, FIELD.z - 6, 6);
+        S.me(FIELD.x - 34, FIELD.z, -Math.PI / 2, 0);
+        P().setCrouch(true);
+        deer = stand('stag', FIELD.x + 44, FIELD.z - 6, 6);
         await seen(deer);
         await run(50);
         say(`the deer: ${live(deer).map((b) => `${Math.round(b.x)},${Math.round(b.z)} mode ${b.mode}`).join(' | ')}`);
-        lens = S.at(FIELD.x - 18, FIELD.z + 12, 1.9);
+        lens = S.at(FIELD.x - 26, FIELD.z + 12, 1.7);
         op.reset(lens, middle(deer, 1));
       },
       cam: (t) => op.update(t, lens, middle(deer, 1)),
@@ -250,6 +251,7 @@ export function actWild(c: Ctx) {
       },
       tick: (t, _S, dt) => {
         look(t, dt);
+        P().vitals.bleeding = false;
         S.key('Mouse2', true);
         S.key('Mouse0', (t > 0.4 && t < 0.8) || (t > 1.2 && t < 1.6) || (t > 2 && t < 2.5));
       },
@@ -296,7 +298,7 @@ export function actWild(c: Ctx) {
       },
       tick: (t, _S, dt) => {
         look(t, dt);
-        S.key('Mouse2', true);
+        P().vitals.bleeding = false;
         S.key('Mouse0', t > 0.45 && !bear.dead);
         when(t, 0.6, 'hurt', () => herd().hurt(bear.i, 60, g.wild.host.me(), Date.now()));
         const d = flat(P().pos, bear);
@@ -318,14 +320,15 @@ export function actWild(c: Ctx) {
       const [sx, sz] = TOWN.street;
       return V(TOWN.x + sx * a - sz * side, 0, TOWN.z + sz * a + sx * side);
     };
-    let kills = 0;
-    add(BAR * 1.5, {
-      name: 'infected',
-      hud: true,
+    let kills = 0, lens = V(0, 0, 0);
+    const op = new Operator(BRACED, 289, 40);
+    const runners = () => infected.zeds.filter((q: Any) => !q.dead && q.pos.y > -100).sort((p: Any, q: Any) => flat(p.pos, P().pos) - flat(q.pos, P().pos));
+    add(BAR, {
+      name: 'infected-run',
       hour: NOON,
       m: 'dread',
       setup: async () => {
-        lightHands();
+        c.keepZeds.on = true;
         kit(['ak', ['ammo_762', 60]]);
         S.hold('primary');
         kills = 0;
@@ -333,30 +336,48 @@ export function actWild(c: Ctx) {
         me.y = ground.floorAt(me.x, me.z);
         S.me(me.x, me.z, yawTo(me, K(10)), 0, me.y);
         await run(30);
-        const zs = [[-8, -1], [-5, 1.6], [-2, -2.2], [1, 0.6]].map(([a, b], k) => {
-          const q = K(a, b);
-          q.y = ground.floorAt(q.x, q.z, me.y + 1);
-          infected.putZ(infected.zeds[k], q, yawTo(q, me), true);
+        const zs = [[-1, -1], [2, 1.6], [5, -2.2], [8, 0.6]].map(([q, s], k) => {
+          const p = K(q, s);
+          p.y = ground.floorAt(p.x, p.z, me.y + 1);
+          infected.putZ(infected.zeds[k], p, yawTo(p, me), true);
           infected.awake(infected.zeds[k]);
-          return q;
+          return p;
         });
         say(`in sight: ${zs.map((q) => ground.seesWide(me.clone().setY(me.y + 1.6), q.clone().setY(q.y + 1.3))).join(' ')}`);
-        await run(40);
-        hand.set(yawTo(eye(), K(-4)), -0.02);
+        await run(50);
+        lens = K(-13, 2.2);
+        lens.y = ground.floorAt(lens.x, lens.z, me.y + 1) + 0.55;
+        op.reset(lens, K(-2));
+      },
+      cam: (t) => {
+        const z = runners()[0];
+        return op.update(t, lens, z ? V(z.pos.x, z.pos.y + 1.1, z.pos.z) : K(-2));
+      },
+      after: (t) => chipSay(t, 0.2, BAR - 0.05, 'THE INFECTED', 'TWELVE KINDS'),
+    });
+    add(BAR * 1.25, {
+      name: 'infected',
+      hud: true,
+      chain: true,
+      m: 'dread',
+      setup: () => {
+        c.keepZeds.on = false;
+        lightHands();
+        const z = runners()[0];
+        if (z) hand.set(yawTo(eye(), V(z.pos.x, z.pos.y + 1.2, z.pos.z)), -0.02);
       },
       tick: (t, _S, dt) => {
-        const z = infected.zeds.filter((q: Any) => !q.dead && q.pos.y > -100).sort((a: Any, b: Any) => flat(a.pos, P().pos) - flat(b.pos, P().pos))[0];
+        const z = runners()[0];
         if (z) hand.look(t, V(z.pos.x, z.pos.y + 1.2, z.pos.z), true, 9);
         look(t, dt);
         S.key('Mouse2', true);
-        S.key('Mouse0', t > 0.5 && t % 0.9 < 0.3);
+        S.key('Mouse0', t > 0.15 && t % 0.8 < 0.3);
         if (z && flat(z.pos, P().pos) < 4.5 && kills < 4) {
           kills++;
           infected.dropZ(z, eye());
         }
       },
-      after: (t) => chipSay(t, 0.2, BAR * 1.5 - 0.1, 'THE INFECTED', 'TWELVE KINDS'),
     });
-    c.cleaners.push(() => infected.away());
+    c.cleaners.push(() => { if (!c.keepZeds.on) infected.away(); });
   }
 }

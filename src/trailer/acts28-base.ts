@@ -6,7 +6,7 @@ import { BRACED, DRONE, Operator, yawTo, pitchTo } from './human';
 import { AFTERNOON, BAR, GOLDEN, SUNSET, V, ease, type Ctx } from './frame28';
 import { Base28, SITE } from './base28';
 import { assets } from '../core/assets';
-import { ITEMS, makeItem } from '../sim/items';
+import { ITEMS } from '../sim/items';
 import { CELL } from '../sim/build/pieces';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -116,7 +116,7 @@ export function actBuild(c: Ctx) {
       },
     });
   }
-  // the flag on its pole at sunset, and the rack inside by the torches
+  // the flag on its pole at sunset
   {
     const op = new Operator(BRACED, 287, 30);
     let lens = V(0, 0, 0), at = V(0, 0, 0);
@@ -133,32 +133,6 @@ export function actBuild(c: Ctx) {
       },
       cam: (t) => op.update(t, lens, at),
       after: (t) => chipSay(t, 0.1, BAR - 0.04, 'CLAIM IT', 'YOUR FLAG · YOUR LAND'),
-    });
-    add(BAR, {
-      name: 'rack',
-      hour: SUNSET,
-      m: 'groove',
-      setup: async () => {
-        if (!base.base) base.begin(), base.whole();
-        const st = [...g.build.boxes.racks()][0] as Any;
-        if (st && !st.stocked) {
-          st.stocked = true;
-          for (const id of ['ak', 'mosin', 'a91', 'vssk', 'deagle']) st.container.add(makeItem(id));
-        }
-        const me = base.at(CELL * 1, 0, CELL * 1.7);
-        S.me(me.x, me.z, 0, 0, ground.floorAt(me.x, me.z, me.y + 0.5));
-        await run(60);
-        for (let k = 0; k < 40; k++) await wait(30);
-        at = base.at(CELL * -0.1, 1.1, CELL * 2.1);
-        lens = base.at(CELL * 0.75, 1.25, CELL * 1.75);
-        op.reset(lens, at);
-        S.parkMe();
-        warm.position.copy(base.at(CELL * 0.2, 2.2, CELL * 1.85)).sub(O);
-        keyLamp.position.copy(base.at(CELL * 0.1, 1.2, CELL * 1.7)).sub(O);
-        warm.intensity = 70;
-        keyLamp.intensity = 34;
-      },
-      cam: (t) => op.update(t, lens.clone().lerp(at, t * 0.04), at),
     });
   }
   /** the room the guns are shown in: the eighth film's, a hundred and seventy metres over the ground, its own lamps */
