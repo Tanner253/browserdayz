@@ -10,7 +10,7 @@ import { TOWN, SEA_LEVEL } from '../world/worldgen';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
 
-export const PAID = { sol: '10.05' };
+export const PAID = { sol: '10.06' };
 /** the middle of Pokrov's lane (shots26.ts) */
 const LANE = 34.5;
 

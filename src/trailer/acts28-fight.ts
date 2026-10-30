@@ -16,7 +16,7 @@ import { PAID } from './acts28-wild';
 type Any = any;
 
 /** the figures on the board, read from /api/cashins?format=total and format=status (read again before a take) */
-export const LIVE = { sol: 10.05, tags: 848, usd: 950, since: '8 OCT', solUsd: 94.4 };
+export const LIVE = { sol: 10.06, tags: 849, usd: 960, since: '8 OCT', solUsd: 95.42 };
 const GEAR = ['tactical_jacket', 'combat_trousers', 'rubber_boots', 'chest_rig', 'balaclava'];
 
 export function actRaid(c: Ctx) {
@@ -95,7 +95,7 @@ export function actRaid(c: Ctx) {
         const b = house(), me = b.at(CELL, STOREY, CELL * 2.5 - 0.75);
         await upstairs(me, 0, -0.2);
         for (const [k, a] of three().entries()) {
-          const q = b.at(CELL * (0.2 + k * 0.9), 0, CELL * (6.5 + k * 0.7));
+          const q = b.at(CELL * (0.1 + k * 0.9), 0, CELL * (9 + k * 0.7));
           a.place(q.x, q.z, yawTo(q, b.at(CELL, 0, CELL * 3)), 'ak', GEAR);
           a.pos.y = floorAt(q.x, q.z, q.y + 0.8);
           a.sprint = true;
@@ -109,7 +109,7 @@ export function actRaid(c: Ctx) {
       tick: (t, _S, dt) => {
         look(t, dt);
         const b = house();
-        for (const a of three()) runner(a, b.at(CELL, 0, CELL * 3.4), 4.6, dt);
+        for (const a of three()) runner(a, b.at(CELL, 0, CELL * 5), 4.8, dt);
         S.key('Mouse2', true);
         S.key('Mouse0', (t > 0.7 && t < 1.05) || (t > 1.9 && t < 2.3) || (t > 3 && t < 3.3));
         if (aim && !aim.alive) {
@@ -142,7 +142,7 @@ export function actRaid(c: Ctx) {
         await upstairs(me, yawTo(me, door), 0);
         man = S.actor(1);
         const q = b.at(CELL, 0, CELL * 3.3);
-        way = b.at(CELL, 0, CELL * 1.95);
+        way = b.at(CELL, 0, CELL * 2.42);
         man.place(q.x, q.z, yawTo(q, way), 'ak', GEAR);
         man.pos.y = floorAt(q.x, q.z, q.y + 0.8);
         const dp = [...b.base!.pieces.values()].find((p) => p.k === 'door_metal');
@@ -161,10 +161,10 @@ export function actRaid(c: Ctx) {
         look(t, dt);
         runner(man, way, 4, dt);
         S.key('Mouse2', true);
-        when(t, 0.8, 'one', () => S.tap('Mouse0', 60));
-        when(t, 1.3, 'two', () => S.tap('Mouse0', 60));
-        when(t, 1.8, 'three', () => S.tap('Mouse0', 60));
-        when(t, 2.2, 'down', () => { if (man.alive) man.die(fwdOf(man.yaw)); });
+        when(t, 0.55, 'one', () => S.tap('Mouse0', 60));
+        when(t, 0.95, 'two', () => S.tap('Mouse0', 60));
+        when(t, 1.35, 'three', () => S.tap('Mouse0', 60));
+        when(t, 1.5, 'down', () => { if (man.alive) man.die(fwdOf(man.yaw)); });
       },
       cam: (t) => op.update(t, lens, eye().addScaledVector(fwdOf(c.P().yaw), 2).setY(eye().y - 0.25)),
     });

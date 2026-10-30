@@ -10,6 +10,7 @@ import { Hand, Speeds, wrap, yawTo } from './human';
 import { Drive26, Infected26, ground26 } from './kit26';
 import { ITEMS, makeItem, stockGun } from '../sim/items';
 import { HELI } from '../sim/heli';
+import { F_DEAD } from '../net/protocol';
 import type { Kind28 } from './music28';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -327,6 +328,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
       },
       tick: (t, st, dt) => {
         lt = t;
+        for (const a of S.actors) if (!a.alive) a.more |= F_DEAD;
         tick?.(t, st, dt);
       },
       after: (t, st) => {
