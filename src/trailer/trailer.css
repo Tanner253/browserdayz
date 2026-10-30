@@ -811,3 +811,8 @@ body.tr-cut26 .hud-keys { visibility: hidden !important; }
 .x28-end h5 { margin: 24px 0 12px; font: 800 28px/1 var(--trailer-font); letter-spacing: 0.1em; color: #f2ede2; }
 .x28-end em { font: 800 40px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.06em; color: #ffd35a; }
 body.tr-cut28 .hud-claim { display: none; }
+.x28-stats { position: absolute; right: 56px; top: 44px; display: flex; gap: 26px; font: 700 19px/1 var(--trailer-font); letter-spacing: 0.1em; color: #f2ede2; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85); }
+.x28-stats b { font-weight: 800; font-size: 30px; color: #ffd35a; letter-spacing: 0.02em; }
+.x28-clock { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); text-align: center; text-shadow: 0 3px 16px rgba(0, 0, 0, 0.85); }
+.x28-clock i { display: block; font: 800 24px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.24em; color: #f2ede2; margin-bottom: 6px; }
+.x28-clock b { display: block; font: 800 92px/1 var(--trailer-font); letter-spacing: 0.02em; color: #ffd35a; font-variant-numeric: tabular-nums; }

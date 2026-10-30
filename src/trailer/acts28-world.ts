@@ -10,7 +10,14 @@ import { BUNKER, bunkerAt, levelY } from '../sim/bunker';
 type Any = any;
 
 export function actWorld(c: Ctx) {
-  const { S, g, add, helis, seatIn, pilot, say, chipSay, run, kit, lightHands, hand, look, eye, notes, when, P } = c;
+  const { S, g, add, helis, seatIn, pilot, say, chipSay, run, kit, lightHands, hand, look, eye, notes, when, P, piece, show, dressers } = c;
+  // what is on the map, counted off the world as it is filmed (the owner: "people wanna see content density")
+  const stats = piece('x28-stats', '');
+  dressers.push(async () => {
+    const w = S.world as Any, named = (w.pois as { name: string }[]).filter((q) => !/tower/i.test(q.name)).length;
+    stats.innerHTML = `<span><b>${named}</b> PLACES</span><span><b>${w.buildings.length}</b> BUILDINGS</span><span><b>${w.basements.length}</b> BASEMENTS</span>`;
+    say(`on the map: ${named} places, ${w.buildings.length} buildings, ${w.basements.length} basements`);
+  });
   let H: Any = null;
   const heli = () => (H = H ?? helis()[0]);
   // up off the roof of Kamenka's hospital, in the game's own view from behind, the town falling away under it
@@ -57,9 +64,13 @@ export function actWorld(c: Ctx) {
         const off = f.clone().multiplyScalar(-24).addScaledVector(r, side).setY(10);
         return spec.update(t, heli().pos, off, f.clone().multiplyScalar(60).setY(-up * 0.8));
       },
-      after: (t) => chipSay(t, 0.2, len - 0.08, big, small),
+      after: (t) => {
+        chipSay(t, 0.2, len - 0.08, big, small);
+        show(stats, 1);
+      },
     });
   };
+  c.cleaners.push(() => { stats.style.display = 'none'; });
   flyby('kalat', 'KALAT', 'THE WALLED CITY', [-3215, 230], Math.PI * 0.3, 62, 9);
   flyby('pokrov', 'POKROV', 'A MONASTERY AND ITS LAMPS', [-1850, -30], -Math.PI / 2, 52, -9);
   flyby('mokroye', 'MOKROYE', 'A VILLAGE IN THE SWAMP', [-1855, 585], Math.PI * 0.75, 48, 9);

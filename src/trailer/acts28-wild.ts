@@ -174,6 +174,7 @@ export function actWild(c: Ctx) {
         deer = stand('stag', FIELD.x + 22, FIELD.z - 6, 6);
         await seen(deer);
         await run(50);
+        say(`the deer: ${live(deer).map((b) => `${Math.round(b.x)},${Math.round(b.z)} mode ${b.mode}`).join(' | ')}`);
         lens = S.at(FIELD.x - 18, FIELD.z + 12, 1.9);
         op.reset(lens, middle(deer, 1));
       },
@@ -217,7 +218,7 @@ export function actWild(c: Ctx) {
         S.me(p.x, p.z, -Math.PI / 2, 0);
         pack = stand('wolf', p.x + 15, p.z - 9, 4);
         await seen(pack);
-        await run(420);
+        await run(330);
         hand.set(P().yaw, 0);
         say(`the pack: ${live(pack).map((w) => `${Math.hypot(w.x - p.x, w.z - p.z).toFixed(0)} m, mode ${w.mode}`).join(' | ')}`);
       },
@@ -269,11 +270,11 @@ export function actWild(c: Ctx) {
         S.hold('primary');
         const me = S.at(FIELD.x - 14, FIELD.z, 0);
         S.me(me.x, me.z, -Math.PI / 2, 0);
-        const out = stand('bear', me.x + 34, me.z - 2, 1);
+        const out = stand('bear', me.x + 25, me.z - 2, 1);
         bear = herd().beasts.get(out[0].i);
         await seen(out);
         await run(40);
-        lens = S.at(me.x + 24, me.z + 4.5, 0.8);
+        lens = S.at(me.x + 15, me.z + 4.5, 0.8);
         op.reset(lens, at());
         say(`the bear stands ${flat(me, bear).toFixed(1)} m off, mode ${bear.mode}`);
       },
@@ -297,7 +298,9 @@ export function actWild(c: Ctx) {
         look(t, dt);
         S.key('Mouse2', true);
         S.key('Mouse0', t > 0.45 && !bear.dead);
+        when(t, 0.6, 'hurt', () => herd().hurt(bear.i, 60, g.wild.host.me(), Date.now()));
         const d = flat(P().pos, bear);
+        when(t, 1.2, 'how', () => say(`the bear at 1.2 s: ${d.toFixed(1)} m, mode ${bear.mode}, hp ${bear.hp}`));
         // (it falls at the feet: the rounds are the game's, and this one was going to get there first)
         if (!bear.dead && (d < 3.4 || t > 3.3)) {
           when(t, 0, 'dropped', () => {

@@ -3,7 +3,7 @@
 // owner: "for karambit only show the model dont show in hand").
 import * as THREE from 'three';
 import { BRACED, DRONE, Operator, yawTo, pitchTo } from './human';
-import { AFTERNOON, BAR, DUSK, GOLDEN, SUNSET, V, ease, type Ctx } from './frame28';
+import { AFTERNOON, BAR, GOLDEN, SUNSET, V, ease, type Ctx } from './frame28';
 import { Base28, SITE } from './base28';
 import { assets } from '../core/assets';
 import { ITEMS, makeItem } from '../sim/items';
@@ -20,8 +20,8 @@ export function actBuild(c: Ctx) {
   // a pine by the site down with the felling axe, watched from beside him: the last blows, and it goes over
   {
     const op = new Operator(BRACED, 285, 42);
-    let tree: { x: number; z: number; i: number } | null = null, lens = V(0, 0, 0);
-    add(BAR * 1.5, {
+    let tree: { x: number; z: number; i: number } | null = null, lens = V(0, 0, 0), felled = 0;
+    add(BAR * 2, {
       name: 'chop',
       hour: AFTERNOON,
       m: 'groove',
@@ -32,7 +32,7 @@ export function actBuild(c: Ctx) {
         const all = S.world.trees as Any[];
         let best = -1, bd = 1e9;
         all.forEach((t, i) => {
-          if (t.kind?.startsWith('bush')) return;
+          if (!/pine|spruce|fir/i.test(t.kind ?? '')) return;
           const d = Math.hypot(t.x - (SITE.x + 40), t.z - SITE.z);
           if (d < bd) { bd = d; best = i; }
         });
@@ -44,18 +44,18 @@ export function actBuild(c: Ctx) {
         g.takeUp(it);
         await run(30);
         // (two blows left in it: the rest were struck before the lens came)
-        const need = (await import('../sim/gather')).treeOf(all[best])!.blows;
-        g.gather.woods.cut.set(best, { n: need - 2 * 2.5 + 0.01, at: Date.now() });
+        felled = best;
         lens = V(me.x + 5.5, me.y + 1.5, me.z + 2.5);
         op.reset(lens, me.clone().setY(me.y + 1.2));
-        say(`the tree ${best}, ${need} blows, trunk ${bd.toFixed(0)} m from the site`);
+        say(`the tree ${best}, a ${all[best].kind}, ${bd.toFixed(0)} m from the site`);
       },
       tick: (t, _S, dt) => {
         look(t, dt);
-        S.key('Mouse0', t > 0.1 && t < 2);
+        S.key('Mouse0', t > 0.1 && t < 1.7);
+        when(t, 1.75, 'falls', () => g.gather.onFell({ t: 'fell', i: felled, a: P().yaw + 1.2 }));
       },
       cam: (t) => op.update(t, lens, P().pos.clone().setY(P().pos.y + 1.3)),
-      after: (t) => chipSay(t, 0.3, BAR * 1.5 - 0.1, 'GATHER', 'CHOP · MINE · SMELT · CRAFT'),
+      after: (t) => chipSay(t, 0.3, BAR * 2 - 0.1, 'GATHER', 'CHOP · MINE · SMELT · CRAFT'),
     });
   }
   let endOfRise = () => V(SITE.x + 30, S.ground(SITE.x, SITE.z) + 10, SITE.z);
@@ -118,7 +118,7 @@ export function actBuild(c: Ctx) {
   }
   // the flag on its pole at sunset, and the rack inside by the torches
   {
-    const op = new Operator(BRACED, 287, 40);
+    const op = new Operator(BRACED, 287, 30);
     let lens = V(0, 0, 0), at = V(0, 0, 0);
     add(BAR, {
       name: 'flag',
@@ -136,7 +136,7 @@ export function actBuild(c: Ctx) {
     });
     add(BAR, {
       name: 'rack',
-      hour: DUSK,
+      hour: SUNSET,
       m: 'groove',
       setup: async () => {
         if (!base.base) base.begin(), base.whole();
@@ -155,8 +155,8 @@ export function actBuild(c: Ctx) {
         S.parkMe();
         warm.position.copy(base.at(CELL * 0.2, 2.2, CELL * 1.85)).sub(O);
         keyLamp.position.copy(base.at(CELL * 0.1, 1.2, CELL * 1.7)).sub(O);
-        warm.intensity = 14;
-        keyLamp.intensity = 7;
+        warm.intensity = 70;
+        keyLamp.intensity = 34;
       },
       cam: (t) => op.update(t, lens.clone().lerp(at, t * 0.04), at),
     });

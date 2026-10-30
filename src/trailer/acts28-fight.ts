@@ -7,7 +7,7 @@ import { BRACED, ON_FOOT, Operator, pitchTo, yawTo } from './human';
 import { BAR, DAWN, DUSK, GOLDEN, MORNING, NIGHT, SUNSET, V, ease, flat, fwdOf, type Ctx } from './frame28';
 import { Screen, frameUrl, loadReel, type Reel } from './footage';
 import { CELL, STOREY } from '../sim/build/pieces';
-import { TAG_HOLD, makeItem } from '../sim/items';
+import { TAG_HOLD, makeItem, tagClock } from '../sim/items';
 import { TOWN } from '../world/worldgen';
 import { inZona } from '../world/zona';
 import { PAID } from './acts28-wild';
@@ -26,6 +26,13 @@ export function actRaid(c: Ctx) {
   /** the house standing, whole, however the film got here */
   const standing = () => {
     if (!c.base!.base) c.base!.begin(), c.base!.whole();
+  };
+  /** the player on a floor of the house (its solids are made only with somebody near them) */
+  const upstairs = async (at: THREE.Vector3, yaw: number, pitch: number) => {
+    S.me(at.x, at.z, yaw, pitch);
+    await run(14);
+    S.me(at.x, at.z, yaw, pitch, at.y);
+    await run(10);
   };
   /** a man on the physics' ground, at a run toward a place */
   const runner = (a: Any, to: THREE.Vector3, v: number, dt: number) => {
@@ -87,8 +94,7 @@ export function actRaid(c: Ctx) {
         kit(['a91', ['ammo_739', 80]], { a91: ['a91_suppressor'] });
         S.hold('primary');
         const b = house(), me = b.at(CELL, STOREY, CELL * 2.5 - 0.75);
-        me.y = floorAt(me.x, me.z, me.y + 0.5);
-        S.me(me.x, me.z, 0, -0.2, me.y);
+        await upstairs(me, 0, -0.2);
         for (const [k, a] of three().entries()) {
           const q = b.at(CELL * (0.2 + k * 0.9), 0, CELL * (6.5 + k * 0.7));
           a.place(q.x, q.z, yawTo(q, b.at(CELL, 0, CELL * 3)), 'ak', GEAR);
@@ -133,7 +139,7 @@ export function actRaid(c: Ctx) {
         standing();
         lightHands(2.2, 1.6);
         notes(true);
-        kit(['deagle', ['ammo_50', 21]], { deagle: ['suppressor_9'] });
+        kit(['deagle', ['ammo_50', 21]]);
         S.hold('holster');
         const b = house(), me = b.at(CELL * 1.2, 0, CELL * 1.75);
         me.y = floorAt(me.x, me.z, me.y + 0.5);
@@ -180,8 +186,7 @@ export function actRaid(c: Ctx) {
         kit(['mosin', ['ammo_762', 10]], { mosin: ['pu_scope'] });
         S.hold('primary');
         const b = house(), me = b.at(CELL * 2, STOREY * 2, CELL * 1.5 - 0.75);
-        me.y = floorAt(me.x, me.z, me.y + 0.5);
-        S.me(me.x, me.z, 0, 0, me.y);
+        await upstairs(me, 0, 0);
         man = S.actor(2);
         // (the bearing out of the window with no bough across it: a ray finds trunks, so the trees' own places are asked)
         const trunks = ((S.world.trees ?? []) as { kind: string; x: number; z: number }[]).filter((q2) => !q2.kind.startsWith('bush') && flat(q2, me) < 110);
@@ -237,6 +242,21 @@ export function actPaid(c: Ctx) {
     g.inventoryChanged();
     return it;
   };
+  /** the tag's clock as the game keeps it, large; and what it pays */
+  const big = piece('x28-clock', '<i>STAY ALIVE</i><b></b>');
+  const clockOf = (t: number, from: number, to: number) => {
+    const it = (g.inv.find as Any) && [...g.inv.carried()].find((q: Any) => q.id === 'dogtag') as Any;
+    show(big, t >= from && t <= to ? 1 : 0);
+    if (it) big.querySelector('b')!.textContent = tagClock(it);
+    else {
+      big.querySelector('i')!.textContent = 'CASHED IN';
+      big.querySelector('b')!.textContent = '+0.01 SOL';
+    }
+  };
+  c.cleaners.push(() => {
+    big.style.display = 'none';
+    big.querySelector('i')!.textContent = 'STAY ALIVE';
+  });
   // the Zona: a rival in Kamenka's street, the shot, the tag off him, and twenty minutes on the hospital's roof. (Not at
   // the house: a kill on claimed land leaves no tag.)
   const K = (along: number, side = 0) => {
@@ -255,7 +275,7 @@ export function actPaid(c: Ctx) {
       lightHands();
       kit(['ak', ['ammo_762', 60]]);
       S.hold('primary');
-      const me = K(-30);
+      const me = K(-22);
       me.y = floorAt(me.x, me.z);
       S.me(me.x, me.z, yawTo(me, K(0)), 0, me.y);
       rival = S.actor(0);
@@ -311,6 +331,7 @@ export function actPaid(c: Ctx) {
       look(t, dt);
       c.when(t, 0.9, 'taken', () => tag(0));
     },
+    after: (t) => clockOf(t, 1, 9),
   });
   /** the top of the hospital, by its helipad: the town below */
   const onRoof = async (held: number) => {
@@ -332,6 +353,7 @@ export function actPaid(c: Ctx) {
     under: true,
     setup: () => onRoof(TAG_HOLD - 700),
     tick: (t, _S, dt) => look(t, dt),
+    after: (t) => clockOf(t, 0, 9),
   });
   add(BAR * 1.5, {
     name: 'cashed',
@@ -340,6 +362,7 @@ export function actPaid(c: Ctx) {
     m: 'sting',
     setup: () => onRoof(TAG_HOLD - 2.2),
     tick: (t, _S, dt) => look(t, dt),
+    after: (t) => clockOf(t, 0, 9),
   });
   // the board: how it pays, and what it has paid
   const steps = piece('x28-steps', ['DROP IN', 'LOOT', 'TAKE A TAG', 'HOLD 20:00', 'CASH IN'].map((w, k) => `<div><i>${k + 1}</i><b>${w}</b></div>`).join(''));
