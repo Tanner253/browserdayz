@@ -7,11 +7,13 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { physics } from '../core/physics';
 import { noise3 } from './cave-carve';
 import type { Atmosphere } from './atmosphere';
-import { concretePaint } from './bunker';
+import { concretePaint, painted } from './bunker';
 import { MINE, inMine } from '../sim/mine';
 
 /** how far the rock lies out from the plan at most, metres; the cell of its surface; and how often a lamp hangs */
 const ROUGH = 0.5, CELL = 0.9, LAMP_EVERY = 13;
+/** a lamp's painted pool: how far it reaches, metres, and how strongly it is laid on */
+const POOL = 9, GLOW = 2.4;
 
 /** a stretch of rock, from one corner to the other, its inside to `n` (bumped away from it) */
 function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vector3): THREE.BufferGeometry {
@@ -83,9 +85,44 @@ export class MineSite {
       }
       parts.push(side > 0 ? face(v(x, Y1, z0), v(x, Y1, z1), v(x, Y1 + 1.4, z0), v(1, 0, 0)) : face(v(x, Y1, z1), v(x, Y1, z0), v(x, Y1 + 1.4, z1), v(-1, 0, 0)));
     }
+    // (lamps down the drift on a wire, one in the hoist room: each a bulb, and its pool of light painted once on a plan of the mine and laid over
+    // the rock, as the bunker's is: only the few lamps nearest the eye are real lights, and those light what stands in the drift)
+    const lamps: [number, number, number][] = [];
+    for (let x = M.x0 + 8, k = 0; x < M.x1 - 3; x += LAMP_EVERY, k++) {
+      const y = Y1 - 0.35 + (Math.abs(x - H.x) < H.hx ? 1.2 : 0);
+      lamps.push([x, y, Z]);
+      this.lamps.push({ pos: new THREE.Vector3(x, y, Z), k });
+    }
+    const span = M.x1 - M.x0, deep = H.hz * 2, Nx = 2048, Nz = 128;
+    const glow = painted(Nx, Nz, (g) => {
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, Nx, Nz);
+      g.globalCompositeOperation = 'lighter';
+      for (const [x] of lamps) {
+        const px = ((x - M.x0) / span) * Nx, r = (POOL / span) * Nx, grad = g.createRadialGradient(0, 0, 0, 0, 0, r);
+        grad.addColorStop(0, 'rgb(255, 214, 150)');
+        grad.addColorStop(0.3, 'rgb(150, 116, 76)');
+        grad.addColorStop(0.7, 'rgb(46, 34, 22)');
+        grad.addColorStop(1, 'rgb(0, 0, 0)');
+        g.save();
+        g.translate(px, Nz / 2);
+        // (a plan of 180 m by 14: its pools are round in metres, not in pixels)
+        g.scale(1, (Nz / deep) / (Nx / span));
+        g.fillStyle = grad;
+        g.fillRect(-r, -r, r * 2, r * 2);
+        g.restore();
+      }
+    }, 1, false);
+    glow.channel = 1;
     const map = concretePaint(3301, [96, 80, 64]);
-    const rock = atmo.register(new THREE.MeshStandardMaterial({ map, roughness: 0.97, metalness: 0 })) as THREE.MeshStandardMaterial;
-    const walls = new THREE.Mesh(mergeGeometries(parts, false), rock);
+    const rock = atmo.register(new THREE.MeshStandardMaterial({ map, roughness: 0.97, metalness: 0, lightMap: glow, lightMapIntensity: GLOW })) as THREE.MeshStandardMaterial;
+    const merged = mergeGeometries(parts, false), at = merged.getAttribute('position'), plan = new Float32Array(at.count * 2);
+    for (let i = 0; i < at.count; i++) {
+      plan[i * 2] = (at.getX(i) - M.x0) / span;
+      plan[i * 2 + 1] = 1 - (at.getZ(i) - (Z - H.hz)) / deep;
+    }
+    merged.setAttribute('uv1', new THREE.BufferAttribute(plan, 2));
+    const walls = new THREE.Mesh(merged, rock);
     walls.receiveShadow = true;
     walls.matrixAutoUpdate = false;
     this.all.add(walls);
@@ -95,14 +132,9 @@ export class MineSite {
       if (Math.abs(x - H.x) < H.hx + 1) continue;
       for (const s of [-1, 1]) physics.addStatic(physics.R.ColliderDesc.cuboid(0.16, 1.6, 0.16), 'wood', { x, y: Y0 + 1.6, z: Z + s * 1.48 }, 0);
     }
-    // (lamps down the drift on a wire, and one in the hoist room: each a bulb, and the few nearest the eye real lights)
     const bulb = atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.8, 0.5), emissiveIntensity: 3, roughness: 0.5 }));
     const bulbs: THREE.BufferGeometry[] = [];
-    for (let x = M.x0 + 8, k = 0; x < M.x1 - 3; x += LAMP_EVERY, k++) {
-      const inHall = Math.abs(x - H.x) < H.hx, y = Y1 - 0.35 + (inHall ? 1.2 : 0);
-      this.lamps.push({ pos: new THREE.Vector3(x, y, Z), k });
-      bulbs.push(new THREE.SphereGeometry(0.07, 8, 6).translate(x, y, Z));
-    }
+    for (const [x, y, z] of lamps) bulbs.push(new THREE.SphereGeometry(0.07, 8, 6).translate(x, y, z));
     const lights = new THREE.Mesh(mergeGeometries(bulbs, false), bulb);
     lights.matrixAutoUpdate = false;
     this.all.add(lights);

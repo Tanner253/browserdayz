@@ -98,7 +98,7 @@ ok('the director stands them all, the still ones marked so for every game, and p
   assert.ok(still.every((b) => b.w === 1) && all.every((b) => b.home === k || homes[b.home].still || !b.w));
   const listed = d.list();
   assert.ok(listed.filter((b) => b.w === 1).length >= 6);
-  assert.ok(listed.filter((b) => b.w !== undefined).length === listed.filter((b) => b.w === 1).length, 'only the still ones carry it');
+  assert.ok(listed.every((b) => b.w === undefined || b.w === 1), 'only the still ones carry it');
   // two killed, one of each: with the door open neither comes back, nor does anybody else's wait on it
   const gone = [still[0], pass[0]];
   for (const b of gone) d.hurt(b.i, 1e6, 30_000);

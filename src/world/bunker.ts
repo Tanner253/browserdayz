@@ -13,7 +13,7 @@ import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BUNKER, bunkerAt, bunkerPlan, inBunker, lampBurns, levelY, type Place, CAB, LEVELS, levelAt, type Plan } from '../sim/bunker';
 
-function painted(w: number, h: number, draw: (g: CanvasRenderingContext2D, rnd: () => number) => void, seed: number, repeat = true): THREE.CanvasTexture {
+export function painted(w: number, h: number, draw: (g: CanvasRenderingContext2D, rnd: () => number) => void, seed: number, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
