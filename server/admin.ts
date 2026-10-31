@@ -2,6 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import { spawnAnimal, takeAnimal, takeAnimals } from './animals';
+import { sitesReset } from './sites';
 import { createHash } from 'node:crypto';
 import { heldIn } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
@@ -787,6 +788,11 @@ export async function command(c: Client, line: string) {
       place(moved, to.pose[0] + Math.sin(yaw) * back, to.pose[1] + 0.1, to.pose[2] + Math.cos(yaw) * back, c);
       log(`[admin] ${c.name} ${cmd === 'goto' ? `went to ${t.name}` : `brought ${t.name}`}`);
       return void sys(c, cmd === 'goto' ? `You are with ${t.name}.` : `${t.name} is with you.`);
+    }
+    case 'site': {
+      if (!admin) return need();
+      sitesReset();
+      return void sys(c, 'Every site is ready again.');
     }
     case 'tp': {
       if (!admin) return need();

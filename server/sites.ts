@@ -106,6 +106,28 @@ export function useSite(c: Client, m: Extract<C2S, { t: 'site' }>) {
   log(`[site] ${c.name} set off ${s.name}`);
 }
 
+function ready(id: string, s: Site, r: Run, now: number) {
+  Object.assign(r, { phase: 'idle', until: 0 });
+  // (what is left of it cleared away, and the room shut again)
+  for (const i of r.stood) {
+    const h = horde.hurt(i, 1e6, now);
+    if (h) broadcast({ t: 'ihp', i, hp: h.hp, dead: h.dead, by: 0, zone: 'torso', dir: [0, 0], melee: false });
+  }
+  r.stood.clear();
+  for (const cid of r.crates.splice(0)) if (boxes.delete(cid)) broadcast({ t: 'drop-', uid: cid });
+  const i = doorOf(id, s);
+  if (i >= 0) {
+    doors.set(i, [false, 1]);
+    broadcast({ t: 'door', i, open: false, swing: 1 });
+  }
+  broadcast(said(id, r, now));
+}
+
+/** An admin's: every site as it was, at once (/site). */
+export function sitesReset() {
+  for (const [id, r] of runs) ready(id, SITES[id], r, Date.now());
+}
+
 /** Once a second: the waves, and what comes after them. */
 export function sitesTick(now: number) {
   for (const [id, r] of runs) {
@@ -124,21 +146,6 @@ export function sitesTick(now: number) {
         fillDrop(b);
       }, `The locker at ${s.name}`);
       broadcast(said(id, r, now));
-    } else if (r.phase === 'spent' && now >= r.until) {
-      Object.assign(r, { phase: 'idle', until: 0 });
-      // (what is left of it cleared away, and the room shut again)
-      for (const i of r.stood) {
-        const h = horde.hurt(i, 1e6, now);
-        if (h) broadcast({ t: 'ihp', i, hp: h.hp, dead: h.dead, by: 0, zone: 'torso', dir: [0, 0], melee: false });
-      }
-      r.stood.clear();
-      for (const cid of r.crates.splice(0)) if (boxes.delete(cid)) broadcast({ t: 'drop-', uid: cid });
-      const i = doorOf(id, s);
-      if (i >= 0) {
-        doors.set(i, [false, 1]);
-        broadcast({ t: 'door', i, open: false, swing: 1 });
-      }
-      broadcast(said(id, r, now));
-    }
+    } else if (r.phase === 'spent' && now >= r.until) ready(id, s, r, now);
   }
 }

@@ -58,7 +58,7 @@ export const dropsMethods = {
       else fillDrop(stash.container);
       stash.known = true;
     }
-    this.drops.set(d.uid, { stash, until: performance.now() + d.left * 1000, at: new THREE.Vector3(d.x, d.y, d.z), smoke: { owed: 0 } });
+    this.drops.set(d.uid, { stash, until: performance.now() + d.left * 1000, at: new THREE.Vector3(d.x, d.y, d.z), smoke: { owed: 0 }, quiet: !!d.site });
     this.markDrops();
     const where = describeSpot(this.s.world, d.x, d.z);
     const mins = Math.max(1, Math.round(d.left / 60));

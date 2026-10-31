@@ -1704,6 +1704,8 @@ export class Weapons {
    * `wait`: taken into the hand and not yet used (an injector: see `ready` in game.ts). `age` is how long it has
    * been in the hand, `t` how far into its use it is; `from` is where it was held when the use began.
    */
+  /** how many times the hands have been asked to take something up or to stop: a model that comes late looks at this */
+  private useAsked = 0;
   private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** seconds since it was thrown: the empty hand goes on through the throw, and what is to follow */ thrown?: number; then?: () => void; /** the middle of its top end, in its own frame (`heldTip`) */ top?: THREE.Vector3 } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3; round?: THREE.Object3D }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
@@ -3834,6 +3836,7 @@ export class Weapons {
       return;
     }
     if (!this.itemModels) return;
+    const asked = ++this.useAsked;
     void this.itemModels.get(id).then(async (tpl) => {
       let h = this.heldCache.get(id);
       if (!h) {
@@ -3919,6 +3922,8 @@ export class Weapons {
         h = { root, size, round };
         this.heldCache.set(id, h);
       }
+      // (the work was over before its model came: a card that took six seconds stayed in the hand for good)
+      if (asked !== this.useAsked) return;
       if (this.held) this.vmRoot.remove(this.held.root);
       this.held = { root: h.root, id, kind, t: 0, age: 0, dur, size: h.size, ending: 0, wait, round: h.round };
       // (not seen until it has been put where it goes: it is made at the eye itself)
@@ -3928,6 +3933,7 @@ export class Weapons {
   }
 
   endUse() {
+    this.useAsked++;
     if (this.held && !this.held.ending) this.held.ending = 1e-4;
   }
 

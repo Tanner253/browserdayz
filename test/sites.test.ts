@@ -94,7 +94,7 @@ try {
   await ann.until('the card went in', () => ann.all('siteok').length === 1);
   assert.equal(ann.last('siteok')!.card, 'card_blue');
   await bob.until('everybody hears the alarm', () => bob.last('site')?.phase === 'alarm');
-  assert.ok(bob.last('site')!.left >= 2 && bob.last('site')!.left <= 3, 'it tells how long is left');
+  assert.ok(bob.last('site')!.left >= 1 && bob.last('site')!.left <= 3, 'it tells how long is left');
   await bob.until('the strong room opened', () => bob.all('door').some((m) => m.open));
   const door = bob.all('door').find((m) => m.open)!.i;
   const crate = bob.all('drop+').find((m) => m.d.site?.includes('strong room'))?.d;

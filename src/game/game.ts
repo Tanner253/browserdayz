@@ -410,7 +410,7 @@ export class Game {
    * Supply drops standing in the world (see src/sim/drops.ts): the crate, when it is due to
    * be cleared away (performance clock, ms), and its column of smoke.
    */
-  drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number }; wreck?: { obj: THREE.Object3D; solid: unknown[] } }>();
+  drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number }; quiet?: boolean; wreck?: { obj: THREE.Object3D; solid: unknown[] } }>();
   /** playing alone: game time the next one is due (-1 until the clock is first read) */
   nextDrop = -1;
   /** the helicopters in the air with a supply drop, and the crates coming down (src/game/airdrop.ts) */
