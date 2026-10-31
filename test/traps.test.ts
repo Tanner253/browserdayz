@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { WEAPON_RULES } from '../src/sim/combat';
 import { LAUNCHED, THROWN, inHandDamage } from '../src/sim/grenades';
 import { ITEMS } from '../src/sim/items';
-import { TRAPS, isTrap, steppedOn } from '../src/sim/traps';
+import { TRAPS, isTrap, steppedOn, trapsBack } from '../src/sim/traps';
 
 let n = 0;
 const ok = (name: string, f: () => void) => {
@@ -46,6 +46,12 @@ ok('a flare is fired as a launcher\'s round is, and hurts nobody', () => {
 ok('a land mine is the end of a car', () => {
   assert.ok(WEAPON_RULES.land_mine.damage > 0);
   assert.equal(WEAPON_RULES.land_mine.car, 1);
+});
+
+ok('over a restart a trap comes back with the end it had, and one whose time is up does not', () => {
+  const t = { k: 'land_mine', x: 1, y: 2, z: 3, yaw: 0, key: 'a', name: 'Ann', ends: 2000 };
+  assert.deepEqual(trapsBack([t, { ...t, ends: 500 }, { ...t, k: 'grenade' }, { ...t, x: NaN }, null], 1000), [t]);
+  assert.deepEqual(trapsBack(undefined, 1000), []);
 });
 
 console.log(`${n} checks passed`);

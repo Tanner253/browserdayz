@@ -437,6 +437,8 @@ export class Game {
   camp!: TraderCamp;
   /** what the small wins leave in the air (src/game/toys.ts), and the traps on the ground (src/game/traps.ts) */
   toys!: Toys;
+  /** the guns and tools in, to be held */
+  gunsIn: Promise<unknown> = Promise.resolve();
   traps!: Traps;
   /** the recyclers (src/game/craft-recyclers.ts) */
   recyclers!: RecyclerView;
@@ -942,6 +944,7 @@ export class Game {
     // what wants them is done when they are: `loaded`)
     const behind = new Promise<void>((go) => (this.buildBehind = go));
     const guns = behind.then(() => this.weapons.load());
+    this.gunsIn = guns;
     // (and beside them the world got ready for the lighting it is not lit by, the lamps' (Renderer.warmOther): part of
     // what Deploy waits for, so that the card's last work on it is done in the menu and never in the game, where it
     // was six seconds of a game that stood still, the first night)
@@ -1523,6 +1526,7 @@ export class Game {
         return st;
       },
       base: () => new Base28(this, () => {}),
+      guns: this.gunsIn,
       // (the lamp of somebody in a scene: said as another player's is, with no disc of light at it)
       beam: (pos, dir, power, wide) => this.lamps.beam(pos, dir, power, wide, 0),
     });

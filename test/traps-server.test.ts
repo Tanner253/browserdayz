@@ -1,5 +1,5 @@
 // Traps on the real server (server/traps.ts): one is set and told only to whoever is near it; it waits until it is armed,
-// then a foot sets it off and it breaks a leg; a mine goes off, and what it kills is nobody's. The real server is started on
+// then a foot sets it off and it breaks a leg; a mine goes off; and either is its setter's doing. The real server is started on
 // a port of its own.   npx tsx test/traps-server.test.ts
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -61,6 +61,7 @@ try {
   await ann.join();
   await bob.join();
   await far.join();
+  const annId = (ann.got.find((m) => m.t === 'welcome') as unknown as { you: number }).you;
   // (somewhere open in the valley, away from anybody's base)
   const X = 30, Y = 20, Z = 200;
   ann.at(X, Y, Z);
@@ -97,9 +98,9 @@ try {
   assert.equal(hit.w, 'trap');
   assert.equal(hit.zone, 'legs');
   assert.equal(hit.amount, TRAPS.bear_trap.damage);
-  assert.equal(hit.from, 0, 'a trap is nobody\'s doing');
+  assert.equal(hit.from, annId, 'a trap is its setter\'s doing');
   await bob.until('the snap was not told to whoever is near', () => bob.last('trapgo')?.how === 'snap');
-  ok('a foot crossing it at a sprint sets it off: the legs, and nobody\'s doing');
+  ok('a foot crossing it at a sprint sets it off: the legs, and its setter\'s doing');
 
   const [mine] = ann.carry('land_mine');
   await sleep(200);
@@ -124,8 +125,8 @@ try {
   bob.at(X + 1, Y, Z + 2.5);
   await bob.until('a mine stepped on did nothing', () => bob.last('trapgo')?.how === 'boom');
   await bob.until('the mine hurt nobody on it', () => bob.got.some((m) => m.t === 'dmg' && m.w === 'land_mine'));
-  assert.equal(bob.got.find((m) => m.t === 'dmg')!.from, 0, 'a mine is nobody\'s doing');
-  ok('a mine goes off under whoever steps on it, in nobody\'s name');
+  assert.equal(bob.got.find((m) => m.t === 'dmg')!.from, annId, 'a mine is its setter\'s doing');
+  ok('a mine goes off under whoever steps on it, in its setter\'s name');
   console.log(`${n} checks passed`);
 } catch (e) {
   failed = e;

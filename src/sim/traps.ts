@@ -3,7 +3,9 @@
 // setter's too, once it has armed, and anybody may take one up who is given the time. The server keeps them and decides
 // when they go (server/traps.ts); no game is told of one further off than `sight`, so none can be listed from afar.
 //
-// What a trap kills earns no tag: nobody is the killer (`nobody` in server/acts.ts), so a mine laid on a road pays nothing.
+// The owner, 2026-10-31: "traps should surive restart i think... but have a max timer on their life. can be reset by picking
+// up and replacing trap by owner. also you cna get tags from traps." So they are kept with the world, each with its end, and
+// one taken up and set again has a whole life from then; and a death in one is its setter's doing, as a shot is.
 
 export const TRAPS = {
   /** how near a foot sets it off, metres; seconds until it is armed; seconds it takes to take up; what its jaws do */
@@ -16,7 +18,7 @@ export const isTrap = (id: string): id is TrapKind => id in TRAPS;
 export const TRAP_KEEP = {
   /** how many one player has set at once */
   most: 6,
-  /** how long one lies before it rusts away, ms: there is no base to pay for it */
+  /** how long one lies before it rusts away, ms: taken up and set again it has all of this again */
   lasts: 4 * 3600_000,
   /** how far off a game is told of one, metres */
   sight: 60,
@@ -27,6 +29,26 @@ export const TRAP_KEEP = {
   /** how near a car sets a mine off, metres */
   car: 2.2,
 };
+
+/** a trap as it is kept over a restart */
+export interface KeptTrap {
+  k: TrapKind;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  /** whose it is, and what they are called: whose doing a death in it is, when they are not here */
+  key: string;
+  name: string;
+  /** when it rusts away, ms */
+  ends: number;
+}
+
+/** What was kept and is still in its time. (Time runs while the server is down: a life is by the clock.) */
+export function trapsBack(list: unknown, now: number): KeptTrap[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter((t): t is KeptTrap => !!t && isTrap(t.k) && [t.x, t.y, t.z, t.yaw, t.ends].every(Number.isFinite) && typeof t.key === 'string' && t.ends > now).map((t) => ({ k: t.k, x: t.x, y: t.y, z: t.z, yaw: t.yaw, key: t.key, name: typeof t.name === 'string' ? t.name : 'somebody', ends: t.ends }));
+}
 
 /** does a foot gone from a to b come within `r` of (x, z)? (A sprint is a metre between two looks: it does not step over one.) */
 export function steppedOn(ax: number, az: number, bx: number, bz: number, x: number, z: number, r: number): boolean {

@@ -28,6 +28,8 @@ import { keepBases, restoreBases, sightFor } from './build';
 import type { KeptBase } from '../src/sim/build/bases';
 import { keepLearned, restoreLearned } from './learn';
 import { keepCamp, restoreCamp } from './camp';
+import { keepTraps, restoreTraps } from './traps';
+import type { KeptTrap } from '../src/sim/traps';
 
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
 const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
@@ -165,6 +167,8 @@ interface Snapshot {
   learned?: [string, string[]][];
   /** each player's day at the trader camp, and whose old book is paid out (server/camp.ts) */
   camp?: ReturnType<typeof keepCamp>;
+  /** the traps on the ground (server/traps.ts) */
+  traps?: KeptTrap[];
 }
 
 /** a body as it is kept: where it lies, whose it was, how it fell, what is on it, and the seconds it has left */
@@ -247,7 +251,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), roster: roster.keep(), reports: reports.keep(), proofs: proofs.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags(), plates: plating.keep(), bases: keepBases(), learned: keepLearned(), camp: keepCamp() };
+  return { rev: WORLD_REV, wipe: WIPE, traps: keepTraps(), chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), roster: roster.keep(), reports: reports.keep(), proofs: proofs.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags(), plates: plating.keep(), bases: keepBases(), learned: keepLearned(), camp: keepCamp() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -318,6 +322,7 @@ function takeInLate(save: KeptFile) {
   restoreBases(snap.bases);
   restoreLearned(snap.learned);
   restoreCamp(snap.camp);
+  restoreTraps(snap.traps);
   takePowers(snap.powers);
   // (from a last word only: see loadKept)
   if (save.final) takeTags(snap.tags);
@@ -573,6 +578,7 @@ export async function loadKept() {
     restoreBases(snap.bases);
     restoreLearned(snap.learned);
     restoreCamp(snap.camp);
+    restoreTraps(snap.traps);
     let bad = 0;
     for (const [k, r] of snap.chars ?? []) {
       try {

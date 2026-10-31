@@ -9,6 +9,7 @@ import { audio } from '../../core/audio';
 import { shown } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
 import { ITEMS, GEAR_SLOTS, holds, makeItem, type ItemInstance } from '../../sim/items';
+import { TRAPS, type TrapKind } from '../../sim/traps';
 import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
@@ -356,7 +357,10 @@ export const onlineMethods = {
     net.on('traps', (m) => this.traps.onNear(m.near));
     net.on('trapok', (m) => {
       const it = this.traps.set(m.uid);
-      if (it) this.inv.remove(it);
+      if (it) {
+        this.inv.remove(it);
+        this.hud.note(`${ITEMS[it.id].name} set. It arms in ${TRAPS[it.id as TrapKind].arm} seconds`, 'good');
+      }
       this.meDirty = true;
     });
     net.on('trapback', (m) => {

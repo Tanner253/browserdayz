@@ -76,6 +76,8 @@ export interface MenuHost {
   wear(body: Avatar, ids: string[]): Promise<void>;
   /** a stash case, a suitcase or a bag stood on the ground as the game stands one (its `setBuried` puts it under; whoever asked for it takes it away again) */
   stash(item: string, x: number, z: number, rot: number): Promise<Stash>;
+  /** when the guns and tools are in, to be held */
+  guns: Promise<unknown>;
   /** a base laid by the game's own rules, for the scenes of one (nobody's: it is taken away with the menu) */
   base(): Base28;
   /** a lamp somebody carries, lit for this frame: where it is and which way it shines (see Lamps.beam) */
@@ -216,6 +218,8 @@ export class MenuScenes {
   /** The cast is brought in (their bodies take a moment to arrive): until then the menu has the view from the air. */
   async load() {
     const { atmo, scene } = this.h;
+    // (the guns and the tools the cast holds: asked for before they had come, the scenes of them were left out, a different few each visit)
+    await this.h.guns;
     // four survivors, each kitted a little differently, and what they carry
     const kits: [string, 'rifle' | 'pistol', string, string[]][] = [
       ['Volkov', 'pistol', 'm9', ['sack_pack']],

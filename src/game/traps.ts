@@ -31,7 +31,7 @@ const AHEAD = 1.1;
 /** what a mine is let into the ground by, metres: the top of it shows */
 const SUNK: Record<TrapKind, number> = { bear_trap: 0, land_mine: 0.02 };
 
-const _ray = new THREE.Vector3();
+const _ray = new THREE.Vector3(), _n = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _tilt = new THREE.Quaternion();
 
 export class Traps {
   private here = new Map<number, { k: TrapKind; root: THREE.Group; x: number; y: number; z: number }>();
@@ -48,6 +48,9 @@ export class Traps {
       const root = new THREE.Group();
       root.position.set(x, y - SUNK[k], z);
       root.rotation.y = yaw;
+      // (lying with the ground under it, and not flat in the air off a slope)
+      const hit = physics.raycast(_ray.set(x, y + 0.8, z), { x: 0, y: -1, z: 0 }, 2, SOLID_GROUPS);
+      if (hit?.normal) root.quaternion.premultiply(_tilt.setFromUnitVectors(_up, _n.set(hit.normal.x, hit.normal.y, hit.normal.z).normalize()));
       this.h.scene.add(root);
       this.here.set(i, { k, root, x, y, z });
       void this.h.models.get(k).then((tpl) => root.add(tpl.group.clone()), () => {});
