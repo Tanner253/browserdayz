@@ -29,12 +29,12 @@ export const TOY_ITEMS: ItemDef[] = [
   // is kept down Bunker 17, and goes out to the desert. One model: its bands are each pass's own `paint`)
   {
     id: 'card_blue', name: 'Blue Clearance Pass', model: 'clearance_pass', paint: 0x1d4f9c, w: 1, h: 1, weight: 0.03, category: 'misc',
-    desc: 'A blue pass out of Bunker 17, cleared for a post on a mesa in the desert: Stolovaya. One scan at its reader, and it is cancelled.',
-    loot: { pair: 'ShippingContainerKeys_Blue', at: [0, 0, 0, 0, 2], away: [], lifetime: 7200, restock: 600, usage: ['Bunker'] },
+    desc: 'A blue pass out of Bunker 17, cleared for the post on the mesa in the desert: Stolovaya, marked on your map. One scan at its reader, and it is cancelled. Bring friends.',
+    loot: { pair: 'ShippingContainerKeys_Blue', at: [0, 0, 0, 0, 3], away: [], lifetime: 7200, restock: 300, usage: ['Bunker'] },
   },
   {
     id: 'card_yellow', name: 'Yellow Clearance Pass', model: 'clearance_pass', paint: 0xd9a514, w: 1, h: 1, weight: 0.03, category: 'misc',
-    desc: 'A yellow pass from the locker at Stolovaya, cleared for the gate of the Old Mine in the canyon wall, and the pumps at Bolotnaya beyond it.',
+    desc: 'A yellow pass from the locker at Stolovaya. It is cleared for somewhere further down the way, and that is coming soon. Keep it.',
   },
   {
     id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',

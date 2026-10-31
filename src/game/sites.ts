@@ -50,7 +50,7 @@ export class Sites {
     if (!s || was === m.phase) return;
     const [x, z] = sitePoint(s, s.reader), me = this.h.feet(), d = Math.hypot(x - me.x, z - me.z);
     if (m.phase === 'alarm' && d < TOLD) this.h.note(`A siren is going at ${s.name}`, 'warn');
-    if (m.phase === 'spent' && d < 120) this.h.note(`The locker at ${s.name} has opened`, 'good');
+    if (m.phase === 'spent' && d < 120) this.h.note(`The locker at ${s.name} has opened: what it holds is the next step down`, 'good');
   }
 
   /** the prompt at a reader, if one is near; and the card goes in if F has just gone down */
