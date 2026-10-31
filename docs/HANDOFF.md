@@ -26,7 +26,7 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
-- **LANGUAGE 2026-10-30, on battle-royale, NOT deployed (PROTOCOL 78)**: Settings > Game > Language (en es pt ru de fr tr zh), the
+- **LANGUAGE, LIVE 2026-10-31 06:48 UTC as 8755228d (PROTOCOL 78)**: Settings > Game > Language (en es pt ru de fr tr zh), the
   browser's language by default, `?lang=es` to try one. Interface text: catalogs English -> theirs in `src/i18n/lang/*.json`, met
   on the page by `src/i18n/index.ts` (a MutationObserver, none at all in English), so a new string is a line per catalog
   and no code; `node scripts/i18n.mjs check` shows coverage. About 970 strings a language are done by hand, everything a player
@@ -35,7 +35,9 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
   lines, one call per line for all its languages, cached by line and language, 450 ms at most before a line goes as typed and
   its translation follows ('chatx'), ceilings TRANSLATE_PER_DAY (5000 calls) and 15 a player a minute. With no key everybody reads
   what was typed. The key goes on RENDER, not Vercel: env var `TRANSLATE_API_KEY` on the game server service (and on zona-arena
-  for arena and battle royale chat); never tried against the real API yet, so try one line on the first key.
+  for arena and battle royale chat). The owner shipped it without a test on the real API ("skip and ship"): the request was read
+  against the API's rules for Haiku 5.5, but no real line has been seen translated, and a 400 would only show as `[translate]` in the
+  server's log with chat left as typed. A word with two meanings has a line for each, `Back|slot`, and `data-sense="slot"` on its element.
 - **ASKED 2026-10-27**: admins see every chat (others' Party and Proximity lines too), switched on and off in the admin
   panel. The owner hoped it was a page-only change, but the server sends party and proximity lines only to their own
   listeners, so the server has to copy them to admins who switched it on (server/handle.ts chat; a per-admin switch
