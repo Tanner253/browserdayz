@@ -34,7 +34,7 @@ function shapeOf(from: string, to: string) {
     else shapes.set(k, [shape]);
   } else loose.push(shape);
 }
-function shaped(core: string) {
+function shaped(core: string): string | undefined {
   for (const list of [shapes.get(core.slice(0, 3)), loose]) {
     for (const s of list ?? []) {
       const m = s.re.exec(core);
@@ -44,7 +44,7 @@ function shaped(core: string) {
   }
   return undefined;
 }
-function render(text: string) {
+function render(text: string): string {
   const start = text.length - text.trimStart().length, core = text.trim();
   let hit = exact.get(core);
   if (hit === undefined && core === core.toUpperCase()) hit = capitals.get(core.toLowerCase())?.toLocaleUpperCase(lang);
@@ -52,7 +52,7 @@ function render(text: string) {
   return hit === undefined ? text : text.slice(0, start) + hit + text.slice(start + core.length);
 }
 /** Text in the player's language: what is not in the catalog stays as it is. */
-export function tr(text: string) {
+export function tr(text: string): string {
   if (lang === 'en' || !/\p{L}/u.test(text)) return text;
   let out = memo.get(text);
   if (out === undefined) {
