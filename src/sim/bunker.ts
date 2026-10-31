@@ -187,7 +187,7 @@ function apart(plan: Plan, level: number) {
 const vaultRoom = (rooms: Room[]) => rooms.filter((q) => q.kind === 'armoury').sort((a, b) => a.f0 - b.f0)[0];
 export const bunkerVault = () => {
   const plan = bunkerPlan(3), q = vaultRoom(plan.rooms), b = plan.stood.find((s) => s.id === 'breaker_box')!;
-  return { room: [(q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2] as [number, number], breaker: [b.r, b.f] as [number, number] };
+  return { room: [(q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2] as [number, number], breaker: [b.r, b.f] as [number, number], clear: clearIn(3, q) };
 };
 
 /** what the rooms of the levels under the first are, by lot; the biggest is always the plant and the deepest in the armoury */
@@ -838,6 +838,20 @@ export function bunkerCrates(p: Place): { kind: string; x: number; y: number; z:
     for (const s of plan.stood) add(SEARCHED[s.id], s.r, s.f, s.rot);
   }
   return out;
+}
+
+/** two clear places on the floor of a level's room, for a site's crate and its locker: off all that stands there, off its doorways and off each other, the nearest its middle first */
+export function clearIn(level: number, q: Room): [[number, number], [number, number]] {
+  const plan = bunkerPlan(level), cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2, may: [number, number][] = [];
+  for (let r = q.r0 + 0.9; r <= q.r1 - 0.9; r += 0.25) {
+    for (let f = q.f0 + 0.9; f <= q.f1 - 0.9; f += 0.25) {
+      const off = !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.3) && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 0.8 + Math.max(m.w, m.d) / 2) && !q.doors.some(([a, b]) => Math.hypot(a - r, b - f) < 1.8);
+      if (off) may.push([r, f]);
+    }
+  }
+  may.sort((a, b) => Math.hypot(a[0] - cr, a[1] - cf) - Math.hypot(b[0] - cr, b[1] - cf));
+  const one = may[0], two = may.find((p) => Math.hypot(p[0] - one[0], p[1] - one[1]) >= 2.2) ?? one;
+  return [one, two];
 }
 
 /** where the infected of a site's waves are stood on a level: clear spots down the passages, [right, forward] */

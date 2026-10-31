@@ -173,6 +173,57 @@ try {
   await ann.until('the carriage rolled', () => ann.all('put').length === puts + 1);
   assert.ok(Math.abs((ann.all('put').pop()!.y ?? 0) - (PAD + levelY(3))) < 0.1, 'the carriage does not go to Level 3');
   ok('only the purple pass calls the carriage, and the carriage goes to Level 3');
+
+  // ---- the vault, which wants no pass: only somebody at its breaker, on its own level
+  const V = SITES.vault, Y3 = PAD + levelY(3), [bx, , bz] = spotAt(siteSpot(V, V.reader), P);
+  await ann.go(bx, Y3 + 3.8, bz);
+  ann.carry('bandage');
+  await sleep(200);
+  ann.send({ t: 'site', s: 'vault' });
+  await sleep(250);
+  assert.equal(ann.site('vault')?.phase, 'idle', 'the breaker was thrown from the level above');
+  await ann.go(bx, Y3, bz);
+  ann.send({ t: 'site', s: 'vault' });
+  await ann.until('the vault went off', () => ann.site('vault')?.phase === 'alarm');
+  await ann.until('the vault paid out', () => ann.all('drop+').some((m) => m.d.site?.includes('locker at the vault')), 9000);
+  const vault = ann.all('drop+').find((m) => m.d.site?.includes('locker at the vault'))!.d;
+  await ann.go(vault.x, vault.y, vault.z);
+  ann.send({ t: 'copen', cid: vault.uid });
+  await ann.until('the vault\'s locker opened', () => ann.all('cdata').some((m) => m.cid === vault.uid));
+  assert.ok(ann.all('cdata').find((m) => m.cid === vault.uid)!.items.some((i) => i.id === 'night_vision'), 'no night vision in the vault');
+  ok('the vault wants a hand at its breaker on its own level, and pays out night vision');
+
+  // ---- out by the ladder, and the mine's gates
+  const [lx, ly, lz] = spotAt(RIDES.ladder.from, P), before = ann.all('put').length;
+  await ann.go(lx, ly!, lz);
+  ann.send({ t: 'ride', w: 'ladder' });
+  await ann.until('the ladder went up', () => ann.all('put').length === before + 1);
+  const up = ann.all('put').pop()!, [ux, , uz] = spotAt(RIDES.ladder.to, P);
+  assert.ok(Math.hypot(up.x - ux, up.z - uz) < 0.1 && up.y === undefined, 'the ladder does not come up on the ground at the camp');
+  ok('the ladder comes up at the camp over the bunker');
+
+  const [wx, , wz] = spotAt(GATES.mine.at, P), [ex, , ez] = spotAt(GATES.mine.also!, P), [ix, iy, iz] = spotAt(RIDES.mine_in.to, P);
+  await ann.go(wx, 2, wz);
+  ann.send({ t: 'ride', w: 'mine_in' });
+  await sleep(250);
+  assert.equal(ann.all('put').length, before + 1, 'the mine let somebody in with its gate shut');
+  ann.carry('card_yellow');
+  await sleep(200);
+  ann.send({ t: 'gate', g: 'mine' });
+  await ann.until('the mine opened', () => ann.all('gate').some((m) => m.g === 'mine' && m.open));
+  assert.equal(ann.all('siteok').filter((m) => m.card === 'card_yellow').length, 2, 'the mine took the yellow pass');
+  const [mx, , mz] = spotAt(RIDES.mine_in.from, P);
+  await ann.go(mx, 2, mz);
+  ann.send({ t: 'ride', w: 'mine_in' });
+  await ann.until('in by the west gate', () => ann.all('put').length === before + 2);
+  const inside = ann.all('put').pop()!;
+  assert.ok(Math.hypot(inside.x - ix, inside.z - iz) < 0.1 && Math.abs(inside.y! - iy!) < 0.1, 'the gate leads somewhere else');
+  await ann.go(ix + 1, iy!, iz);
+  ann.send({ t: 'ride', w: 'mine_out' });
+  await ann.until('out again', () => ann.all('put').length === before + 3);
+  assert.ok(Math.hypot(ann.all('put').pop()!.x - wx, ann.all('put').pop()!.z - wz) < 6, 'out by another gate');
+  assert.ok(ex !== wx && ez !== wz);
+  ok('the yellow pass opens the mine and stays with whoever showed it, and there is a way out from inside');
 } catch (e) {
   failed = e;
 }

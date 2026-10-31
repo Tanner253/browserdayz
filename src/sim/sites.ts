@@ -4,7 +4,7 @@
 // come for as long as `hold` says, and the end of it gives the next card. Then the place is spent for a while. The rules
 // only: the server runs it (server/sites.ts), and every number is here.
 
-import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, levelAt, levelY, type Place } from './bunker';
+import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, levelY, type Place } from './bunker';
 import { inMine, MINE } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, SIDING, STOLOVAYA } from './outposts';
 import { townPoint, type Town } from './towns';
@@ -53,14 +53,14 @@ export const SITES: Record<string, Site> = {
 
 SITES.bolotnaya = {
   town: BOLOTNAYA, name: 'Bolotnaya', card: 'card_yellow', gives: 'card_red',
-  room: [14, -14], reader: [12, -10.6], crate: [14.3, -14.6], locker: [8, -7],
+  room: [14, -14], reader: [12, -10.6], crate: [15, -13.6], locker: [8, -7],
   hold: 360, again: 1800, heard: 100,
   wave: { every: 24, n: 8, most: 30, from: [20, 38] },
   steps: { at: [[-24, 8], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4, after: 0 },
 };
 SITES.kupol = {
   town: KUPOL, name: 'the Kupol', card: 'card_black', gives: 'card_purple',
-  room: [-12, 14], reader: [-14.2, 10.7], crate: [-11.8, 14.6], locker: [-8, 8],
+  room: [-12, 14], reader: [-14.2, 10.7], crate: [-13, 13.6], locker: [-8, 8],
   hold: 240, again: 2400, heard: 130,
   wave: { every: 20, n: 10, most: 40, from: [22, 44] },
   steps: { at: [[-12, -8], [12, -12], [0, 22]], name: 'breakers', use: 'Throw the breaker', doing: 'Throwing the breaker', secs: 4, after: 720 },
@@ -68,13 +68,10 @@ SITES.kupol = {
 
 /** Level 2's plant, and its armoury, as the plan lays them out */
 const plant = () => bunkerPlan(2).made.find((m) => m.kind === 'generator')!;
-const safe = (): [number, number] => {
-  const q = bunkerPlan(2).rooms.find((r) => r.kind === 'armoury')!, s = bunkerPlan(2).spots.find((p) => p.floor && p.r > q.r0 && p.r < q.r1 && p.f > q.f0 && p.f < q.f1);
-  return s ? [s.r, s.f] : [(q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2];
-};
+const safe = () => clearIn(2, bunkerPlan(2).rooms.find((r) => r.kind === 'armoury')!);
 SITES.level2 = {
   town: GORODOK, name: 'Level 2', card: 'jerrycan', gives: 'card_black', level: 2, quiet: true,
-  room: [plant().r, plant().f], reader: [plant().r, plant().f + plant().d / 2 + 0.7], crate: safe(), locker: [safe()[0] + 0.2, safe()[1] + 1.4],
+  room: [plant().r, plant().f], reader: [plant().r, plant().f + plant().d / 2 + 0.7], crate: safe()[0], locker: safe()[1],
   hold: 180, again: 1800, heard: 40,
   wave: { every: 45, n: 5, most: 16, from: [0, 0] },
   // (the owner, 2026-10-31: "gas can be found on the same level floor where required for generator always and rewspawn 5 in intervals after collected")
@@ -84,7 +81,7 @@ SITES.level2 = {
 
 SITES.vault = {
   town: GORODOK, name: 'the vault', card: '', gives: 'night_vision', level: 3,
-  room: bunkerVault().room, reader: [bunkerVault().breaker[0], bunkerVault().breaker[1] + 1], crate: bunkerVault().room, locker: [bunkerVault().room[0] + 1.4, bunkerVault().room[1]],
+  room: bunkerVault().room, reader: [bunkerVault().breaker[0], bunkerVault().breaker[1] + 1], crate: bunkerVault().clear[0], locker: bunkerVault().clear[1],
   hold: 240, again: 3600, heard: 70,
   wave: { every: 24, n: 9, most: 32, from: [0, 0] },
   what: { use: 'Throw the vault breaker', doing: 'Throwing the breaker', none: '' },
