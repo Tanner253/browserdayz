@@ -64,6 +64,7 @@ import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
 import { setTrap, takeTrap } from './traps';
+import { doorLocked, useSite } from './sites';
 import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
 import { knock, swing } from './doors';
@@ -432,6 +433,8 @@ export function handle(c: Client, m: C2S) {
       return setTrap(c, m);
     case 'untrap':
       return takeTrap(c, m);
+    case 'site':
+      return useSite(c, m);
     case 'trade':
       return trade(c, m);
     case 'book':
@@ -686,7 +689,7 @@ export function handle(c: Client, m: C2S) {
       return;
     }
     case 'door': {
-      if (!num(m.i) || m.i < 0 || m.i >= world.doorCount) return;
+      if (!num(m.i) || m.i < 0 || m.i >= world.doorCount || doorLocked(m.i)) return;
       const swing = m.swing > 0 ? 1 : -1;
       doors.set(m.i, [!!m.open, swing]);
       broadcast({ t: 'door', i: m.i, open: !!m.open, swing }, c);

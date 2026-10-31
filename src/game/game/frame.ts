@@ -438,6 +438,7 @@ export const frameMethods = {
     this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.build.wheelOpen && !this.hold && !ride && !camped);
     this.grenades.update(dt);
     this.toys.update(dt);
+    this.sites.update(dt, this.s.r.camera.position);
     this.throwing.update(dt);
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;

@@ -25,6 +25,16 @@ export const TOY_ITEMS: ItemDef[] = [
     loot: { pair: 'Ammo_Flare', at: [0, 2, 5, 0, 0], restock: 600, usage: ['Military', 'Police', 'Village'] },
     worth: 3,
   },
+  // (the way down's cards, src/sim/sites.ts. The blue one is kept down Bunker 17, and goes out to the desert)
+  {
+    id: 'card_blue', name: 'Blue Access Card', model: '@card_blue', w: 1, h: 1, weight: 0.02, category: 'misc',
+    desc: 'A blue card out of Bunker 17, stamped for a post on a mesa in the desert: Stolovaya. Its reader takes it, once.',
+    loot: { pair: 'ShippingContainerKeys_Blue', at: [0, 0, 0, 0, 2], away: [], lifetime: 7200, restock: 600, usage: ['Bunker'] },
+  },
+  {
+    id: 'card_yellow', name: 'Yellow Access Card', model: '@card_yellow', w: 1, h: 1, weight: 0.02, category: 'misc',
+    desc: 'A yellow card from the locker at Stolovaya, stamped for a gate in the canyon wall.',
+  },
   {
     id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',
     desc: 'Toothed steel on a spring. Set on the ground it waits for whoever steps on it, and breaks the leg. Held F takes up one that is set.',

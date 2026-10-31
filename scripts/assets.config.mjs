@@ -1049,6 +1049,11 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
     credit: { name: 'Signal flare', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Signal flare" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
+  card_reader: {
+    dir: '../incoming/higgsfield/toys', file: 'card_reader_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Card reader', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Card reader" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
   // (made for crafting in Higgsfield, 2026-10-25, sized at intake by progress/tools/intake.mjs: a slim sledgehammer, a coil of
   // hemp rope and a bundle of rags, in place of the downloads judged too thick, untextured and whole clothes)
   sledgehammer_slim: {

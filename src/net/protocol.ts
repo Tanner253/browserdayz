@@ -103,7 +103,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (77, 2026-10-27: a report from the death screen ('report'): a server of 76 hears none)
 // (78, 2026-10-30: the language a page reads ('lang', and on 'hello'), a line's `orig` and `mid` and its late translation 'chatx')
 // (79, 2026-10-31: traps ('trap', 'untrap', 'traps', 'trapok', 'trapback', 'trapgo'); a flare is launched by anybody with the gun)
-export const PROTOCOL = 79;
+// (80, 2026-10-31: the way down's stops ('site', 'siteok'; `sites` on 'welcome'))
+export const PROTOCOL = 80;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -446,6 +447,8 @@ export type C2S =
   /** a trap set before the player (src/sim/traps.ts): which, the item it was, where and which way */
   | { t: 'trap'; k: string; uid: string; o: [number, number, number]; yaw: number }
   | { t: 'untrap'; i: number }
+  /** a card in a site's reader (src/sim/sites.ts) */
+  | { t: 'site'; s: string }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string; /** what sprang it: the reader's stack, or the hooking code (src/net/bait.ts) */ proof?: string }
@@ -572,6 +575,10 @@ export type S2C =
   | { t: 'trapok'; uid: string }
   /** the trap they took up: it goes back in their pockets */
   | { t: 'trapback'; k: string }
+  /** how a site stands, and how long it has left so, seconds */
+  | { t: 'site'; s: string; phase: 'idle' | 'alarm' | 'spent'; left: number }
+  /** the reader took their card */
+  | { t: 'siteok'; card: string }
   | { t: 'trapgo'; i: number; k: string; o: [number, number, number]; how: 'snap' | 'boom' | 'take' }
   | { t: 'bfizz'; i: number }
   /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */

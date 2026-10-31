@@ -100,6 +100,7 @@ import { Fires } from './fires';
 import { Lockers } from './lockers';
 import '../sim/injury';
 import { Base28 } from '../trailer/base28';
+import { Sites } from './sites';
 import { Toys } from './toys';
 import { Traps } from './traps';
 import { MenuScenes } from './menu-scenes';
@@ -437,6 +438,8 @@ export class Game {
   camp!: TraderCamp;
   /** what the small wins leave in the air (src/game/toys.ts), and the traps on the ground (src/game/traps.ts) */
   toys!: Toys;
+  /** the way down's stops (src/game/sites.ts) */
+  sites!: Sites;
   /** the guns and tools in, to be held */
   gunsIn: Promise<unknown> = Promise.resolve();
   traps!: Traps;
@@ -663,6 +666,16 @@ export class Game {
       scene: r.scene, models: this.loot.models, online: () => this.online, send: (m) => this.net.send(m), pressed: (code) => this.input.pressed(code),
       note: (text) => this.hud.note(text, 'info'), work: (label, seconds, item, done) => this.startUse(label, seconds, item, 'open', null, done),
       feet: () => this.player.pos, facing: () => this.s.r.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(),
+    });
+    const game = this;
+    this.sites = new Sites({
+      online: () => this.online, send: (m) => this.net.send(m), pressed: (code) => this.input.pressed(code), note: (text, kind) => this.hud.note(text, kind ?? 'info'),
+      work: (label, seconds, item, done) => this.startUse(label, seconds, item, 'swipe', null, done), feet: () => this.player.pos, noise: (x, z, heard) => this.horde.noise(x, z, heard), has: (id) => this.inv.count(id) > 0,
+      doorAt: (i) => {
+        const p = this.s.buildings.doors[i]?.pivot.position;
+        return p ? [p.x, p.z] : null;
+      },
+      get doors() { return game.s.buildings.doors.length; },
     });
     this.grenades.onFlare = (at, dt) => this.toys.rising(at, dt);
     this.grenades.onExplode = (at, mine, id) => {

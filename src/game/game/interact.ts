@@ -61,6 +61,14 @@ export const interactMethods = {
         return;
       }
     }
+    // at a reader out in the world (src/game/sites.ts)
+    if (!this.br && this.started && !this.garage.ride && !this.use) {
+      const site = this.sites.prompt(!this.hud.chatOpen);
+      if (site) {
+        this.prompt = site;
+        return;
+      }
+    }
     // at a trap on the ground (src/game/traps.ts)
     if (!this.br && this.started && !this.garage.ride && !this.use) {
       const trap = this.traps.prompt(!this.hud.chatOpen);
@@ -224,6 +232,7 @@ export const interactMethods = {
       }
     } else if (owner instanceof Door) {
       const door = owner;
+      if (this.sites.locked(this.s.buildings.doors.indexOf(door))) return void (this.prompt = '<small>Locked. The reader outside opens it</small>');
       this.prompt = `<kbd>F</kbd>${door.open ? 'Close' : 'Open'} door`;
       if (key) {
         door.toggle(this.player.pos);

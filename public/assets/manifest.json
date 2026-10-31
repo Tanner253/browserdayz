@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T12:15:28.989Z",
+ "generated": "2026-10-31T18:36:16.944Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14741,6 +14741,26 @@
     0.01,
     0.07,
     0.0099
+   ],
+   "lods": []
+  },
+  "card_reader": {
+   "url": "assets/models/card_reader.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 270648,
+   "srcTris": 2804,
+   "tris": 2804,
+   "min": [
+    -0.2161,
+    0,
+    -0.194
+   ],
+   "max": [
+    0.2161,
+    1.2,
+    0.194
    ],
    "lods": []
   }

@@ -52,6 +52,7 @@ import { regrowing } from './gather';
 import { keepBases, restoreBases, sighting } from './build';
 import { charges } from './raid';
 import { trapSight, trapsTick } from './traps';
+import { sitesReady, sitesTick } from './sites';
 import { upkeep } from './claims';
 import { ROT } from '../src/sim/build/upkeep';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
@@ -137,6 +138,8 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 export interface Box {
   cid: string;
   kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox' | 'recycler';
+  /** a drop's crate that is a site's and no aircraft's (server/sites.ts): what it is called */
+  site?: string;
   /** a base's Weapon Rack: its grid has a rack's bays (src/sim/inventory.ts RACK) */
   rack?: true;
   /** furniture: where in its grid each of the economy's things inside it was last put, by uid (server/storages.ts) */
@@ -255,7 +258,7 @@ export const hearths = new Hearths(world.fires);
  * none is here.)
  */
 // (but the gas mask, which the old trader sold made by the game that bought it: those already carried were never issued)
-const GUARDED = new Set(Object.values(ITEMS).filter((d) => !d.wear?.gas && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
+const GUARDED = new Set(Object.values(ITEMS).filter((d) => !d.wear?.gas && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard' || d.id.startsWith('card_'))).map((d) => d.id));
 
 /** every such thing the server has put in the world, by its own number: laid out as loot, packed in a crate or a drop, left on a body */
 const issued = new Set<string>();
@@ -449,6 +452,9 @@ setInterval(() => charges(Date.now()), 250);
 // (traps: whoever has stepped on one, and which each game is told of: server/traps.ts)
 setInterval(() => trapsTick(Date.now()), 120);
 setInterval(() => trapSight(), 1000);
+// (the way down's stops: server/sites.ts)
+sitesReady();
+setInterval(() => sitesTick(Date.now()), 1000);
 
 // felled trees standing again, out of everybody's sight (server/gather.ts); bases told to whoever comes near them (server/build.ts)
 setInterval(() => regrowing(), 30_000);

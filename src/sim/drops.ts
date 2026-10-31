@@ -133,6 +133,8 @@ export interface DropInfo {
   left: number;
   /** it is the cargo of a helicopter that came down: the wreck lies beside it (see CRASH) */
   heli?: boolean;
+  /** it is no aircraft's: a site's, by this name (src/sim/sites.ts) */
+  site?: string;
 }
 
 /** one of a weighted list */

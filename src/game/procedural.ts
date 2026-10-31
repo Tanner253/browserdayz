@@ -51,7 +51,10 @@ const CARD = { L: 0.0856, W: 0.054, T: 0.001, PX: 1024, PY: 646, GAP: 20 };
  * The pass card's two faces, painted one over the other on one sheet: its front above (the end
  * that is held on the left, the end that goes into the reader on the right), its back below.
  */
-function keycardPaint(): THREE.CanvasTexture {
+const CARD_COLOURS: Record<string, string> = { blue: '#1d4f9c', yellow: '#c49a12', red: '#a32424', black: '#22242a', purple: '#6a2fa8' };
+const cardMats: Record<string, THREE.Material> = {};
+
+function keycardPaint(green = '#1d6a3c'): THREE.CanvasTexture {
   const W = CARD.PX, H = CARD.PY, GAP = CARD.GAP;
   const c = document.createElement('canvas');
   c.width = W;
@@ -67,7 +70,6 @@ function keycardPaint(): THREE.CanvasTexture {
   g.fillStyle = '#e7e4d8';
   g.fillRect(0, 0, W, H);
   // a green field: down the long edge at the top, and across the end that is held
-  const green = '#1d6a3c';
   g.fillStyle = green;
   g.beginPath();
   g.moveTo(0, 0);
@@ -320,6 +322,12 @@ export function proceduralParts(model: string): MeshPart[] {
     // a pass card: green and white plastic, printed, chipped, and carried about for years
     keycardMat ??= new THREE.MeshStandardMaterial({ map: keycardPaint(), roughness: 0.42, metalness: 0.05, name: 'keycard' });
     return [{ name: 'keycard', geometry: keycardGeometry(), material: keycardMat }];
+  }
+  // (the way down's cards: the same card in another colour, src/sim/sites.ts)
+  const card = /^@card_(\w+)$/.exec(model)?.[1];
+  if (card && CARD_COLOURS[card]) {
+    const mat = (cardMats[card] ??= new THREE.MeshStandardMaterial({ map: keycardPaint(CARD_COLOURS[card]), roughness: 0.42, metalness: 0.05, name: 'keycard' }));
+    return [{ name: 'keycard', geometry: keycardGeometry(), material: mat }];
   }
   throw new Error(`unknown procedural model ${model}`);
 }

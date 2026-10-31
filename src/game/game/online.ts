@@ -353,6 +353,12 @@ export const onlineMethods = {
     net.on('trade', (m) => this.camp.onTrade(m));
     net.on('tday', (m) => this.camp.onDay(m));
     net.on('recy', (m) => this.recyclers.onRun(m));
+    // (the way down's stops: src/game/sites.ts)
+    net.on('site', (m) => this.sites.onSite(m));
+    net.on('siteok', (m) => {
+      this.inv.take(m.card, 1);
+      this.meDirty = true;
+    });
     // (traps: src/game/traps.ts)
     net.on('traps', (m) => this.traps.onNear(m.near));
     net.on('trapok', (m) => {

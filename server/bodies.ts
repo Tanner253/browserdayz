@@ -17,6 +17,8 @@ import { makeItem, type ItemInstance } from '../src/sim/items';
 export interface BodyBox {
   cid: string;
   kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox' | 'recycler';
+  /** a drop's crate that is a site's and no aircraft's (server/sites.ts): what it is called */
+  site?: string;
   w: number;
   h: number;
   items: StoredItem[];

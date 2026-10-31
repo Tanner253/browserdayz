@@ -192,6 +192,7 @@ export function buildWorldData(root: string) {
     homes: infectedHomes(world),
     homeSpot: (h: Home) => homeSpot(world, h, Math.random),
     doorCount: buildings.doorSpecs.length,
+    doorSpecs: buildings.doorSpecs,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),
     /**
      * The top of the earth at a place: the ground, or where the ground is cut down for the fort's passage and earth

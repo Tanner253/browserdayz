@@ -52,7 +52,7 @@ export const dropsMethods = {
    */
   async addDrop(this: Game, d: DropInfo, fill = false) {
     if (this.drops.has(d.uid)) return;
-    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, d.heli ? CRASH.w : DROP.w, d.heli ? CRASH.h : DROP.h, d.heli ? CRASH.label : DROP.label);
+    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, d.heli ? CRASH.w : DROP.w, d.heli ? CRASH.h : DROP.h, d.heli ? CRASH.label : d.site ?? DROP.label);
     if (fill) {
       if (d.heli) fillCrash(stash.container);
       else fillDrop(stash.container);
@@ -66,6 +66,8 @@ export const dropsMethods = {
       void this.layWreck(d);
       this.hud.note(`A helicopter has come down ${where}: its cargo is there for ${mins} min, marked on the map (M)`, 'good');
       this.hud.feed(`Helicopter down ${where}`);
+    } else if (d.site) {
+      this.hud.feed(`${d.site} is open`);
     } else {
       this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
       this.hud.feed(`Supply drop ${where}`);

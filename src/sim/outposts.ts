@@ -71,7 +71,7 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     { type: 'barracks', x: -30, z: 10, rot: Q },
     { type: 'garage', x: 30, z: 20, rot: S },
     { type: 'tent', x: -4, z: 20, rot: S },
-    { type: 'guardpost', x: 22, z: -10, rot: Q },
+    { type: 'guardpost', x: 22, z: -10, rot: -Q },
   ],
   Kolodets: [
     // (the pump house over the well's pipe, the herders' bunkhouse, their two tents)
@@ -165,7 +165,8 @@ const THINGS: Record<string, TownThing[]> = {
     { kind: 'old_tyre', x: 62, z: 34, rot: 0.3 }, { kind: 'old_tyre', x: 61, z: 35, rot: 1.2 },
   ],
   Stolovaya: [
-    // the range's instruments and what they ran on, up here for the view; concrete round the strong room's way in
+    // the range's instruments and what they ran on, up here for the view; concrete round the strong room's way in, and its reader
+    { kind: 'card_reader', x: 18.7, z: -12.3, rot: -Q },
     { kind: 'concrete_road_barrier', x: 12, z: -3, rot: Q }, { kind: 'concrete_road_barrier', x: 12, z: -17, rot: Q }, { kind: 'container_shell@1', x: -4, z: 4, rot: 0.05 },
     { kind: 'container_shell@0', x: 8, z: 22, rot: Q + 0.04 }, { kind: 'uaz_469', x: 34, z: 4, rot: 2.6 }, { kind: 'portable_generator', x: 30, z: -24, rot: 0.5 }, { kind: 'propane_tank', x: 32, z: -26, rot: 0 },
     { kind: 'Barrel_01', x: -18, z: -6, rot: 0 }, { kind: 'Barrel_01', x: -16.8, z: -5.4, rot: 0 }, { kind: 'barrel_03', x: -17.4, z: -7.2, rot: 0.3 }, { kind: 'crate_big', x: -2, z: -6, rot: 0.2 }, { kind: 'wooden_military_crate', x: 0, z: -4.6, rot: 0.7 },

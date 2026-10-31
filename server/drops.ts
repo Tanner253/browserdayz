@@ -24,7 +24,7 @@ const DROP_LINGER = Number(process.env.DROP_LINGER_S) || DROP.linger;
 let nextDrop = -1;
 
 export function dropInfo(b: Box): DropInfo {
-  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, left: Math.max(0, Math.round((b.expires ?? 0) - economy.time)), ...(b.heli ? { heli: true } : {}) };
+  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, left: Math.max(0, Math.round((b.expires ?? 0) - economy.time)), ...(b.heli ? { heli: true } : {}), ...(b.site ? { site: b.site } : {}) };
 }
 
 /**
@@ -98,7 +98,8 @@ export function tickDrops(anyoneAlive: boolean) {
     if (done && !locks.has(b.cid)) {
       boxes.delete(b.cid);
       broadcast({ t: 'drop-', uid: b.cid });
-    } else if (b.heli) wreck = true;
+    } else if (b.site) continue;
+    else if (b.heli) wreck = true;
     else standing = true;
   }
   // (helicopters keep a clock of their own: one down at a time, the first a few minutes after somebody turns up)

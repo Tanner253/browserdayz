@@ -37,6 +37,7 @@ import { tellKnown } from './learn';
 import { tellDay } from './camp';
 import { tellRecyclers } from './recycle';
 import { chargesNow } from './raid';
+import { sitesNow } from './sites';
 import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 
 export interface Client {
@@ -456,6 +457,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   });
   // (and the charges burning on bases, or lying unlit: server/raid.ts)
   for (const ch of chargesNow()) send(c, { t: 'bcharge', ...ch });
+  for (const m of sitesNow()) send(c, m);
   // Dead when they last left, and back to start again: told how. (2026-10-20, a player: "the server just reloads my
   // game out of nowhere and when i get in i spawn fresh". A game whose line went quiet in a fight is seen and shot by
   // everybody while it shows nothing new; its death reaches the server and not the game, the line drops, the page
