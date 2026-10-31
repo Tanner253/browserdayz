@@ -1099,6 +1099,11 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
     credit: { name: 'Railway track', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Railway track" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
+  night_vision: {
+    dir: '../incoming/higgsfield/toys', file: 'night_vision_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Night vision', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Night vision" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
   card_reader: {
     dir: '../incoming/higgsfield/toys', file: 'card_reader_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',

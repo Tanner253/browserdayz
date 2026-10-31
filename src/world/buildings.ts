@@ -1634,7 +1634,7 @@ export class Buildings {
     // said to be kept in the bunker lies there.
     const at = bunkerPlace(this.world);
     if (at) {
-      // (Level 2 and Level 3 after the first, so that none of its places is renumbered; what is kept only on them is marked so)
+      // (Level 2 and Level 3 with marks of their own, for what is kept only on them)
       const MARKS: Record<number, Usage[]> = { 1: ['Bunker'], 2: ['Bunker', 'Lab'], 3: ['Bunker', 'Lab', 'Vault'] };
       for (let level = 1; level <= LEVELS.last; level++) {
       const plan = bunkerPlan(level), Y = levelY(level);
@@ -1642,7 +1642,7 @@ export class Buildings {
         const [x, wy, z] = bunkerAt(at, r, f, y);
         // (on the floor a thing lies a finger over it, as everywhere; on a table or a shelf it lies ON it: that
         // finger, and a mess table whose top was taken to be a metre up, had things hanging in the air over them)
-        this.lootPoints.push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: MARKS[level], building: 'bunker', floor, tier: 5, ...(surf ? { surf } : {}) });
+        (level === 1 ? this.lootPoints : this.deepLoot).push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: MARKS[level], building: 'bunker', floor, tier: 5, ...(surf ? { surf } : {}) });
       };
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
@@ -1734,6 +1734,8 @@ export class Buildings {
     this.lootPoints.push(...townLoot);
     mark(this.laterLoot);
     this.laterLoot.push(...this.laterCellars);
+    // (and the bunker's levels under the first, after all of those: nothing on the live map is renumbered)
+    this.laterLoot.push(...this.deepLoot);
     // (and the new places' things, the towns' buildings' furniture first. A crate stacked on another is set a hand's
     // breadth askew, as the fort's are: what is searched is told by where it stands)
     const searched = (q: Instance) => CRATE_KINDS.has(q.kind.split(/[#@]/)[0]) || SEARCHED_KINDS.has(q.kind.split(/[#@]/)[0]);
@@ -1771,6 +1773,7 @@ export class Buildings {
   }
   /** the later towns' places for things (LATER_TOWNS), for whoever plans the map to add after every other (main.ts, server/world.ts) */
   laterLoot: LootPoint[] = [];
+  deepLoot: LootPoint[] = [];
   /** how many things clearWaysOut slid out of a door's way, the last time the map was planned */
   waysCleared = 0;
   /** and how many clearWells slid off the way down to a basement */

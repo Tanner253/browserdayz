@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T19:41:10.486Z",
+ "generated": "2026-10-31T20:06:37.708Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14977,6 +14977,26 @@
     6,
     0.6422,
     1.6852
+   ],
+   "lods": []
+  },
+  "night_vision": {
+   "url": "assets/models/night_vision.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 177860,
+   "srcTris": 3772,
+   "tris": 3772,
+   "min": [
+    -0.0946,
+    0,
+    -0.1
+   ],
+   "max": [
+    0.0946,
+    0.0839,
+    0.1
    ],
    "lods": []
   }
