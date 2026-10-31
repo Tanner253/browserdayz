@@ -11,7 +11,7 @@ import { concretePaint } from './bunker';
 import { MINE, inMine } from '../sim/mine';
 
 /** how far the rock lies out from the plan at most, metres; the cell of its surface; and how often a lamp hangs */
-const ROUGH = 0.5, CELL = 0.9, LAMP_EVERY = 16;
+const ROUGH = 0.5, CELL = 0.9, LAMP_EVERY = 13;
 
 /** a stretch of rock, from one corner to the other, its inside to `n` (bumped away from it) */
 function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vector3): THREE.BufferGeometry {
@@ -19,7 +19,9 @@ function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vec
   const pos: number[] = [], uv: number[] = [], idx: number[] = [], p = new THREE.Vector3();
   for (let j = 0; j <= nh; j++) for (let i = 0; i <= nw; i++) {
     p.copy(a).lerp(b, i / nw).addScaledVector(c.clone().sub(a), j / nh);
-    const bump = (noise3(p.x * 0.33, p.y * 0.33, p.z * 0.33) * 0.7 + noise3(p.x * 0.9, p.y * 0.9, p.z * 0.9) * 0.3 + 0.5) * ROUGH;
+    // (nothing at its edges: there it meets the next face, and a seam there let the sky in)
+    const edge = Math.min(1, Math.min(i, nw - i, j, nh - j) / 2);
+    const bump = (noise3(p.x * 0.33, p.y * 0.33, p.z * 0.33) * 0.7 + noise3(p.x * 0.9, p.y * 0.9, p.z * 0.9) * 0.3 + 0.5) * ROUGH * edge;
     p.addScaledVector(n, -Math.max(0, bump));
     pos.push(p.x, p.y, p.z);
     uv.push((i / nw) * w * 0.25, (j / nh) * h * 0.25);

@@ -131,11 +131,11 @@ export function useStep(c: Client, m: Extract<C2S, { t: 'sitestep' }>) {
 /** A card in a reader. */
 export function useSite(c: Client, m: Extract<C2S, { t: 'site' }>) {
   const s = SITES[m.s], r = runs.get(m.s);
-  if (!s || !r || !c.alive || r.phase !== 'idle' || !carries(c.inv, s.card)) return;
+  if (!s || !r || !c.alive || r.phase !== 'idle' || (s.card && !carries(c.inv, s.card))) return;
   if (!atSpot(siteSpot(s, s.reader), world.bunker, c.pose[0], c.pose[1], c.pose[2], 4)) return;
   const now = Date.now();
   Object.assign(r, { phase: 'alarm', until: now + holdOf(s) * 1000, nextWave: now });
-  send(c, { t: 'siteok', card: s.card });
+  if (s.card) send(c, { t: 'siteok', card: s.card });
   // (where there is something to be turned, the room stays shut until the last of it is)
   const i = s.level ? -1 : doorOf(m.s, s);
   if (!s.steps) openRoom(i);

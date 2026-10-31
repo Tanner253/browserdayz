@@ -4,7 +4,7 @@
 // come for as long as `hold` says, and the end of it gives the next card. Then the place is spent for a while. The rules
 // only: the server runs it (server/sites.ts), and every number is here.
 
-import { BUNKER, CAB, bunkerAt, bunkerPlan, levelAt, levelY, type Place } from './bunker';
+import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, levelAt, levelY, type Place } from './bunker';
 import { inMine, MINE } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, SIDING, STOLOVAYA } from './outposts';
 import { townPoint, type Town } from './towns';
@@ -14,7 +14,7 @@ export type SitePhase = 'idle' | 'alarm' | 'spent';
 export interface Site {
   town: Town;
   name: string;
-  /** the card that starts it, and the one its end gives */
+  /** the card that starts it ('': nothing does, only a hand), and the one its end gives */
   card: string;
   gives: string;
   /** the strong room's middle and where the reader stands, in the town's frame */
@@ -56,7 +56,7 @@ SITES.bolotnaya = {
   room: [14, -14], reader: [12, -10.6], crate: [14.3, -14.6], locker: [8, -7],
   hold: 360, again: 1800, heard: 100,
   wave: { every: 24, n: 8, most: 30, from: [20, 38] },
-  steps: { at: [[-24, 12], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4, after: 0 },
+  steps: { at: [[-24, 8], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4, after: 0 },
 };
 SITES.kupol = {
   town: KUPOL, name: 'the Kupol', card: 'card_black', gives: 'card_purple',
@@ -80,6 +80,14 @@ SITES.level2 = {
   // (the owner, 2026-10-31: "gas can be found on the same level floor where required for generator always and rewspawn 5 in intervals after collected")
   fuel: { at: [-1.2, -26.5], item: 'jerrycan', back: 300 },
   what: { use: 'Pour the jerrycan into the plant', doing: 'Filling the plant', none: 'The plant is dry. There is a jerrycan on this floor' },
+};
+
+SITES.vault = {
+  town: GORODOK, name: 'the vault', card: '', gives: 'night_vision', level: 3,
+  room: bunkerVault().room, reader: [bunkerVault().breaker[0], bunkerVault().breaker[1] + 1], crate: bunkerVault().room, locker: [bunkerVault().room[0] + 1.4, bunkerVault().room[1]],
+  hold: 240, again: 3600, heard: 70,
+  wave: { every: 24, n: 9, most: 32, from: [0, 0] },
+  what: { use: 'Throw the vault breaker', doing: 'Throwing the breaker', none: '' },
 };
 
 /** where a thing is said to be: on a level of the bunker, at [right, forward]; or on the ground of a town, at a place in its frame */

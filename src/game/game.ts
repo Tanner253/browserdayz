@@ -100,6 +100,7 @@ import { Fires } from './fires';
 import { Lockers } from './lockers';
 import '../sim/injury';
 import { Base28 } from '../trailer/base28';
+import { Goggles } from './goggles';
 import { MineSite } from '../world/mine';
 import { Sites } from './sites';
 import { Toys } from './toys';
@@ -443,6 +444,8 @@ export class Game {
   sites!: Sites;
   /** the Old Mine's drifts (src/world/mine.ts) */
   oldMine!: MineSite;
+  /** night vision (src/game/goggles.ts) */
+  goggles = new Goggles();
   /** the guns and tools in, to be held */
   gunsIn: Promise<unknown> = Promise.resolve();
   traps!: Traps;

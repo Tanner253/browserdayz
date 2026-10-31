@@ -183,6 +183,13 @@ function apart(plan: Plan, level: number) {
   return plan;
 }
 
+/** the deepest of Level 3's armouries: the vault */
+const vaultRoom = (rooms: Room[]) => rooms.filter((q) => q.kind === 'armoury').sort((a, b) => a.f0 - b.f0)[0];
+export const bunkerVault = () => {
+  const plan = bunkerPlan(3), q = vaultRoom(plan.rooms), b = plan.stood.find((s) => s.id === 'breaker_box')!;
+  return { room: [(q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2] as [number, number], breaker: [b.r, b.f] as [number, number] };
+};
+
 /** what the rooms of the levels under the first are, by lot; the biggest is always the plant and the deepest in the armoury */
 const DEEP_ROOMS: Record<number, RoomKind[]> = {
   2: ['medical', 'archive', 'control', 'cells', 'medical', 'stores', 'workshop', 'quarters', 'archive', 'washroom', 'cells', 'stores', 'medical', 'stores'],
@@ -796,6 +803,12 @@ function layOut(seed: number, level = 1): Plan {
     side = -side;
   }
 
+  // (the vault's breaker, on the back wall of the deepest armoury: its panel is the model's +x, turned to look down the room at whoever comes in)
+  if (level === 3) {
+    const q = vaultRoom(rooms), cr = (q.r0 + q.r1) / 2;
+    const r = [cr, cr + 1.6, cr - 1.6, cr + 3, cr - 3].find((x) => !stood.some((s) => Math.hypot(s.r - x, s.f - (q.f0 + 0.5)) < 1.2) && !builtList.some((m) => m.solid !== false && Math.hypot(m.r - x, m.f - (q.f0 + 0.5)) < 1.2)) ?? cr;
+    stood.push({ id: 'breaker_box', r, f: q.f0 + 0.42, rot: -Math.PI / 2 });
+  }
   // (the only way out of Level 3: a ladder up the front wall, flat to it, its width across the passage as the model's is across its x)
   if (level === 3) stood.push({ id: 'bunker_ladder', r: 0, f: H.front - 0.45, rot: 0 });
   for (const add of later) add();

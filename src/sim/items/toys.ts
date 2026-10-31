@@ -48,6 +48,12 @@ export const TOY_ITEMS: ItemDef[] = [
     id: 'card_purple', name: 'Purple Clearance Pass', model: 'clearance_pass', paint: 0x6f35b5, w: 1, h: 1, weight: 0.03, category: 'misc',
     desc: 'A purple pass from the Kupol. It calls the carriage, and the carriage line is the only way into Level 3.',
   },
+  // (the top of the way down: carried, and N puts it to the eye. It is the vault's, and is kept nowhere else)
+  {
+    id: 'night_vision', name: 'Night Vision', model: 'night_vision', w: 2, h: 2, weight: 0.9, category: 'tool',
+    desc: 'A Soviet tube on a head harness, out of the vault of Bunker 17. Carried anywhere on you, N puts it to the eye: the dark goes green, and you see in it.',
+    loot: { pair: 'NVGoggles', at: [0, 0, 0, 0, 1], restock: 3600, usage: ['Vault'] },
+  },
   {
     id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',
     desc: 'Toothed steel on a spring. Set on the ground it waits for whoever steps on it, and breaks the leg. Held F takes up one that is set.',

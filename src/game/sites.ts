@@ -82,7 +82,7 @@ export class Sites {
     if (!s || was === m.phase) return;
     const [x, z] = sitePoint(s, s.reader), me = this.h.feet(), d = Math.hypot(x - me.x, z - me.z);
     if (m.phase === 'alarm' && d < TOLD && !s.quiet) this.h.note(`A siren is going at ${s.name}`, 'warn');
-    if (m.phase === 'alarm' && s.level && d < 90) this.h.note('The plant turns over and the lamps come up. Everything down here heard it', 'warn');
+    if (m.phase === 'alarm' && s.quiet && d < 90) this.h.note('The plant turns over and the lamps come up. Everything down here heard it', 'warn');
     if (m.phase === 'spent' && d < 120) this.h.note(`The locker at ${s.name} has opened`, 'good');
   }
 
@@ -113,11 +113,11 @@ export class Sites {
         return `<kbd>F</kbd>Take the ${ITEMS[s.fuel.item].name.toLowerCase()}`;
       }
       if (!this.at(siteSpot(s, s.reader), s.level ? 2.6 : NEAR)) continue;
-      const phase = this.phase(id), name = ITEMS[s.card].name.toLowerCase();
+      const phase = this.phase(id), name = s.card ? ITEMS[s.card].name.toLowerCase() : '';
       if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : 'The alarm is going'} · ${this.left(this.state.get(id)?.until)}</small>`;
       if (phase === 'spent') return `<small>Spent · back on line in ${this.left(this.state.get(id)?.until)}</small>`;
-      if (!this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}: they are kept down Bunker 17`}</small>`;
-      if (go) this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? 6 : 2, s.card, () => this.h.send({ t: 'site', s: id }));
+      if (s.card && !this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}: they are kept down Bunker 17`}</small>`;
+      if (go) this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? (s.card ? 6 : 3) : 2, s.card, () => this.h.send({ t: 'site', s: id }));
       return `<kbd>F</kbd>${s.what?.use ?? `Scan the ${name}`}`;
     }
     for (const [id, g] of Object.entries(GATES)) {
@@ -162,14 +162,11 @@ export class Sites {
     for (const [id, s] of Object.entries(SITES)) {
       if (this.phase(id) !== 'alarm') continue;
       const [x, z] = sitePoint(s, s.reader);
-      if (s.level) {
-        const [, y] = spotAt(siteSpot(s, s.reader), this.h.bunker());
-        this.h.noise(x, z, s.heard, y ?? undefined);
-        continue;
-      }
-      _at.set(x, cam.y, z);
+      const [, y] = spotAt(siteSpot(s, s.reader), this.h.bunker());
+      this.h.noise(x, z, s.heard, y ?? undefined);
+      if (s.quiet) continue;
+      _at.set(x, y ?? cam.y, z);
       audio.alarm(_at, _at.distanceTo(cam), true);
-      this.h.noise(x, z, s.heard);
     }
   }
 

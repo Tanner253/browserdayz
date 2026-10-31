@@ -372,6 +372,37 @@ export function forge(m: MenuScenes): Vignette | null {
  * Down the river through the Red Canyon in the low sun, the walls going by on both sides. (Not Kalat, which is a town of
  * far-off blocks until somebody walks up to it: src/world/ruins.ts. The canyon is all ground, and always drawn whole.)
  */
+export function kupol(m: MenuScenes): Vignette | null {
+  const seconds = 9;
+  return {
+    caption: 'The Kupol · three breakers, then hold it for twelve minutes',
+    seconds,
+    hour: EVENING,
+    setup: () => {},
+    tick: () => {},
+    view: (t) => {
+      const a = 2.3 + (t / seconds) * 0.5, p = V(720 + Math.sin(a) * 58, 233, -540 + Math.cos(a) * 58);
+      return m.lens(p, V(720, 226, -540), 46, 0.12);
+    },
+  };
+}
+
+/** Stolovaya on its mesa, from the lane up to the strong room. */
+export function mesa(m: MenuScenes): Vignette | null {
+  const seconds = 9;
+  return {
+    caption: 'Stolovaya · a blue pass, a siren, four minutes of infected',
+    seconds,
+    hour: EVENING,
+    setup: () => {},
+    tick: () => {},
+    view: (t) => {
+      const k = t / seconds;
+      return m.lens(V(mix(-2640, -2600, k), mix(62, 52, k), mix(392, 372, k)), V(-2556, 41, 366), 44, 0.12);
+    },
+  };
+}
+
 export function canyon(m: MenuScenes): Vignette | null {
   const pts = (m.h.world.water?.rivers ?? []).flatMap((r) => r.pts).filter((p) => p[0] > -2420 && p[0] < -2120).sort((p, q) => p[0] - q[0]), seconds = 9.5;
   if (pts.length < 4) return m.no('canyon', 'no river through the canyon on this map');

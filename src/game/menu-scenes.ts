@@ -61,7 +61,7 @@ import { infectedMoves } from './infected-moves';
 import { infectedLook } from './infected-look';
 import type { Stash } from './loot';
 import { menuOrder, recall, remember, visit, type SceneRow } from './menu-order';
-import { bearCharge, canyon, forge, fortFlight, raid, sawLogs, wolfPack } from './menu-scenes-new';
+import { bearCharge, canyon, forge, fortFlight, kupol, mesa, raid, sawLogs, wolfPack } from './menu-scenes-new';
 import { DAY } from '../sim/daynight';
 import type { Base28 } from '../trailer/base28';
 
@@ -1594,6 +1594,8 @@ export class MenuScenes {
     { id: 'cells', added: '2026-10-12', phone: false, make: (m) => m.cells() },
     { id: 'deagle', added: '2026-10-09', phone: true, make: (m) => m.sidearm() },
     { id: 'campfire', added: '2026-10-09', phone: true, make: (m) => m.campfire() },
+    { id: 'kupol', added: '2026-10-31', phone: false, make: kupol },
+    { id: 'mesa', added: '2026-10-31', phone: false, make: mesa },
     { id: 'canyon', added: '2026-10-17', phone: false, make: canyon },
     { id: 'stand', added: '2026-10-08', phone: true, make: (m) => m.stand() },
     { id: 'bear', added: '2026-10-24', phone: false, make: bearCharge },

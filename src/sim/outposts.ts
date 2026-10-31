@@ -189,7 +189,7 @@ const THINGS: Record<string, TownThing[]> = {
   Bolotnaya: [
     // the works of the pumps, and the reader by the door. A valve's wheel is its +z: each looks in at the pump house; the reader's panel, its +x, looks south
     { kind: 'card_reader', x: 12, z: -10.6, rot: -Q },
-    { kind: 'valve_stand', x: -24, z: 12, rot: 2.17 }, { kind: 'valve_stand', x: 8, z: 16, rot: 2.94 }, { kind: 'valve_stand', x: 0, z: -24, rot: 0.95 },
+    { kind: 'valve_stand', x: -24, z: 8, rot: 2.09 }, { kind: 'valve_stand', x: 8, z: 16, rot: 2.94 }, { kind: 'valve_stand', x: 0, z: -24, rot: 0.95 },
     { kind: 'Barrel_01', x: 19, z: -9, rot: 0 }, { kind: 'barrel_03', x: 20.2, z: -9.6, rot: 0.3 }, { kind: 'portable_generator', x: 8, z: -17, rot: 0.8 }, { kind: 'concrete_road_barrier', x: 7, z: -8, rot: 0.1 },
   ],
   Kupol: [

@@ -459,6 +459,8 @@ export const dropsMethods = {
     const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
     const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
     // (a torch in the hands is lit with L itself: src/game/building/torches.ts)
+    // (N is an admin's no-clip in their own mode: frame.ts)
+    this.goggles.update(free && this.role !== 'admin' && this.input.pressed('KeyN'), this.inv.count('night_vision') > 0, (text) => this.hud.note(text, 'info'));
     if (free && this.input.pressed('KeyL') && this.inv.held()?.id !== 'torch') {
       if (this.garage.ride) this.hud.note('It lights its own lamps while somebody drives', 'warn');
       else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');
@@ -527,7 +529,7 @@ export const dropsMethods = {
     }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
-    this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 9));
+    this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.9, 13));
     // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
     // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace
     // (a fire basket's light unless the fort says otherwise: its floodlights are white, the wash under its mast red)
@@ -537,12 +539,12 @@ export const dropsMethods = {
     // the basements: the bulbs near the eye, and the dark down them
     this.cellars.update(cam.position, this.lamps);
     const { x: cx, y: cy, z: cz } = cam.position;
-    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cx, cy, cz) * (this.bunker.power && levelAt(cy - (this.bunker.place?.y ?? 0)) === 2 ? 0.86 : 1), inMine(cx, cy, cz) ? 1 : 0, castleDark(this.s.world.castle, cx, cy, cz, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cx, cy, cz), ...this.darkBeside.map((d) => d(cx, cy, cz)));
+    const under = this.nightSight || this.goggles.on ? 0 : Math.max(bunkerDark(this.bunker.place, cx, cy, cz) * (this.bunker.power && levelAt(cy - (this.bunker.place?.y ?? 0)) === 2 ? 0.86 : 1), inMine(cx, cy, cz) ? 0.97 : 0, castleDark(this.s.world.castle, cx, cy, cz, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cx, cy, cz), ...this.darkBeside.map((d) => d(cx, cy, cz)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
     // well so i can see in the dark without flashlight", 2026-10-13. Under a roof the day's light is the little
     // that comes in at the windows: a light from nowhere is added there, eased in and out at the door.)
-    const fill = this.nightSight && this.started ? (this.indoors ? NIGHT_SIGHT.indoors : NIGHT_SIGHT.outdoors) : 0;
+    const fill = (this.nightSight || this.goggles.on) && this.started ? (this.indoors ? NIGHT_SIGHT.indoors : NIGHT_SIGHT.outdoors) : 0;
     atmo.fill.intensity += (fill - atmo.fill.intensity) * Math.min(1, dt * 6);
     this.lamps.update(cam, dt);
     this.weapons.lampSpill.copy(this.lamps.spill);
