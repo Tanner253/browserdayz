@@ -26,6 +26,16 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
+- **LANGUAGE 2026-10-30, on battle-royale, NOT deployed (PROTOCOL 78)**: Settings > Game > Language (en es pt ru de fr tr zh), the
+  browser's language by default, `?lang=es` to try one. Interface text: catalogs English -> theirs in `src/i18n/lang/*.json`, met
+  on the page by `src/i18n/index.ts` (a MutationObserver, none at all in English), so a new string is a line per catalog
+  and no code; `node scripts/i18n.mjs check` shows coverage. About 970 strings a language are done by hand, everything a player
+  meets first; the long tail (item descriptions, rare prompts) shows English until `TRANSLATE_API_KEY=... node scripts/i18n.mjs fill`,
+  cents a language. Chat: `src/sim/chat-translate.ts` on the game server (and the arena's), Claude Haiku 5.5, about $0.04 a thousand
+  lines, one call per line for all its languages, cached by line and language, 450 ms at most before a line goes as typed and
+  its translation follows ('chatx'), ceilings TRANSLATE_PER_DAY (5000 calls) and 15 a player a minute. With no key everybody reads
+  what was typed. The key goes on RENDER, not Vercel: env var `TRANSLATE_API_KEY` on the game server service (and on zona-arena
+  for arena and battle royale chat); never tried against the real API yet, so try one line on the first key.
 - **ASKED 2026-10-27**: admins see every chat (others' Party and Proximity lines too), switched on and off in the admin
   panel. The owner hoped it was a page-only change, but the server sends party and proximity lines only to their own
   listeners, so the server has to copy them to admins who switched it on (server/handle.ts chat; a per-admin switch

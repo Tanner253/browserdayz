@@ -12,7 +12,7 @@ import type { KeyHints } from '../game/key-hints';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { LANGS, langOf } from '../sim/langs';
-import { lang, setLang, tr } from '../i18n';
+import { lang, onLang, setLang, tr } from '../i18n';
 import { PadBinds } from './pad-binds';
 import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
 import { GROUPS, audio, type Group, type Mix } from '../core/audio';
@@ -448,6 +448,7 @@ export class HUD {
     this.radial = new Radial({ rings: RINGS, per: WHEEL_RING, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
     this.root.insertBefore(this.radial.el, this.el.says.nextSibling);
     this.radial.set(wheelEntries(wheelSlots()));
+    onLang(() => this.radial.set(wheelEntries(wheelSlots())));
     // (set again in Emotes: the wedges drawn afresh)
     onWheelSlots((ids) => {
       this.radial.set(wheelEntries(ids));

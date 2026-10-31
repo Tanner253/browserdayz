@@ -38,7 +38,8 @@ function shaped(core: string) {
   for (const list of [shapes.get(core.slice(0, 3)), loose]) {
     for (const s of list ?? []) {
       const m = s.re.exec(core);
-      if (m) return s.to.replace(/\{(\d+)\}/g, (_, i) => exact.get(m[Number(i) + 1]) ?? m[Number(i) + 1]);
+      // (a part of a line may be a string of its own, an item's name: with what stands round it kept)
+      if (m) return s.to.replace(/\{(\d+)\}/g, (_, i) => render(m[Number(i) + 1] ?? ''));
     }
   }
   return undefined;
