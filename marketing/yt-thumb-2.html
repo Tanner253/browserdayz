@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>YouTube thumbnail B: the game itself</title>
+<!-- 1280x720: node scripts/card.mjs yt-thumb-2 1280 720. For the viewer who only wants a good free game: no AI in
+     it. Background: a real frame of the game (the woods, a flare's smoke, a player with a rifle). -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: #0c0d0b; }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; text-transform: uppercase; color: #fff; }
+  .shot { position: absolute; inset: 0; background: url('src-x-perf-1021.png') 30% center/cover; filter: contrast(1.2) saturate(1.3) brightness(1.08); }
+  .shade { position: absolute; inset: 0; background: linear-gradient(270deg, rgba(5,6,4,.9) 0%, rgba(5,6,4,.55) 40%, rgba(5,6,4,0) 65%), linear-gradient(0deg, rgba(5,6,4,.6) 0%, rgba(5,6,4,0) 30%); }
+  .txt { position: absolute; right: 54px; top: 92px; text-align: right; }
+  .txt h1 { font-size: 150px; font-weight: 800; line-height: .86; text-shadow: 0 6px 0 #000, 0 12px 40px rgba(0,0,0,.9); }
+  .txt h1 em { font-style: normal; color: #ff7a4a; }
+  .txt p { margin-top: 22px; font-size: 46px; font-weight: 800; letter-spacing: .06em; color: #ffd35a; text-shadow: 0 4px 0 #000; }
+  .tag { position: absolute; right: 54px; bottom: 52px; padding: 10px 20px; border: 4px solid #9fe08a; color: #9fe08a; font-size: 38px; font-weight: 800; letter-spacing: .1em; background: rgba(5,6,4,.7); }
+  .logo { position: absolute; left: 44px; top: 36px; font-size: 54px; font-weight: 800; letter-spacing: .22em; text-shadow: 0 4px 18px #000; }
+</style></head><body>
+  <div class="shot"></div><div class="shade"></div>
+  <div class="logo">ZONA</div>
+  <div class="txt"><h1>Loot.<br>Fight.<br><em>Survive.</em></h1><p>Free in your browser</p></div>
+  <div class="tag">No download</div>
+</body></html>

@@ -173,12 +173,14 @@ export function bunkerPlan(level = 1): Plan {
 
 /** what is searched is told by where it stands on the map, whatever level it is on: nothing on a level stands right under something on the one above */
 function apart(plan: Plan, level: number) {
-  const searched = (p: Plan) => [...p.made.filter((m) => SEARCHED[m.kind]), ...p.stood.filter((s) => SEARCHED[s.id])];
-  const used = new Set<string>();
-  for (let l = 1; l < level; l++) for (const t of searched(bunkerPlan(l))) used.add(`${t.r},${t.f}`);
+  // (all that stands, a crate being a prop as much as a locker is: only the pipes on the walls stay put, and nobody searches those)
+  const searched = (p: Plan) => [...p.made.filter((m) => SEARCHED[m.kind]), ...p.stood.filter((s) => s.id !== 'bunker_pipes')];
+  // (a name is the place to a tenth of a metre, rounded: two things a hand apart can have one, so they are kept further apart than that)
+  const used: { r: number; f: number }[] = [];
+  for (let l = 1; l < level; l++) used.push(...searched(bunkerPlan(l)));
   for (const t of searched(plan)) {
-    while (used.has(`${t.r},${t.f}`)) t.r += 0.15;
-    used.add(`${t.r},${t.f}`);
+    while (used.some((u) => Math.hypot(u.r - t.r, u.f - t.f) < 0.35)) t.r += 0.2;
+    used.push(t);
   }
   return plan;
 }

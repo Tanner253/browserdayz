@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: how chat is translated</title>
+<!-- How chat translation works and how to set it, an X card, 1600x900. Rendered by: node scripts/card.mjs x-translate 1600 900
+     Every claim is src/sim/chat-translate.ts: 450 ms at most (WAIT_MS), one call for all a line's languages, remembered by line and language.
+     The language buttons are the game's own (progress/i18n/shots), and read the same in every language. -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --panel: #171814; --line: rgba(243, 239, 230, 0.2); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); pointer-events: none; z-index: 3; }
+  .logo { position: absolute; left: 60px; top: 42px; font-size: 38px; font-weight: 700; letter-spacing: 0.18em; line-height: 1; }
+  .site { position: absolute; right: 60px; top: 50px; font-size: 22px; font-weight: 600; letter-spacing: 0.1em; color: var(--gold); }
+  h1 { position: absolute; left: 60px; top: 92px; font-size: 72px; font-weight: 700; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; }
+  h1 em { font-style: normal; color: var(--gold); }
+  svg { position: absolute; inset: 0; z-index: 1; }
+  .box { position: absolute; z-index: 2; padding: 30px 22px 16px 24px; background: var(--panel); border: 1px solid var(--line); }
+  .box b { display: block; font-size: 33px; font-weight: 700; line-height: 1.05; text-transform: uppercase; letter-spacing: 0.03em; }
+  .box p { margin-top: 8px; font-size: 24px; font-weight: 500; line-height: 1.2; color: var(--dim); }
+  .n { position: absolute; left: -15px; top: -15px; width: 38px; height: 38px; display: grid; place-items: center; font-size: 25px; font-weight: 700; color: #141109; background: var(--gold); }
+  .you { left: 60px; top: 300px; width: 340px; height: 246px; }
+  .said { margin-top: 14px; padding: 12px 16px; font-size: 32px; font-weight: 600; line-height: 1.15; background: #0c0d0b; border-left: 4px solid var(--gold); }
+  .server { left: 472px; top: 210px; width: 330px; height: 190px; }
+  .ai { left: 472px; top: 456px; width: 330px; height: 190px; }
+  .ai small { display: block; margin-top: 8px; font-size: 20px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
+  .out { position: absolute; z-index: 2; left: 880px; top: 200px; width: 660px; }
+  .out h2 { position: relative; height: 36px; margin-bottom: 4px; padding-left: 50px; font-size: 33px; font-weight: 700; line-height: 36px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .out h2 .n { left: 0; top: -1px; }
+  .row { display: flex; align-items: center; gap: 14px; height: 52px; margin-top: 6px; padding: 0 16px; background: var(--panel); border: 1px solid var(--line); font-size: 27px; font-weight: 500; white-space: nowrap; }
+  .row i { flex: none; width: 48px; font-style: normal; font-size: 23px; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); }
+  .how { position: absolute; z-index: 2; left: 60px; top: 672px; width: 1480px; height: 112px; display: flex; align-items: center; gap: 14px; padding-right: 22px; background: var(--panel); border: 2px solid var(--gold); }
+  .how .lab { align-self: stretch; width: 204px; margin-right: 10px; display: flex; align-items: center; padding: 0 20px; background: var(--gold); color: #141109; font-size: 33px; font-weight: 700; line-height: 1; text-transform: uppercase; }
+  .how .step { padding: 10px 14px; font-size: 27px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; background: #0c0d0b; border: 1px solid var(--line); }
+  .how .gt { font-size: 32px; font-weight: 700; color: var(--gold); }
+  .how .pick { flex: none; margin-left: auto; width: 494px; height: 68px; background: #0c0d0b url('../progress/i18n/shots/lang-settings-ru.png') no-repeat; background-size: 1680px auto; background-position: -1108px -215px; }
+  .foot { position: absolute; left: 60px; right: 60px; bottom: 38px; z-index: 2; display: flex; justify-content: space-between; font-size: 24px; font-weight: 500; color: var(--dim); }
+  .foot b { color: var(--ink); font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="logo">ZONA</div>
+  <div class="site">@zonaSOL_ &nbsp;·&nbsp; ZONAPVP.FUN</div>
+  <h1>One chat. <em>Everyone's language.</em></h1>
+
+  <svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" aria-hidden="true">
+    <defs>
+      <marker id="tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ffd35a"/></marker>
+    </defs>
+    <g stroke="#ffd35a" stroke-width="3">
+      <path d="M400 390 L466 335" marker-end="url(#tip)"/>
+      <path d="M600 400 L600 450" marker-end="url(#tip)"/>
+      <path d="M680 456 L680 406" marker-end="url(#tip)"/>
+    </g>
+    <g stroke="#ffd35a" stroke-width="2.4" opacity="0.8">
+      <path d="M802 305 L876 272" marker-end="url(#tip)"/>
+      <path d="M802 305 L876 330" marker-end="url(#tip)"/>
+      <path d="M802 305 L876 388" marker-end="url(#tip)"/>
+      <path d="M802 305 L876 446" marker-end="url(#tip)"/>
+      <path d="M802 305 L876 504" marker-end="url(#tip)"/>
+      <path d="M802 305 L876 562" marker-end="url(#tip)"/>
+      <path d="M802 305 L876 620" marker-end="url(#tip)"/>
+    </g>
+  </svg>
+
+  <div class="box you"><span class="n">1</span><b>You type</b><p>In any language</p><div class="said">two guys camping the hospital roof</div></div>
+  <div class="box server"><span class="n">2</span><b>The server</b><p>Knows what each player reads. A line they can already read goes straight out.</p></div>
+  <div class="box ai"><span class="n">3</span><b>The translator</b><p>One call for every language needed, then remembered.</p><small>AI: Claude Haiku</small></div>
+
+  <div class="out">
+    <h2><span class="n">4</span>Each player reads it in theirs</h2>
+    <div class="row"><i>ES</i>dos tipos campeando en el techo del hospital</div>
+    <div class="row"><i>PT</i>dois caras campando no telhado do hospital</div>
+    <div class="row"><i>RU</i>двое кемперят на крыше больницы</div>
+    <div class="row"><i>DE</i>zwei Typen campen auf dem Krankenhausdach</div>
+    <div class="row"><i>FR</i>deux gars campent sur le toit de l'hôpital</div>
+    <div class="row"><i>TR</i>hastanenin çatısında iki kişi kamp yapıyor</div>
+    <div class="row"><i>ZH</i>医院楼顶有两个人在蹲点</div>
+  </div>
+
+  <div class="how">
+    <div class="lab">Set your language</div>
+    <span class="step">Esc twice</span><span class="gt">›</span><span class="step">Settings</span><span class="gt">›</span><span class="step">Game</span><span class="gt">›</span><span class="step">Language</span>
+    <div class="pick"></div>
+  </div>
+
+  <div class="foot"><span><b>450 ms at most</b>, then it goes as typed and the translation follows</span><span><b>Click a line</b> to see what they typed</span><span><b>Starts</b> in your browser's language</span></div>
+</body>
+</html>

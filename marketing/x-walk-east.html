@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: start on the coast, walk east</title>
+<!-- An X card, 1600x900 (2026-10-19, marketing/plan-x-media.html). Rendered to marketing/zona-x-walk-east.png by:
+     node scripts/card.mjs x-walk-east 1600 900
+     The picture is the game's own map (M) at dusk, from film 21 (src/trailer/shots21.ts, the map shot), cropped to the
+     sheet. Every word is the game's: new lives start on the far west beach (src/world/worldgen/coast-starts.ts); the map's
+     line "The loot is worse in the west and better to the east: the coast is tier 1, the bunker tier 5" (src/ui/bigmap.ts);
+     the tiers' colours and where each is, the first words of each `where` (src/sim/tiers.ts TIERS). -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #1a1c18, var(--dark) 70%); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .logo { position: absolute; left: 64px; top: 50px; font-size: 40px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; }
+  .logo small { display: block; margin-top: 7px; font-size: 12px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  h1 { position: absolute; left: 290px; top: 48px; font-size: 56px; font-weight: 700; line-height: 0.95; letter-spacing: 0.03em; white-space: nowrap; }
+  h1 em { font-style: normal; color: var(--gold); }
+  .sub { position: absolute; left: 290px; top: 110px; font-size: 22px; font-weight: 500; letter-spacing: 0.02em; text-transform: none; color: var(--dim); }
+  .map { position: absolute; left: 64px; top: 162px; width: 1472px; height: 562px; background: url('src-x-map.jpg') no-repeat center / cover; border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6); }
+  .tiers { position: absolute; left: 64px; top: 742px; width: 1472px; display: grid; grid-template-columns: auto repeat(5, 1fr) auto; gap: 10px; align-items: stretch; }
+  .way { display: flex; align-items: center; font-size: 20px; font-weight: 700; letter-spacing: 0.24em; color: var(--dim); }
+  .t { padding: 10px 14px 12px; background: rgba(12, 13, 11, 0.85); border: 1px solid var(--line); border-top: 6px solid var(--c); }
+  .t b { display: block; font-size: 22px; font-weight: 700; letter-spacing: 0.08em; color: var(--c); }
+  .t span { display: block; margin-top: 3px; font-size: 16px; font-weight: 500; line-height: 1.2; text-transform: none; color: var(--dim); }
+  .foot { position: absolute; right: 64px; top: 58px; display: flex; gap: 28px; font-size: 18px; font-weight: 600; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival</small></div>
+  <h1>Start on the coast. <em>Walk east.</em></h1>
+  <div class="sub">Every new life starts on the far west beach. The loot is worse in the west and better to the east.</div>
+  <div class="foot"><span>X <b>@zonaSOL_</b></span><span><b>ZONAPVP.FUN</b></span></div>
+  <div class="map"></div>
+  <div class="tiers">
+    <div class="way">West</div>
+    <div class="t" style="--c:#cfc9ba"><b>Tier 1</b><span>The west coast and the desert</span></div>
+    <div class="t" style="--c:#7fd4a0"><b>Tier 2</b><span>Kalat, Zavod, Pokrov, Blokpost</span></div>
+    <div class="t" style="--c:#6db3ff"><b>Tier 3</b><span>The pass, Lipki, Mokroye, Ozerki, Zastava</span></div>
+    <div class="t" style="--c:#c58cff"><b>Tier 4</b><span>The Chemical Works, under the gas</span></div>
+    <div class="t" style="--c:#ffd35a"><b>Tier 5</b><span>Bunker 17, and the fort Orlinoye</span></div>
+    <div class="way">East &#8594;</div>
+  </div>
+</body>
+</html>

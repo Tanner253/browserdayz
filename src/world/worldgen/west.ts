@@ -10,6 +10,7 @@
 // At the seam it is the square's own ground carried on (the same valley noise, and its rim where it is kept), and the
 // square's last column met exactly, so there is no step and no crease.
 
+import { BOLOTNAYA } from '../../sim/outposts';
 import { Simplex, clamp, hash2, lerp, smoothstep } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
 import { MOKROYE } from '../../sim/mokroye';
@@ -598,7 +599,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
         // about them: thickets on the hummocks and islands, thin between, ferns under them; drowned trunks and stumps in
         // the water. The owner's review: "reeds and cattails in clumps ... dead and drowned trees, bushes and grassy
         // hummocks". The reeds are the grass's own, grown tall: see reedsOf)
-        if (!hamletClear(hamlet, x, z)) continue;
+        if (!hamletClear(hamlet, x, z) || offPad(BOLOTNAYA, x, z) < 2) continue;
         const above = y - swamp, thicket = smoothstep(-0.15, 0.45, n3.noise(x * 0.019 + 3, z * 0.019 - 6));
         if (above < -0.05) {
           if (hv < 0.035) tools.props.push({ kind: 'dead_tree_trunk', x, y: y - 0.1, z, rot, scale: 0.9 + hz * 0.5 });

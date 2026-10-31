@@ -72,9 +72,11 @@ let checks = 0;
 const ok = (what: string) => { checks++; console.log(`  ok  ${what}`); };
 
 // --- the east half of today's map as it was (prints taken 2026-10-16 off f1d0ca0, the last tree with the square alone)
+// (but for the trees shrunk to nothing from the Kupol's yard and its siding, 2026-10-31: src/world/worldgen/generate.ts, they keep their numbers; and the
+// Kupol's own things and buildings, which were added to the end of each list. Its ground, paint and grass are to the byte what they were)
 const WAS = {
-  heights: 'e84eb63aae84e4a6', surface: '2d94c0e4a0819aa7', splat: 'cb750f3f74b54a53', grass: '2fca3323401c0679', trees: 'c70c152a660b373f', rocks: 'd9d17dfd2558a623',
-  props: '857fa1d1801cc1e7', buildings: '3f0394645ba713f3', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: 'c507af5c93c3db81',
+  heights: 'e84eb63aae84e4a6', surface: '2d94c0e4a0819aa7', splat: 'cb750f3f74b54a53', grass: '2fca3323401c0679', trees: '9fbaeed794168a1f', rocks: 'd9d17dfd2558a623',
+  props: 'aba54b3f492a4992', buildings: '6e662171cd901275', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: 'bff55bd5b927bcaa',
 };
 for (const [k, v] of Object.entries(WAS)) assert.equal(prints[k as keyof typeof prints], v, `the east's ${k} are not what they were`);
 ok(`the east of today's map as it was, to the byte (but within ${KEEP} m of where the bunker was): its ground, paint and grass, ${world.trees.filter(east).length} trees, ${world.rocks.filter(east).length} rocks, ${world.props.filter(east).length} props, ${world.buildings.filter(east).length} buildings, the roads, the fort, Kamenka (made in ${made.toFixed(0)} ms)`);
@@ -292,7 +294,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
 {
   const towns = world.towns!;
   // (the desert's first, since 2026-10-18: src/sim/desert.ts; and those laid later last, since 2026-10-23: LATER_TOWNS)
-  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon']);
+  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon', 'Gorodok', 'Stolovaya', 'Bolotnaya', 'Kupol', 'Kupol Siding', 'Old Mine', 'Old Mine East']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
@@ -301,7 +303,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
     const planted = townTrees(town).map(([, lx, lz]) => townPoint(town, lx, lz));
     // (the swamp's hamlet is no pad since 2026-10-23: the swamp's bushes grow in it, but none at a house, on a boardwalk or by a thing)
     const hamlet = (town.part ?? town.name) === 'Mokroye', mok = towns.find((p) => p.town.name === 'Mokroye')!.town;
-    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01) && (!hamlet || !hamletClear(mok, t.x, t.z)); });
+    // (what the way down's stops shrank to nothing stays on the list, to keep the numbers: src/world/worldgen/generate.ts)
+    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return t.scale > 0.02 && Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01) && (!hamlet || !hamletClear(mok, t.x, t.z)); });
     assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad${hamlet ? ' by its houses, walks or things' : ''}`);
     // (but in a hollow: Mokroye's barn stands sunk to the waist, as it was drawn up)
     for (const b of ids) {

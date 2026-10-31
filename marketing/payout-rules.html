@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: ten tags free</title>
+<!-- An X card, 1600x900. Rendered to marketing/zona-payout-rules.png by: node scripts/card.mjs payout-rules 1600 900
+     Every figure is the payouts' own (api/_lib/payouts.ts), as from 2026-10-22 05:35 UTC (the eighth cut-over): a tag pays
+     0.01 SOL, and 0.001 SOL more for every full 1,000,000 $ZONA its payout wallet holds, up to 0.025 SOL; five tags a wallet
+     in any 24 hours; past a wallet's (or a player's) first 10 paid tags, a tag is paid only while the wallet holds 350,000
+     $ZONA, waiting up to 12 hours for it (the owner, 2026-10-18: "make it clear that the first 10 tags pay for the minimum
+     requirement"). 350,000 $ZONA cost about 0.0997 SOL on 22 October (0.0000002848 SOL a coin, DexScreener, pumpswap);
+     ten tags pay at least 0.1 SOL. A tag is on a body after its owner has lived 20 minutes, and is cashed in after 30
+     minutes carried. -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --green: #9fe08a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .shot { position: absolute; inset: 0; background: url('src-drop-run.jpg') no-repeat; background-size: 1600px 900px; filter: contrast(1.06) saturate(1.1) brightness(0.9); }
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(90deg, rgba(8, 9, 7, 0.97) 0%, rgba(8, 9, 7, 0.9) 46%, rgba(8, 9, 7, 0.55) 100%),
+    linear-gradient(180deg, rgba(8, 9, 7, 0.4) 0%, rgba(8, 9, 7, 0) 30%, rgba(8, 9, 7, 0) 70%, rgba(8, 9, 7, 0.75) 100%); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+
+  .top { position: absolute; left: 64px; top: 54px; right: 64px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .logo { font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8); }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .live { padding: 9px 16px 10px; border: 1px solid rgba(255, 211, 90, 0.55); color: var(--gold); font-size: 18px; font-weight: 600; letter-spacing: 0.22em; background: rgba(12, 13, 11, 0.7); }
+
+  .head { position: absolute; left: 64px; top: 146px; width: 780px; }
+  .head h1 { font-size: 88px; font-weight: 700; line-height: 0.92; letter-spacing: 0.03em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head p { margin-top: 20px; font-size: 26px; font-weight: 500; line-height: 1.3; letter-spacing: 0.03em; text-transform: none; color: var(--dim); }
+  .head p b { color: var(--ink); font-weight: 700; }
+
+  .pays { position: absolute; left: 64px; top: 528px; width: 760px; padding: 22px 28px 20px; background: rgba(12, 13, 11, 0.86); border: 1px solid var(--line); border-left: 8px solid var(--green); }
+  .pays h3 { font-size: 30px; font-weight: 700; letter-spacing: 0.06em; color: var(--green); }
+  .pays .sum { display: flex; align-items: baseline; gap: 14px; margin-top: 8px; white-space: nowrap; font-size: 25px; font-weight: 600; letter-spacing: 0.04em; text-transform: none; color: var(--dim); }
+  .pays .sum b { font-size: 40px; color: var(--ink); letter-spacing: 0.02em; }
+  .pays .sum b.g { color: var(--gold); }
+  .pays small { display: block; margin-top: 6px; font-size: 17px; font-weight: 500; letter-spacing: 0.06em; text-transform: none; color: var(--dim); }
+
+  .facts { position: absolute; left: 64px; top: 742px; width: 760px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .fact { padding: 14px 18px 16px; background: rgba(12, 13, 11, 0.72); border: 1px solid var(--line); }
+  .fact label { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.28em; color: var(--dim); }
+  .fact div { margin-top: 6px; font-size: 29px; font-weight: 700; letter-spacing: 0.04em; }
+  .fact div span { color: var(--gold); }
+
+  .ladder { position: absolute; left: 878px; top: 146px; width: 658px; padding: 28px 34px 24px; background: rgba(12, 13, 11, 0.86); border: 1px solid var(--line); }
+  .ladder h2 { display: flex; justify-content: space-between; font-size: 20px; font-weight: 600; letter-spacing: 0.3em; color: var(--dim); }
+  .row { display: grid; grid-template-columns: 150px 1fr 140px; align-items: center; gap: 18px; margin-top: 18px; }
+  .row .held { font-size: 28px; font-weight: 700; letter-spacing: 0.04em; text-align: right; line-height: 1.05; }
+  .row .held small { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.2em; color: var(--dim); }
+  .bar { position: relative; height: 48px; background: rgba(243, 239, 230, 0.06); border: 1px solid rgba(243, 239, 230, 0.12); }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #b88a1d, var(--gold)); }
+  .bar b { position: absolute; left: 0; top: 0; bottom: 0; background: #8a8572; opacity: 0.85; }
+  .bar b.free { background: linear-gradient(90deg, #4f7a43, var(--green)); opacity: 0.9; }
+  .row .pay { font-size: 36px; font-weight: 700; letter-spacing: 0.02em; color: var(--gold); white-space: nowrap; }
+  .row .pay span { font-size: 0.5em; letter-spacing: 0.1em; margin-left: 4px; color: var(--ink); }
+  .row.flat .pay { color: var(--ink); }
+  .row.free .held, .row.free .pay { color: var(--green); }
+  .row.max .held, .row.max .pay { color: var(--gold); }
+  .tagmax { position: absolute; right: -2px; top: -12px; padding: 3px 9px 4px; background: var(--gold); color: #17140a; font-size: 13px; font-weight: 700; letter-spacing: 0.22em; }
+  .rule { margin-top: 18px; padding: 10px 14px; border: 1px dashed rgba(255, 211, 90, 0.5); font-size: 17px; font-weight: 600; letter-spacing: 0.12em; color: var(--gold); text-align: center; }
+  .key { display: flex; gap: 22px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 15px; font-weight: 600; letter-spacing: 0.14em; color: var(--dim); }
+  .key i { display: inline-block; width: 18px; height: 12px; margin-right: 8px; vertical-align: 1px; }
+
+  .foot { position: absolute; left: 878px; right: 64px; top: 742px; }
+  .foot .ca { padding: 12px 18px 14px; background: rgba(12, 13, 11, 0.84); border: 1px solid var(--line); }
+  .foot .ca label { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.38em; color: var(--dim); }
+  .foot .ca code { display: block; margin-top: 5px; font-family: 'Cascadia Mono', 'Consolas', monospace; font-stretch: normal; font-size: 22px; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+  .foot .links { display: flex; justify-content: space-between; margin-top: 14px; font-size: 21px; font-weight: 600; letter-spacing: 0.1em; color: var(--dim); text-transform: none; }
+  .foot .links b { color: var(--ink); letter-spacing: 0.14em; text-transform: uppercase; }
+  .foot svg { width: 18px; height: 18px; margin: -3px 8px 0 0; vertical-align: middle; }
+</style>
+</head>
+<body>
+  <div class="shot"></div>
+  <div class="shade"></div>
+  <div class="frame"></div>
+
+  <div class="top">
+    <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+    <div class="live">Live now</div>
+  </div>
+
+  <div class="head">
+    <h1>10 tags <em>free</em>.<br>Then hold<br><em>350K $ZONA</em>.</h1>
+    <p>Your first <b>10 dog tags</b> pay SOL with no coin needed. After them, a tag is paid only while your payout wallet holds <b>350,000 $ZONA</b>. Hold more and every tag pays more, up to <b>0.025 SOL</b>.</p>
+  </div>
+
+  <div class="pays">
+    <h3>Your first 10 tags pay for the 350K</h3>
+    <div class="sum"><span>Your first 10 tags pay</span><b class="g">0.1 SOL</b><span>(10 × 0.01)</span></div>
+    <div class="sum"><span>350,000 $ZONA costs about</span><b>0.10 SOL</b></div>
+    <small>At 0.000000285 SOL a coin on 22 October (DexScreener).</small>
+  </div>
+
+  <div class="facts">
+    <div class="fact"><label>A tag drops after</label><div><span>20</span> min alive</div></div>
+    <div class="fact"><label>Cashed in after</label><div><span>30</span> min carried</div></div>
+    <div class="fact"><label>Per wallet</label><div><span>5</span> tags · 24 h</div></div>
+  </div>
+
+  <div class="ladder">
+    <h2><span>$ZONA held</span><span>a tag pays</span></h2>
+    <div class="row free"><div class="held">First 10<small>no coin needed</small></div><div class="bar"><b class="free" style="width:40%"></b></div><div class="pay">0.010<span>SOL</span></div></div>
+    <div class="row flat"><div class="held">350K<small>needed after 10</small></div><div class="bar"><b style="width:40%"></b></div><div class="pay">0.010<span>SOL</span></div></div>
+    <div class="row"><div class="held">1M</div><div class="bar"><i style="width:44%"></i><b style="width:40%"></b></div><div class="pay">0.011<span>SOL</span></div></div>
+    <div class="row"><div class="held">5M</div><div class="bar"><i style="width:60%"></i><b style="width:40%"></b></div><div class="pay">0.015<span>SOL</span></div></div>
+    <div class="row"><div class="held">10M</div><div class="bar"><i style="width:80%"></i><b style="width:40%"></b></div><div class="pay">0.020<span>SOL</span></div></div>
+    <div class="row max"><div class="held">15M+</div><div class="bar"><i style="width:100%"></i><b style="width:40%"></b><span class="tagmax">Max</span></div><div class="pay">0.025<span>SOL</span></div></div>
+    <div class="rule">Under 350K after your first 10 tags: the tag waits 12 hours for you to hold it</div>
+    <div class="key"><span><i style="background:var(--green)"></i>Free tags</span><span><i style="background:#8a8572"></i>Base pay</span><span><i style="background:var(--gold)"></i>Holder bonus</span><span style="margin-left:auto;text-transform:none;letter-spacing:0.04em">Counted per full million</span></div>
+  </div>
+
+  <div class="foot">
+    <div class="ca"><label>$ZONA · contract</label><code>GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump</code></div>
+    <div class="links"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.9L6.3 22H3.2l7.3-8.3L.8 2h6.4l4.5 6.3L18.9 2zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20z"/></svg>@zonaSOL_</span><span>Every payment listed: <b>zonapvp.fun/payouts</b></span></div>
+  </div>
+</body>
+</html>

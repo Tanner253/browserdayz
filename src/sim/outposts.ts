@@ -47,7 +47,7 @@ export const STOLOVAYA: Town = { name: 'Stolovaya', x: -2580, z: 380, pad: [46, 
 // (the way down's other stops, on the ground as it lies. Each mine portal is turned to look straight out of the rock it stands against:
 // the ground's own fall there; the siding runs along the contour)
 export const BOLOTNAYA: Town = { name: 'Bolotnaya', x: -1950, z: 650, pad: [40, 30], rot: 0, asIs: true };
-export const KUPOL: Town = { name: 'Kupol', x: 720, z: -540, pad: [30, 30], rot: 0, asIs: true };
+export const KUPOL: Town = { name: 'Kupol', x: 720, z: -540, pad: [25, 25], rot: 0, asIs: true };
 export const SIDING: Town = { name: 'Kupol Siding', x: 708, z: -474, pad: [20, 8], rot: -0.873, asIs: true };
 export const MINE_W: Town = { name: 'Old Mine', x: -2389, z: 540, pad: [8, 8], rot: 2.53, asIs: true };
 export const MINE_E: Town = { name: 'Old Mine East', x: -2104.5, z: 540, pad: [8, 8], rot: -0.478, asIs: true };
@@ -91,9 +91,8 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     { type: 'barn_sunk', x: -26, z: -16, rot: 0.3, up: 3.3 },
   ],
   Kupol: [
-    // (the crew's strong room, its door to the dome and the reader by it; a hut for the watch)
+    // (the crew's strong room, its door to the dome and the reader by it: on the one flat of the ridge)
     { type: 'guardpost', x: -12, z: 14, rot: S, up: 6.4 },
-    { type: 'hut', x: 6, z: 30, rot: S },
   ],
   'Kupol Siding': [],
   'Old Mine': [],

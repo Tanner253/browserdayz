@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: bots don't get paid</title>
+<!-- An X card, 1600x900 (2026-10-19, marketing/plan-x-media.html). Rendered to marketing/zona-x-bots.png by:
+     node scripts/card.mjs x-bots 1600 900
+     The picture is the bot check as the game shows it (public/changelog/media/botcheck-course-start.jpg). The words are
+     the game's and the payouts' own: everybody is put through the bot check before they are let in (src/game/botcheck.ts,
+     "Bring down all ... figures"); the rule is word for word marketing/payout-rules.html (api/_lib/payouts.ts freeTags 10,
+     holdMin 100,000). -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --green: #9fe08a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .shot { position: absolute; inset: 0; background: url('../public/changelog/media/botcheck-course-start.jpg') no-repeat; background-size: 1600px 900px; background-position: 160px 0; filter: contrast(1.05) saturate(1.05); }
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(90deg, rgba(8, 9, 7, 0.97) 0%, rgba(8, 9, 7, 0.9) 40%, rgba(8, 9, 7, 0.25) 70%, rgba(8, 9, 7, 0) 100%),
+    linear-gradient(180deg, rgba(8, 9, 7, 0.35) 0%, rgba(8, 9, 7, 0) 26%, rgba(8, 9, 7, 0) 72%, rgba(8, 9, 7, 0.7) 100%); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .logo { position: absolute; left: 64px; top: 54px; font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8); }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .head { position: absolute; left: 64px; top: 176px; width: 700px; }
+  .head i { display: inline-block; padding: 6px 14px; font-style: normal; font-size: 18px; font-weight: 700; letter-spacing: 0.26em; color: #141109; background: var(--gold); }
+  .head h1 { margin-top: 20px; font-size: 104px; font-weight: 700; line-height: 0.9; letter-spacing: 0.03em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head p { margin-top: 24px; font-size: 27px; font-weight: 500; line-height: 1.32; letter-spacing: 0.02em; text-transform: none; color: var(--dim); }
+  .head p b { color: var(--ink); font-weight: 700; }
+  .rule { position: absolute; left: 64px; top: 600px; width: 700px; padding: 20px 26px 20px; background: rgba(12, 13, 11, 0.86); border: 1px solid var(--line); border-left: 8px solid var(--green); }
+  .rule h3 { font-size: 30px; font-weight: 700; letter-spacing: 0.06em; color: var(--green); }
+  .rule p { margin-top: 8px; font-size: 22px; font-weight: 500; line-height: 1.3; text-transform: none; color: var(--dim); }
+  .rule p b { color: var(--ink); }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 50px; display: flex; justify-content: space-between; font-size: 19px; font-weight: 600; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="shot"></div><div class="shade"></div><div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+  <div class="head">
+    <i>At the door</i>
+    <h1>Bots don't<br><em>get paid</em></h1>
+    <p>Before anybody is let in, a <b>bot check</b>: bring down every figure in the yard, sights held on each before you fire.</p>
+  </div>
+  <div class="rule">
+    <h3>Then the rule for dog tags</h3>
+    <p>Your <b>first 10</b> dog tags pay SOL with no coin needed. After them, a tag is paid only while your payout wallet holds <b>100,000 $ZONA</b>.</p>
+  </div>
+  <div class="foot"><span>X <b>@zonaSOL_</b></span><span><b>ZONAPVP.FUN</b></span></div>
+</body>
+</html>

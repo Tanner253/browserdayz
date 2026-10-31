@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: your language</title>
+<!-- The update of 2026-10-30: the changelog's picture and an X card, 1600x900. Rendered by: node scripts/card.mjs update-1030 1600 900
+     Every picture is the game's own (progress/i18n/shots). -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); pointer-events: none; z-index: 3; }
+  .logo { position: absolute; left: 64px; top: 54px; font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .head { position: absolute; left: 64px; top: 176px; width: 560px; }
+  .head i { display: inline-block; padding: 6px 14px; font-style: normal; font-size: 18px; font-weight: 700; letter-spacing: 0.26em; color: #141109; background: var(--gold); }
+  .head h1 { margin-top: 20px; font-size: 96px; font-weight: 700; line-height: 0.9; letter-spacing: 0.03em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head ul { margin-top: 26px; list-style: none; }
+  .head li { margin-top: 10px; padding-left: 22px; position: relative; font-size: 23px; font-weight: 500; line-height: 1.25; text-transform: none; color: var(--dim); }
+  .head li::before { content: ''; position: absolute; left: 0; top: 11px; width: 10px; height: 10px; background: var(--gold); }
+  .head li b { color: var(--ink); font-weight: 700; }
+  .t { position: absolute; overflow: hidden; border: 1px solid var(--line); background: #1a1b18 no-repeat; }
+  .settings { right: 48px; top: 48px; width: 900px; height: 340px; background-image: url('../progress/i18n/shots/lang-settings-ru.png'); background-size: 1756px auto; background-position: -812px -93px; }
+  .wheel { left: 652px; top: 400px; width: 444px; height: 428px; background-image: url('../progress/i18n/shots/lang-wheel-es.png'); background-size: 1366px auto; background-position: -461px -164px; }
+  .names { left: 1108px; top: 400px; width: 444px; height: 428px; display: flex; flex-direction: column; justify-content: center; padding: 0 34px; gap: 9px; font-size: 32px; font-weight: 700; letter-spacing: 0.04em; text-transform: none; line-height: 1.1; }
+  .names b { color: var(--gold); font-weight: 700; }
+  .foot { position: absolute; left: 64px; bottom: 50px; width: 560px; display: flex; justify-content: space-between; font-size: 19px; font-weight: 600; letter-spacing: 0.1em; }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+  <div class="head">
+    <i>Update · 30 Oct</i>
+    <h1>Your<br><em>language.</em></h1>
+    <ul>
+      <li><b>Eight languages</b> in Settings, on the Game tab</li>
+      <li><b>Chat comes to you in yours</b>, whatever it was typed in</li>
+      <li><b>Changes at once</b>, with nothing reloaded</li>
+    </ul>
+  </div>
+  <div class="t settings"></div>
+  <div class="t wheel"></div>
+  <div class="t names"><span>English</span><span><b>Español</b></span><span>Português (Brasil)</span><span><b>Русский</b></span><span>Deutsch</span><span><b>Français</b></span><span>Türkçe</span><span><b>简体中文</b></span></div>
+  <div class="foot"><span>X <b>@zonaSOL_</b></span><span><b>ZONAPVP.FUN</b></span></div>
+</body>
+</html>

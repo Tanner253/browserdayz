@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>YouTube thumbnail C: one dev and AI</title>
+<!-- 1280x720: node scripts/card.mjs yt-thumb-3 1280 720. The middle ground: the maker's story, with the game as the
+     proof. Left, lines of the game's own code (src/game/player.ts); right, a real frame of the game (the canyon). -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: #0c0d0b; }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; text-transform: uppercase; color: #fff; }
+  .code { position: absolute; left: 0; top: 0; bottom: 0; width: 520px; background: #0d1117; padding: 46px 34px; font: 600 19px/1.55 Consolas, 'Courier New', monospace; text-transform: none; color: #6e7d8f; overflow: hidden; }
+  .code b { color: #ff7b72; font-weight: 600; } .code i { color: #79c0ff; font-style: normal; } .code u { color: #a5d6ff; text-decoration: none; }
+  .shot { position: absolute; left: 470px; right: 0; top: 0; bottom: 0; background: url('src-x-perf.png') center/cover; filter: contrast(1.15) saturate(1.25); clip-path: polygon(10% 0, 100% 0, 100% 100%, 0 100%); }
+  .shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(5,6,4,.75) 0%, rgba(5,6,4,0) 45%); }
+  h1 { position: absolute; left: 0; right: 0; bottom: 120px; text-align: center; font-size: 150px; font-weight: 800; line-height: .9; text-shadow: 0 6px 0 #000, 0 12px 40px rgba(0,0,0,.95); }
+  h1 em { font-style: normal; color: #ffd35a; }
+  .sub { position: absolute; left: 0; right: 0; bottom: 56px; text-align: center; font-size: 44px; font-weight: 800; letter-spacing: .08em; text-shadow: 0 4px 0 #000; }
+  .sub b { color: #9fe08a; }
+  .logo { position: absolute; right: 44px; top: 36px; font-size: 54px; font-weight: 800; letter-spacing: .22em; text-shadow: 0 4px 18px #000; }
+</style></head><body>
+  <div class="code">
+    <b>look</b>(input: <i>Input</i>, sensMul = <u>1</u>) {<br>
+    &nbsp;&nbsp;<b>if</b> (this.dead) <b>return</b>;<br>
+    &nbsp;&nbsp;this.yaw -= input.mouseDX * this.sensitivity;<br>
+    &nbsp;&nbsp;this.pitch = clamp(this.pitch, <u>-1.5</u>, <u>1.5</u>);<br>
+    }<br><br>
+    <b>const</b> want = Math.hypot(pace.x, pace.z);<br>
+    <b>if</b> (wasOnGround &amp;&amp; got &lt; want * <u>0.9</u>) {<br>
+    &nbsp;&nbsp;<b>for</b> (<b>const</b> [nx, nz] <b>of</b> uprights) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<i>this</i>.kcc.computeColliderMovement(...);<br>
+    &nbsp;&nbsp;}<br>
+    }<br><br>
+    <b>export const</b> PROTOCOL = <u>56</u>;
+  </div>
+  <div class="shot"></div><div class="shade"></div>
+  <div class="logo">ZONA</div>
+  <h1>1 dev <em>+ AI</em></h1>
+  <div class="sub">made this <b>free</b> browser shooter</div>
+</body></html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: the next update</title>
+<!-- A community card, 1600x900 (2026-10-23, the owner: "make a graphic ... its for sharing with community"). Rendered to
+     marketing/zona-next-update.png by: node scripts/card.mjs next-update 1600 900
+     The picture is Pokrov's church after the world-polish rework (progress/world-polish/pokrov-before-after.jpg).
+     Everything here is what the next update is built to hold (docs/HANDOFF.md, THE WORK LIST), said as coming. No
+     player count, no payout wording (public pages, AdSense). -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.18); --green: #9fe08a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase;
+    background: radial-gradient(ellipse at 75% 20%, #1d2018 0%, #0c0d0b 60%); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .logo { position: absolute; left: 64px; top: 54px; font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .head { position: absolute; left: 64px; top: 172px; width: 640px; }
+  .head i { display: inline-block; padding: 6px 14px; font-style: normal; font-size: 18px; font-weight: 700; letter-spacing: 0.26em; color: #141109; background: var(--gold); }
+  .head h1 { margin-top: 18px; font-size: 112px; font-weight: 700; line-height: 0.88; letter-spacing: 0.02em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head p { margin-top: 22px; font-size: 26px; font-weight: 500; line-height: 1.3; text-transform: none; color: var(--dim); }
+  .shot { position: absolute; left: 760px; top: 64px; width: 776px; height: 430px; background: url('src-update-pokrov-4.jpg') center / cover no-repeat;
+    border: 2px solid var(--line); filter: saturate(1.08) contrast(1.05); }
+  .shot span { position: absolute; left: 0; bottom: 0; padding: 8px 14px; font-size: 16px; font-weight: 700; letter-spacing: 0.22em; background: rgba(12, 13, 11, 0.82); color: var(--dim); }
+  .tiles { position: absolute; left: 64px; right: 64px; top: 528px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .tile { height: 140px; padding: 18px 22px; background: rgba(243, 239, 230, 0.05); border: 1px solid var(--line); border-left: 6px solid var(--gold); }
+  .tile h3 { font-size: 30px; font-weight: 700; letter-spacing: 0.05em; }
+  .tile p { margin-top: 8px; font-size: 21px; font-weight: 500; line-height: 1.28; text-transform: none; color: var(--dim); }
+  .tile.g { border-left-color: var(--green); }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 44px; display: flex; justify-content: space-between; font-size: 19px; font-weight: 600; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+  <div class="head">
+    <i>Coming next update</i>
+    <h1>Into the<br><em>wild</em></h1>
+    <p>Wildlife to hunt, a dozen new places, towns rebuilt, and a smoother game on every device.</p>
+  </div>
+  <div class="shot"><span>Pokrov, rebuilt</span></div>
+  <div class="tiles">
+    <div class="tile g"><h3>Animals &amp; hunting</h3><p>Bears, deer and wolf packs in the wild. Hunt, skin, cook over a fire.</p></div>
+    <div class="tile"><h3>12 new places</h3><p>Across the desert, along the river and up the north valley. Lipki and Mokroye grow.</p></div>
+    <div class="tile"><h3>Towns rebuilt</h3><p>Pokrov's kremlin and church, Kalat's ruins re-laid, a dig camp on the flats.</p></div>
+    <div class="tile"><h3>Fort Orlinoye</h3><p>Every gap in the walls sealed, and the stone polished.</p></div>
+    <div class="tile g"><h3>Survival</h3><p>The infected's loot stays on the body. Water lasts longer.</p></div>
+    <div class="tile"><h3>Smoother</h3><p>Less loading, a quicker inventory, fixes for iPhone and Android.</p></div>
+  </div>
+  <div class="foot"><span>X <b>@zonaSOL_</b></span><span><b>ZONAPVP.FUN</b></span></div>
+</body>
+</html>
