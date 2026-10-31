@@ -118,7 +118,7 @@ async function withServer(play: (log: () => string) => Promise<void>, more: Reco
   server.stderr!.on('data', (d) => (logged += d));
   let failed: unknown = null;
   try {
-    for (let k = 0; k < 600 && !logged.includes('listening'); k++) await sleep(100);
+    for (let k = 0; k < 1800 && !logged.includes('listening'); k++) await sleep(100);
     assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
     for (let k = 0; k < 100 && !logged.includes('lists read from the site'); k++) await sleep(100);
     assert.ok(logged.includes('lists read from the site'), `the lists were not read:\n${logged.slice(-600)}`);

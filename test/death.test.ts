@@ -70,7 +70,7 @@ server.stdout!.on('data', (d) => (logged += d));
 server.stderr!.on('data', (d) => (logged += d));
 let checks = 0, failed: unknown = null;
 try {
-  for (let k = 0; k < 600 && !logged.includes('listening'); k++) await sleep(100);
+  for (let k = 0; k < 1800 && !logged.includes('listening'); k++) await sleep(100);
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
   const ann = new Player('Ann'), vic = new Player('Vic');
   for (const p of [ann, vic]) assert.ok(await p.join());

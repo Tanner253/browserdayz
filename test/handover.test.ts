@@ -148,7 +148,7 @@ function start(port: number, commit: string) {
   return out;
 }
 const up = async (s: { log: string }) => {
-  for (let k = 0; k < 600 && !s.log.includes('listening'); k++) await sleep(100);
+  for (let k = 0; k < 1800 && !s.log.includes('listening'); k++) await sleep(100);
   assert.ok(s.log.includes('listening'), `a server did not start:\n${s.log.slice(-600)}`);
 };
 

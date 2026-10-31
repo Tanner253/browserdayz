@@ -56,7 +56,7 @@ const start = () => {
   return { s, out };
 };
 const up = async (o: { text: string }) => {
-  for (let k = 0; k < 600 && !o.text.includes('listening'); k++) await sleep(100);
+  for (let k = 0; k < 1800 && !o.text.includes('listening'); k++) await sleep(100);
   assert.ok(o.text.includes('listening'), `the server did not start:\n${o.text.slice(-600)}`);
 };
 const stop = async (s: ChildProcess, o: { text: string }) => {

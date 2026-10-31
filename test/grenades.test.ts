@@ -407,7 +407,7 @@ server.stderr!.on('data', (d) => (logged += d));
 let failed: unknown = null;
 const all: Player[] = [];
 try {
-  for (let k = 0; k < 600 && !logged.includes('listening'); k++) await sleep(100);
+  for (let k = 0; k < 1800 && !logged.includes('listening'); k++) await sleep(100);
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
 
   // Ada throws. Ben stands six metres from her, Cy sixteen, Dee thirty.

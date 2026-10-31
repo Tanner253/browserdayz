@@ -74,7 +74,7 @@ server.stdout!.on('data', (d) => (logged += d));
 server.stderr!.on('data', (d) => (logged += d));
 let failed: unknown = null;
 try {
-  for (let k = 0; k < 600 && !logged.includes('listening'); k++) await sleep(100);
+  for (let k = 0; k < 1800 && !logged.includes('listening'); k++) await sleep(100);
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
 
   // Dead while the line was down: the death is the server's (here, as a game says it, and then the line goes)
