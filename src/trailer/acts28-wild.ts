@@ -10,7 +10,7 @@ import { TOWN, SEA_LEVEL } from '../world/worldgen';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
 
-export const PAID = { sol: '10.07' };
+export const PAID = { sol: '10.11' };
 /** the middle of Pokrov's lane (shots26.ts) */
 const LANE = 34.5;
 
@@ -364,7 +364,6 @@ export function actWild(c: Ctx) {
         const z = runners()[0];
         if (z) hand.look(t, V(z.pos.x, z.pos.y + 1.2, z.pos.z), true, 9);
         look(t, dt);
-        S.key('Mouse2', true);
         S.key('Mouse0', t > 0.15 && t % 0.8 < 0.3);
         if (z && flat(z.pos, P().pos) < 4.5 && kills < 4) {
           kills++;

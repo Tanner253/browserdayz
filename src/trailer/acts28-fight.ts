@@ -16,7 +16,7 @@ import { PAID } from './acts28-wild';
 type Any = any;
 
 /** the figures on the board, read from /api/cashins?format=total and format=status (read again before a take) */
-export const LIVE = { sol: 10.07, tags: 850, usd: 965, since: '8 OCT', solUsd: 95.77 };
+export const LIVE = { sol: 10.11, tags: 854, usd: 975, since: '8 OCT', solUsd: 96.39 };
 const GEAR = ['tactical_jacket', 'combat_trousers', 'rubber_boots', 'chest_rig', 'balaclava'];
 
 export function actRaid(c: Ctx) {
@@ -77,23 +77,23 @@ export function actRaid(c: Ctx) {
       after: (t) => chipSay(t, 0.3, BAR * 1.5 - 0.1, 'THEY WILL COME FOR IT', ''),
     });
   }
-  // the top floor's window: the 9A-91, suppressed, down on the yard
+  // the top floor's window: over his shoulder, the 9A-91 up, down on the yard (through his own eyes the arm's shoulder is a dark
+  // mound in the corner of the sights, and from the hip the wall under the sill fills the picture and takes the rounds)
   {
-    let aim: Any = null;
+    const op = new Operator(BRACED, 291, 46);
+    let aim: Any = null, lens = V(0, 0, 0), hold = V(0, 0, 0);
     add(BAR * 2, {
       name: 'window',
-      hud: true,
       hour: SUNSET,
       m: 'board',
       hit: true,
       setup: async () => {
         standing();
-        lightHands(2.2, 1.6);
-        notes(true);
         kit(['a91', ['ammo_739', 80]], { a91: ['a91_suppressor'] });
         S.hold('primary');
         const b = house(), me = b.at(CELL, STOREY, CELL * 2.5 - 0.75);
         await upstairs(me, 0, -0.2);
+        await c.dressedNow();
         for (const [k, a] of three().entries()) {
           const q = b.at(CELL * (0.1 + k * 0.9), 0, CELL * (9 + k * 0.7));
           a.place(q.x, q.z, yawTo(q, b.at(CELL, 0, CELL * 3)), 'ak', GEAR);
@@ -105,13 +105,18 @@ export function actRaid(c: Ctx) {
         hand.set(yawTo(eye(), aim.chest()), pitchTo(eye(), aim.chest()));
         hand.look(-0.3, () => (aim.alive ? aim.chest() : aim.pos.clone()), true, 0);
         say(`from the window: sees them ${three().map((a) => ground.sees(eye(), a.chest())).join(' ')}`);
+        lens = b.at(CELL + 0.48, STOREY + 1.85, CELL * 2.5 - 2.25);
+        hold = b.at(CELL + 0.08, STOREY + 1.45, CELL * 2.5);
+        op.reset(lens, hold);
       },
       tick: (t, _S, dt) => {
         look(t, dt);
         const b = house();
         for (const a of three()) runner(a, b.at(CELL, 0, CELL * 5), 4.8, dt);
+        // (a burst that has gone home is a man down)
         S.key('Mouse2', true);
         S.key('Mouse0', (t > 0.7 && t < 1.05) || (t > 1.9 && t < 2.3) || (t > 3 && t < 3.3));
+        for (const end of [1.2, 2.45, 3.45]) when(t, end, `down${end}`, () => { if (aim?.alive) aim.die(fwdOf(aim.yaw)); });
         if (aim && !aim.alive) {
           const n = three().find((a) => a.alive);
           if (n && n !== aim) {
@@ -123,6 +128,7 @@ export function actRaid(c: Ctx) {
           }
         }
       },
+      cam: (t) => op.update(t, lens, hold),
     });
   }
   // the door: over his shoulder in the front room, the Desert Eagle up, and one comes in at it
@@ -471,7 +477,7 @@ export function actGetIn(c: Ctx) {
       const me = at.clone().addScaledVector(f, 6.5);
       S.me(me.x, me.z, yawTo(me, at), 0, floorAt0(me));
       await run(90);
-      lensT = at.clone().addScaledVector(f, 4.4).add(V(0.4, 1.95, 0.4));
+      lensT = at.clone().addScaledVector(f, 8.6).add(V(1.1, 1.9, 1.1));
       lookT = at.clone().add(V(0, 1.2, 0));
     },
     cam: (t) => ({ p: lensT.clone().add(V(0, 0, t * 0.05)), l: lookT, fov: 44 }),
