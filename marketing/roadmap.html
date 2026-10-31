@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>ZONA: roadmap</title>
-<!-- A card, 1900x900 (six phases since 14 Oct 2026). Rendered to marketing/zona-roadmap.png by: node scripts/card.mjs roadmap 1900 900
+<!-- A card, 1900x900 (seven phases since 31 Oct 2026, the owner: "we can change anything about the roadmap"). Rendered to marketing/zona-roadmap.png by: node scripts/card.mjs roadmap 1900 900
      (and copied to public/changelog/media/roadmap.jpg, where the changelog shows it).
      What is ticked is in the game on the day in the footer: each line is an entry of the changelog
      (public/changelog/index.html). What is not ticked is a plan, and says so. When something ships, tick it
@@ -24,28 +24,28 @@
 
   /* the line the phases hang from: gold as far as the one being worked on */
   .rail { position: absolute; left: 48px; right: 48px; top: 163px; height: 2px; background: var(--line); }
-  .rail i { position: absolute; left: 0; top: 0; height: 2px; width: 59.2%; background: var(--gold); }
-  .row { position: absolute; left: 48px; right: 48px; top: 150px; bottom: 64px; display: grid; grid-template-columns: 1fr 1fr 1.1fr 1.22fr 0.95fr 0.95fr; gap: 14px; }
+  .rail i { position: absolute; left: 0; top: 0; height: 2px; width: 78%; background: var(--gold); }
+  .row { position: absolute; left: 48px; right: 48px; top: 150px; bottom: 64px; display: grid; grid-template-columns: 0.92fr 0.92fr 1.06fr 1fr 1fr 1.14fr 1.06fr; gap: 11px; }
   .phase { position: relative; display: flex; flex-direction: column; padding-top: 30px; }
   .dot { position: absolute; left: 50%; top: 0; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: var(--dark); border: 2px solid var(--faint); }
   .phase.done .dot { background: var(--gold); border-color: var(--gold); }
   .phase.done .dot::after { content: ''; position: absolute; left: 8px; top: 3px; width: 7px; height: 13px; border: solid var(--dark); border-width: 0 3px 3px 0; transform: rotate(42deg); }
   .phase.now .dot { border-color: var(--gold); box-shadow: 0 0 0 5px rgba(255, 211, 90, 0.18); }
   .phase.now .dot::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--gold); }
-  .box { flex: 1; margin-top: 12px; display: flex; flex-direction: column; padding: 16px 16px 14px; background: rgba(18, 20, 16, 0.92); border: 1px solid var(--line); }
+  .box { flex: 1; margin-top: 12px; display: flex; flex-direction: column; padding: 14px 12px 12px; background: rgba(18, 20, 16, 0.92); border: 1px solid var(--line); }
   .phase.now .box { border-color: rgba(255, 211, 90, 0.7); background: rgba(30, 30, 20, 0.95); }
-  .no { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 600; letter-spacing: 0.3em; color: var(--dim); }
-  .no b { padding: 2px 8px 3px; font-size: 12px; letter-spacing: 0.2em; color: var(--dark); background: var(--faint); }
+  .no { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; letter-spacing: 0.2em; color: var(--dim); }
+  .no b { padding: 2px 6px 3px; font-size: 11px; letter-spacing: 0.12em; color: var(--dark); background: var(--faint); }
   .phase.done .no b { background: var(--ok); }
   .phase.now .no b { background: var(--gold); }
-  h2 { margin-top: 8px; font-size: 31px; font-weight: 700; letter-spacing: 0.05em; line-height: 1; white-space: nowrap; }
-  .sub { margin-top: 6px; height: 34px; font-size: 13.5px; font-weight: 500; letter-spacing: 0.12em; line-height: 1.25; color: var(--dim); }
+  h2 { margin-top: 8px; font-size: 26px; font-weight: 700; letter-spacing: 0.05em; line-height: 1; white-space: nowrap; }
+  .sub { margin-top: 6px; height: 46px; font-size: 12.5px; font-weight: 500; letter-spacing: 0.08em; line-height: 1.25; color: var(--dim); }
   .bar { margin-top: 10px; height: 8px; background: rgba(243, 239, 230, 0.12); }
   .bar i { display: block; height: 100%; background: var(--ok); }
   .phase.now .bar i { background: var(--gold); }
   .count { margin-top: 5px; font-size: 12px; font-weight: 600; letter-spacing: 0.22em; color: var(--faint); }
   ul { list-style: none; margin-top: 10px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-  li { position: relative; padding-left: 24px; font-size: 16.5px; font-weight: 500; letter-spacing: 0.035em; line-height: 1.12; color: var(--faint); }
+  li { position: relative; padding-left: 21px; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; line-height: 1.13; color: var(--faint); }
   li::before { content: ''; position: absolute; left: 1px; top: 2px; width: 12px; height: 12px; border: 1.5px solid var(--faint); }
   li.done { color: var(--ink); }
   li.done::before { border-color: var(--ok); background: var(--ok); }
@@ -65,7 +65,7 @@
 <body>
   <div class="frame"></div>
   <div class="logo">ZONA<small>PvP survival shooter · play to earn</small></div>
-  <div class="title"><h1>Roadmap</h1><p>Three phases done · <b>the fourth under way</b></p></div>
+  <div class="title"><h1>Roadmap</h1><p>Five phases done · <b>the sixth under way</b></p></div>
   <div class="rail"><i></i></div>
 
   <div class="row">
@@ -143,14 +143,14 @@
       </div>
     </section>
 
-    <section class="phase now">
+    <section class="phase done">
       <div class="dot"></div>
       <div class="box">
-        <div class="no">Phase 4 <b>In progress</b></div>
+        <div class="no">Phase 4 <b>Complete</b></div>
         <h2>Wilder ground</h2>
         <p class="sub">Under every roof, in the woods, a harder fight</p>
-        <div class="bar"><i style="width: 71%"></i></div>
-        <p class="count">12 of 17</p>
+        <div class="bar"><i style="width: 100%"></i></div>
+        <p class="count">12 of 12</p>
         <ul>
           <li class="done">The road all the way round, a bridge</li>
           <li class="done">Orlinoye: a fort and its vaults</li>
@@ -164,62 +164,87 @@
           <li class="done">Bigger packs and pockets</li>
           <li class="done">Animals: deer, wolves, bears</li>
           <li class="done">Hunting, skinning, cooking meat</li>
-          <li>Attics</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="phase done">
+      <div class="dot"></div>
+      <div class="box">
+        <div class="no">Phase 5 <b>Complete</b></div>
+        <h2>Settling in</h2>
+        <p class="sub">Something of your own to build, and to take from others</p>
+        <div class="bar"><i style="width: 100%"></i></div>
+        <p class="count">11 of 11</p>
+        <ul>
+          <li class="done">Base building: walls, gates, towers</li>
+          <li class="done">Locks, crates and beds that stay</li>
+          <li class="done">Felling, mining and salvage</li>
+          <li class="done">Crafting, a forge, blueprints</li>
+          <li class="done">Raiding bases with C4 and satchels</li>
+          <li class="done">Traders and recyclers</li>
+          <li class="done">Clothes to loot, new survivors</li>
+          <li class="done">Knives and a felling axe</li>
+          <li class="done">Team matches, watch any match</li>
+          <li class="done">Battle royale: last one standing</li>
+          <li class="done">The game in eight languages</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="phase now">
+      <div class="dot"></div>
+      <div class="box">
+        <div class="no">Phase 6 <b>In progress</b></div>
+        <h2>The way down</h2>
+        <p class="sub">Bunker 17 goes deeper, and the keys to it are out across the map</p>
+        <div class="bar"><i style="width: 15%"></i></div>
+        <p class="count">2 of 13</p>
+        <ul>
+          <li class="done">New scenes on the front page</li>
+          <li class="done">The Zona reshaped to be walked</li>
+          <li>Bear traps and land mines</li>
+          <li>Smoke grenades, a flare gun</li>
+          <li>A camp in the gas, over the bunker</li>
+          <li>A new place in the desert</li>
+          <li>An old mine through the canyon</li>
+          <li>A new place in the swamp</li>
+          <li>Level 2: the labs</li>
+          <li>A new place in the snow</li>
+          <li>Level 3, and the vault</li>
+          <li>Night vision</li>
+          <li>The best guns made rarer</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="phase later">
+      <div class="dot"></div>
+      <div class="box">
+        <div class="no">Phase 7 <b>Later</b></div>
+        <h2>Still to come</h2>
+        <p class="sub">Plans change: this is what is on the list</p>
+        <div class="bar"><i style="width: 0%"></i></div>
+        <p class="count">Planned</p>
+        <ul>
           <li>Weather: rain, cold, shelter</li>
           <li>Crashed aircraft and their cargo</li>
           <li>Forests of different trees</li>
-          <li>100 frames a second and more</li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="phase later">
-      <div class="dot"></div>
-      <div class="box">
-        <div class="no">Phase 5 <b>Later</b></div>
-        <h2>Settling in, and more</h2>
-        <p class="sub">Something of your own to build and defend; then what DayZ does not do</p>
-        <div class="bar"><i style="width: 0"></i></div>
-        <p class="count">Planned</p>
-        <ul>
-          <li>The industrial zone: four times Kamenka</li>
-          <li>Ladders, and a radio tower to climb</li>
-          <li>A military base</li>
-          <li>Base building: walls, gates, towers</li>
-          <li>Locks, tents and crates that stay</li>
-          <li>Fishing, growing food, crafting</li>
-          <li>Raiding bases</li>
+          <li>Attics, a cellar under every house</li>
+          <li>Fishing and growing food</li>
           <li>Sickness and medicine</li>
           <li>Guns that wear, jam and are cleaned</li>
-          <li>Night vision</li>
           <li>Cars that are mended; more vehicles</li>
-          <li>More map: new towns, new sites</li>
+          <li>A military base, the industrial zone</li>
           <li>Events through the seasons</li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="phase later">
-      <div class="dot"></div>
-      <div class="box">
-        <div class="no">Phase 6 <b>Later</b></div>
-        <h2>The Arena</h2>
-        <p class="sub">Team matches; then battle royale and real stakes</p>
-        <div class="bar"><i style="width: 29%"></i></div>
-        <p class="count">2 of 7</p>
-        <ul>
-          <li class="done">Team matches at the fort</li>
-          <li class="done">Watch any match being played</li>
-          <li>Battle royale: last one standing</li>
-          <li>New game modes</li>
+          <li>New game modes, more Arena maps</li>
           <li>Wagers in SOL between players</li>
-          <li>More Arena maps from the open world</li>
-          <li>The fort finished: hatch, walls, windows</li>
+          <li>100 frames a second and more</li>
         </ul>
       </div>
     </section>
   </div>
 
-  <div class="foot"><span>As of <b>24 Oct 2026</b> · zonapvp.fun</span><span class="key"><i class="d"></i>In the game today<i class="n"></i>Next in this phase<i></i>Planned: plans change</span></div>
+  <div class="foot"><span>As of <b>31 Oct 2026</b> · zonapvp.fun</span><span class="key"><i class="d"></i>In the game today<i class="n"></i>Next in this phase<i></i>Planned: plans change</span></div>
 </body>
 </html>

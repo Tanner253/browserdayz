@@ -26,6 +26,20 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
+- **SMALL WINS, THEN THE WAY DOWN (the owner, 2026-10-31: "we can change anything about the roadmap", "small wins now and then we
+  can get to the optimizations", "give players stuff to chew on"). The plan is `marketing/plan-grand-tour.html` (git-excluded, card
+  zona-plan-grand-tour.jpg; copies and the true map in `progress/small-wins/`), the owner's yes given; memory note
+  small-wins-and-card-chain-2026-10-31.** Drops, each one tested by the owner and deployed on their word, one at a time:
+  1. Front page: DONE on battle-royale, NOT deployed. Seven menu scenes (src/game/menu-scenes-new.ts; a Vignette may say its `hour`),
+     the roadmap redrawn in seven phases (marketing/roadmap.html, `public/changelog/media/roadmap.jpg`; it ticks two lines that are
+     live only once this drop is: scenes, Zona). The Zona reshaped too (1d377616): corridors baked along walkable ground
+     (`npx tsx scripts/zona-ways.ts`, `... picture`), 68 m wide, soft corners, about a quarter more land. It is a tag rule, so this drop
+     deploys site AND server. Under a slow load some gun scenes are left out at random (a model not yet come when the table is made,
+     as the shovel's was): seen headless, not fixed.
+  2. Toys: bear traps, land mines, smoke grenades, a flare gun.
+  3. The camp in the gas over the bunker (radio tower, barracks, decon tents, watchtower, motor pool, hatch hut), blue card, Stolovaya.
+  4. The Old Mine, Bolotnaya, Level 2 and the generator; tappers Level 2 only, Deagle, Benelli, heavy armour 2 each, AK out of Tier 3.
+  5. Kupol, the train, Level 3, night vision; tappers Level 3 only. COMING SOON moves a door deeper each drop. Then the owner's optimise pass.
 - **LANGUAGE, LIVE 2026-10-31 06:48 UTC as 8755228d (PROTOCOL 78)**: Settings > Game > Language (en es pt ru de fr tr zh), the
   browser's language by default, `?lang=es` to try one. Interface text: catalogs English -> theirs in `src/i18n/lang/*.json`, met
   on the page by `src/i18n/index.ts` (a MutationObserver, none at all in English), so a new string is a line per catalog
