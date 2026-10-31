@@ -268,6 +268,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   // (a road through a town lies exactly at its pad's own level, a desert place's to its pad's edge, as its bed leaves
   // the pad (`padHeld`); where it crosses the river, on the ford's bed)
   const onPad = (x: number, z: number) => PLACED.find((t) => {
+    if (t.asIs) return false;
     const [lx, lz] = townLocal(t, x, z), m = desertTown(t) ? 0 : 10;
     return Math.abs(lx) < t.pad[0] - m && Math.abs(lz) < t.pad[1] - m;
   });

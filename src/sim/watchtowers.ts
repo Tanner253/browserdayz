@@ -25,6 +25,8 @@ export const WATCHTOWERS: Watchtower[] = [
   { x: -278, z: -324, tier: 3 },
   { x: 690, z: -134, tier: 4 },
   { x: 700, z: 496, tier: 4 },
+  // (the camp over Bunker 17, its way to see over the gas: last, for the others keep their numbers; src/sim/outposts.ts GORODOK)
+  { x: -1415, z: -303, tier: 4 },
 ];
 
 /**

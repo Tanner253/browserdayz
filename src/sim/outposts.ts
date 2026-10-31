@@ -33,15 +33,46 @@ export const MELNITSA: Town = { name: "Mel'nitsa", x: -1760, z: -505, pad: [34, 
 export const KHUTOR: Town = { name: 'Khutor', x: -1560, z: -575, pad: [34, 28], rot: -0.2 };
 /** the forest ranger's post */
 export const KORDON: Town = { name: 'Kordon', x: -1300, z: -480, pad: [28, 24], rot: 0.1 };
+/**
+ * The army's camp over Bunker 17, in the gas (the owner, 2026-10-31: "put some buildings on top and around it in the gas").
+ * In the bunker's own frame (x its right, z toward its way out: src/sim/bunker.ts), on the hollow's level ground as it is:
+ * its dig is under the pad between, and a pad levelled here would fill it.
+ */
+export const GORODOK: Town = { name: 'Gorodok', x: -1450, z: -320, pad: [62, 62], rot: -1.0458, asIs: true };
+/**
+ * A test range's observation post on the table top of a mesa in the desert, seen for kilometres (the way down's first stop:
+ * src/sim/sites.ts). Its strong room is what the blue card opens.
+ */
+export const STOLOVAYA: Town = { name: 'Stolovaya', x: -2580, z: 380, pad: [46, 36], rot: 0.2, asIs: true };
 
-export const OUTPOSTS: Town[] = [KOLODETS, AERODROM, KARYER, RYBAKI, KEMPING, USTYE, NASOSNAYA, BROD, MELNITSA, KHUTOR, KORDON];
+// (new ones at the end: what is laid after them keeps its numbers)
+export const OUTPOSTS: Town[] = [KOLODETS, AERODROM, KARYER, RYBAKI, KEMPING, USTYE, NASOSNAYA, BROD, MELNITSA, KHUTOR, KORDON, GORODOK, STOLOVAYA];
 /** their loot steps: the coast's and the desert's first and second, the valley's second (see westTier) */
-export const OUTPOST_TIERS: Record<string, 1 | 2> = { Kolodets: 1, Aerodrom: 2, "Kar'yer": 2, Rybaki: 1, Kemping: 1, "Ust'ye": 1, Nasosnaya: 1, Brod: 1, "Mel'nitsa": 2, Khutor: 2, Kordon: 2 };
+export const OUTPOST_TIERS: Record<string, 1 | 2 | 4> = { Gorodok: 4, Stolovaya: 2, Kolodets: 1, Aerodrom: 2, "Kar'yer": 2, Rybaki: 1, Kemping: 1, "Ust'ye": 1, Nasosnaya: 1, Brod: 1, "Mel'nitsa": 2, Khutor: 2, Kordon: 2 };
 
 // (a building north of a lane faces south, rot 0; south of it, north, rot PI)
 const N = 0, S = PI;
 
 const BUILDINGS: Record<string, TownSpot[]> = {
+  Gorodok: [
+    // (the men's quarters along the east of the yard, the motor pool beyond them, the decon tents by the way in, the gate)
+    { type: 'barracks', x: 38, z: 14, rot: Q },
+    { type: 'barracks', x: 53, z: 14, rot: Q },
+    { type: 'garage', x: 42, z: 40, rot: S },
+    { type: 'garage', x: 54, z: 40, rot: S },
+    { type: 'hut', x: 18, z: 48, rot: N },
+    { type: 'tent', x: -14, z: 36, rot: S },
+    { type: 'tent', x: -23, z: 36, rot: S },
+    { type: 'guardpost', x: 10, z: 60, rot: N },
+  ],
+  Stolovaya: [
+    // (the observers' quarters, the instrument shop, the crew tent; and the guard post, its door to the reader, the strong room)
+    { type: 'hut', x: -10, z: -18, rot: N },
+    { type: 'barracks', x: -30, z: 10, rot: Q },
+    { type: 'garage', x: 30, z: 20, rot: S },
+    { type: 'tent', x: -4, z: 20, rot: S },
+    { type: 'guardpost', x: 22, z: -10, rot: Q },
+  ],
   Kolodets: [
     // (the pump house over the well's pipe, the herders' bunkhouse, their two tents)
     { type: 'shed', x: -10, z: -7, rot: N + 0.1 },
@@ -123,6 +154,23 @@ function fence(kind: string, a: [number, number], b: [number, number], gone: num
 }
 
 const THINGS: Record<string, TownThing[]> = {
+  Gorodok: [
+    // the way in, barred; what the camp ran on; what is left of the motor pool; the bunker's air
+    { kind: 'concrete_road_barrier', x: -6, z: 58, rot: 0 }, { kind: 'concrete_road_barrier', x: -12, z: 58, rot: 0.04 }, { kind: 'concrete_road_barrier', x: -18, z: 57, rot: -0.1 },
+    { kind: 'concrete_road_barrier', x: 22, z: 58, rot: 0 }, { kind: 'container_shell@0', x: 28, z: 40, rot: Q }, { kind: 'container_shell@1', x: 28, z: 32, rot: Q + 0.05 },
+    { kind: 'uaz_469', x: 44, z: 28, rot: 0.3 }, { kind: 'covered_car', x: 58, z: 28, rot: Q },
+    { kind: 'portable_generator', x: 30, z: 6, rot: 0.4 }, { kind: 'propane_tank', x: 29, z: 3.6, rot: 0 }, { kind: 'Barrel_01', x: 33, z: 30, rot: 0 }, { kind: 'Barrel_01', x: 34.2, z: 30.6, rot: 0 },
+    { kind: 'barrel_03', x: 33.4, z: 31.8, rot: 0.5 }, { kind: 'metal_jerrycan_green', x: 35.6, z: 29.6, rot: 0.4 }, { kind: 'crate_big', x: 12, z: 36, rot: 0.2 }, { kind: 'crate_big', x: 13.4, z: 37.6, rot: 0.6 },
+    { kind: 'wooden_military_crate', x: -18, z: 42, rot: 0.3 }, { kind: 'ventilator', x: 30, z: -8, rot: 0 }, { kind: 'ventilator', x: 34, z: -8, rot: 0 }, { kind: 'bunker_pipes', x: 32, z: -14, rot: Q },
+    { kind: 'old_tyre', x: 62, z: 34, rot: 0.3 }, { kind: 'old_tyre', x: 61, z: 35, rot: 1.2 },
+  ],
+  Stolovaya: [
+    // the range's instruments and what they ran on, up here for the view; concrete round the strong room's way in
+    { kind: 'concrete_road_barrier', x: 12, z: -3, rot: Q }, { kind: 'concrete_road_barrier', x: 12, z: -17, rot: Q }, { kind: 'container_shell@1', x: -4, z: 4, rot: 0.05 },
+    { kind: 'container_shell@0', x: 8, z: 22, rot: Q + 0.04 }, { kind: 'uaz_469', x: 34, z: 4, rot: 2.6 }, { kind: 'portable_generator', x: 30, z: -24, rot: 0.5 }, { kind: 'propane_tank', x: 32, z: -26, rot: 0 },
+    { kind: 'Barrel_01', x: -18, z: -6, rot: 0 }, { kind: 'Barrel_01', x: -16.8, z: -5.4, rot: 0 }, { kind: 'barrel_03', x: -17.4, z: -7.2, rot: 0.3 }, { kind: 'crate_big', x: -2, z: -6, rot: 0.2 }, { kind: 'wooden_military_crate', x: 0, z: -4.6, rot: 0.7 },
+    { kind: 'old_tyre', x: -38, z: -22, rot: 0.5 }, { kind: 'covered_car', x: -18, z: 28, rot: Q + 0.1 },
+  ],
   Kolodets: [
     // (the well is the game's own, drawn and drunk at: src/sim/wells.ts; its yard here)
     ...fence('fence_grey', [6, 4], [22, 4], [3]), ...fence('fence_grey', [22, 4], [22, 18]), ...fence('fence_grey', [22, 18], [6, 18], [5]), ...fence('fence_grey', [6, 18], [6, 4], [2]),
@@ -196,6 +244,8 @@ const THINGS: Record<string, TownThing[]> = {
 };
 
 const GROUND: Record<string, TownGround> = {
+  Gorodok: { yards: [[26, 4, 62, 50]], lanes: [{ line: [[0, 64], [0, 24]], w: 6, dark: true }] },
+  Stolovaya: { yards: [[-38, -26, 40, 30]], lanes: [{ line: [[-46, 30], [-12, 6], [10, -8]], w: 4, dark: true }] },
   Kolodets: { yards: [[-14, -12, 0, 8]], lanes: [{ line: [[-30, 2], [-12, 0]], w: 4 }] },
   // (the strip, graded flat and trodden; the apron along its north side)
   Aerodrom: { yards: [[-30, -20, 42, -5]], lanes: [{ line: [[-70, 9], [70, 9]], w: 14, dark: true }, { line: [[4, -5], [4, 2]], w: 4 }] },

@@ -32,6 +32,8 @@ export interface Town {
   rot: number;
   /** a part of the town of this name, laid after every town (src/sim/town-parts.ts) */
   part?: string;
+  /** the ground left as it is: no pad levelled, no road laid to it (the camp over the bunker's own dig; the mesa's flat top) */
+  asIs?: boolean;
 }
 /** a building of a town, in the town's frame: `rot` turns its front (+z of its own) toward (sin, cos) */
 export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }

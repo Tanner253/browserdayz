@@ -76,6 +76,7 @@ const h1 = new Simplex(WORLD_SEED + 351);
  * swamp's hamlet is no pad: it lies on the swamp's own floor (`layHamlet`).
  */
 export function layPad(H: Float32Array, net: Net, t: Town, padY: number, lake?: number) {
+  if (t.asIs) return;
   if (t.name === MOKROYE.name) return layHamlet(H, net, t, padY);
   // (the open country's small places eased into the land over 20 m: 40 reached a stash kept in Bereg from Ust'ye)
   const E = isOutpost(t) ? 20 : 40;
