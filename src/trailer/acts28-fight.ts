@@ -4,7 +4,7 @@
 // GET IN: the game's other sides, and the end card.
 import * as THREE from 'three';
 import { BRACED, ON_FOOT, Operator, pitchTo, yawTo } from './human';
-import { BAR, DAWN, DUSK, GOLDEN, MORNING, NIGHT, SUNSET, V, ease, flat, fwdOf, rightOf, type Ctx } from './frame28';
+import { BAR, DAWN, DUSK, GOLDEN, MORNING, NIGHT, SUNSET, TALL, V, ease, flat, fwdOf, rightOf, type Ctx } from './frame28';
 import { Screen, frameUrl, loadReel, type Reel } from './footage';
 import { CELL, STOREY } from '../sim/build/pieces';
 import { TAG_HOLD, makeItem, tagClock } from '../sim/items';
@@ -440,7 +440,7 @@ export function actGetIn(c: Ctx) {
     m: 'board',
     setup: async () => {
       S.parkMe();
-      reel = reel ?? await loadReel('br27');
+      reel = reel ?? await loadReel(TALL ? 'br27t' : 'br27');
     },
     tick: (t) => {
       if (reel) screen.show(frameUrl(reel, from + t));

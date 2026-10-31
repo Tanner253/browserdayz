@@ -484,16 +484,17 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `acts28-base.ts` | 257 | The twenty-eighth film's fourth act: |
-| `acts28-fight.ts` | 501 | The twenty-eighth film's last acts. |
-| `acts28-wild.ts` | 378 | The twenty-eighth film's first two acts: |
+| `acts28-base.ts` | 258 | The twenty-eighth film's fourth act: |
+| `acts28-fight.ts` | 507 | The twenty-eighth film's last acts. |
+| `acts28-wild.ts` | 377 | The twenty-eighth film's first two acts: |
 | `acts28-world.ts` | 135 | The twenty-eighth film's third act: |
+| `acts29.ts` | 673 | The twenty-ninth film's shots, "Friendly" (shots29.ts). |
 | `arena26.ts` | 180 | The gameplay trailer's Arena (shots26.ts): one round at the fort, as the eleventh film made the Arena (shots11.ts: its measure of the fort, blue's two up the ramp and in at the gate, red on the keep's landing, and... |
 | `base28.ts` | 154 | The base of the twenty-eighth film, laid by the game's own rules (Bases.lay, snap.ts spots): every piece goes where a player's could go, in the order a player would, on the meadow north of Pokrov with the pines round it. |
 | `brbots.ts` | 68 | The other players in the battle royale's film (shots25.ts): sockets this page opens to the film's arena server (tools/br-film/vclock.mjs, whose clock the film moves on frame by frame) and moves itself, as people move... |
-| `director.ts` | 947 | The trailer's director. |
+| `director.ts` | 953 | The trailer's director. |
 | `footage.ts` | 88 | Footage one cut lays into another (2026-10-23, for the gameplay trailer, shots26.ts): the pictures another take kept frame by frame (film.mjs --frames <dir>: tools/trailer/out/<dir>/<frame>.jpg and sounds.json),... |
-| `frame28.ts` | 391 | The twenty-eighth film's frame (shots28.ts): what every act reaches for. |
+| `frame28.ts` | 399 | The twenty-eighth film's frame (shots28.ts): what every act reaches for. |
 | `human.ts` | 303 | Movement with somebody behind it, for the films from the twenty-first on (2026-10-19, the owner: |
 | `kit26.ts` | 299 | The gameplay trailer's set (shots26.ts): the ground and what stands in the way, the jeep on its road with friends in the back and the helicopter told where it is, the infected with their own minds, and the house in... |
 | `music.ts` | 341 | The trailer's score, written as code: one row per bar (the chord, and how hard the band plays it), in D minor at 128 beats a minute, so a bar is 1.875 s and every cut in shots.ts lands on a bar line. |
@@ -503,6 +504,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `music16.ts` | 404 | The sixteenth film's score ("This week in ZONA", shots16.ts): a trailer's, made here from nothing but oscillators and noise, as every score of these films is. |
 | `music17.ts` | 630 | The seventeenth film's score ("The man in the window", shots17.ts): the ninth's band as the fourteenth had it (music9.ts says what each part is and how it is made), playing a tune of its own. |
 | `music28.ts` | 629 | The twenty-eighth film's score ("Keep what you kill", shots28.ts): the seventeenth's band (music9.ts says what each part is and how it is made) at 128 beats a minute, with a tune of its own. |
+| `music29.ts` | 330 | The twenty-ninth film's song, "Friendly" (shots29.ts): hardbass, made here from nothing but oscillators and noise, as every score of these films is. |
 | `music3.ts` | 533 | The third trailer's score. |
 | `music8.ts` | 374 | The eighth film's score, and nothing of the other seven in it. |
 | `music9.ts` | 630 | The ninth film's score, and none of the other three bands in it. |
@@ -528,6 +530,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `shots26.ts` | 795 | The twenty-sixth film, about 70 s: the gameplay trailer (2026-10-23, the owner: |
 | `shots27.ts` | 787 | The twenty-seventh film, about 31 s: the battle royale for the gameplay trailer (shots26.ts lays these pictures in, kept frame by frame by film.mjs --frames). |
 | `shots28.ts` | 104 | The twenty-eighth film: |
+| `shots29.ts` | 116 | The twenty-ninth film: |
 | `shots3.ts` | 1664 | The third trailer: a story, and then how the money works. |
 | `shots4.ts` | 1452 | The fourth trailer: the Zone has grown, and everything the other three were about. |
 | `shots5.ts` | 982 | The fifth trailer: the infected, and what comes after them. |

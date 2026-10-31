@@ -811,6 +811,36 @@ body.tr-cut26 .hud-keys { visibility: hidden !important; }
 .x28-end h5 { margin: 24px 0 12px; font: 800 28px/1 var(--trailer-font); letter-spacing: 0.1em; color: #f2ede2; }
 .x28-end em { font: 800 40px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.06em; color: #ffd35a; }
 body.tr-cut28 .hud-claim { display: none; }
+/* the twenty-ninth film: every word on it is for a phone with the sound off */
+.x29-line { position: absolute; left: 36px; right: 36px; top: 210px; text-align: center; }
+.x29-line b { font: 800 62px/1.04 var(--trailer-font); letter-spacing: 0.03em; color: #f6f1e6; text-shadow: 0 0 3px #000, 0 3px 4px rgba(0, 0, 0, 0.9), 0 6px 26px rgba(0, 0, 0, 0.8); }
+.x29-big { position: absolute; left: 0; right: 0; top: 190px; text-align: center; }
+.x29-big b { display: inline-block; font: 800 104px/1 var(--trailer-font); letter-spacing: 0.01em; color: #ffd35a; text-shadow: 0 0 4px #000, 0 4px 6px rgba(0, 0, 0, 0.9), 0 8px 34px rgba(0, 0, 0, 0.85); }
+.x29-say { position: absolute; transform: translate(-50%, -100%); padding: 4px 12px 3px; border-radius: 6px; background: rgba(246, 241, 230, 0.94); box-shadow: 0 3px 14px rgba(0, 0, 0, 0.5); font: 800 36px/1 var(--trailer-font); letter-spacing: 0.04em; color: #14110b; white-space: nowrap; }
+.x29-dead { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; background: radial-gradient(ellipse at center, rgba(70, 0, 0, 0.3), rgba(40, 0, 0, 0.72)); }
+.x29-dead b { font: 800 82px/0.98 var(--trailer-font); letter-spacing: 0.03em; color: #ff4a3a; text-shadow: 0 0 4px #000, 0 6px 30px rgba(0, 0, 0, 0.9); }
+.x29-dead i { margin-top: 14px; font: 800 26px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.2em; color: #f6f1e6; text-shadow: 0 2px 10px #000; }
+.x29-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.x29-cut { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; background: #000; text-align: center; }
+.x29-cut b { font: 800 84px/1 var(--trailer-font); letter-spacing: 0.02em; color: #f6f1e6; }
+.x29-cut i { margin-top: 16px; font: 800 25px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.12em; color: #ffd35a; }
+.x29-mark { position: absolute; left: 0; right: 0; top: 118px; text-align: center; font: 800 20px/1 var(--trailer-font); letter-spacing: 0.22em; color: rgba(246, 241, 230, 0.8); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8); }
+/* upright (tr-tall): set for a phone, words clear of the app's own buttons at the foot and down the right */
+body.tr-tall.tr-cut28 .x21-chip { left: 36px; right: 110px; bottom: 270px; }
+body.tr-tall.tr-cut28 .x21-chip b { font-size: 38px; line-height: 1.05; }
+body.tr-tall .x28-title b, body.tr-tall .x28-end b { font-size: 128px; }
+body.tr-tall .x28-title u, body.tr-tall .x28-end u { font-size: 25px; letter-spacing: 0.18em; }
+body.tr-tall .x28-title i { padding: 0 48px; font-size: 15px; }
+body.tr-tall .x28-steps { flex-direction: column; gap: 12px; }
+body.tr-tall .x28-steps div { width: 430px; padding: 15px 8px 13px; }
+body.tr-tall .x28-paid h6 { font-size: 21px; letter-spacing: 0.14em; }
+body.tr-tall .x28-paid > b { font-size: 106px; }
+body.tr-tall .x28-paid p { flex-direction: column; align-items: center; gap: 12px; }
+body.tr-tall .x28-paid small { max-width: 600px; padding: 0 30px; }
+body.tr-tall .x28-end h5 { padding: 0 36px; font-size: 17px; line-height: 1.3; }
+body.tr-tall .x28-end em { font-size: 34px; }
+body.tr-tall .x28-stats { left: 0; right: 0; top: 120px; justify-content: center; gap: 20px; }
+body.tr-tall .x28-clock { top: 240px; }
 .x28-stats { position: absolute; right: 56px; top: 44px; display: flex; gap: 26px; font: 700 19px/1 var(--trailer-font); letter-spacing: 0.1em; color: #f2ede2; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85); }
 .x28-stats b { font-weight: 800; font-size: 30px; color: #ffd35a; letter-spacing: 0.02em; }
 .x28-clock { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); text-align: center; text-shadow: 0 3px 16px rgba(0, 0, 0, 0.85); }

@@ -26,6 +26,9 @@ export const rightOf = (yaw: number) => V(Math.cos(yaw), 0, -Math.sin(yaw));
 export const BAR = 1.875;
 /** the hours it goes through (the game's day fraction) */
 export const DAWN = 0.27, MORNING = 0.32, NOON = 0.46, AFTERNOON = 0.58, GOLDEN = 0.655, SUNSET = 0.705, DUSK = 0.722, NIGHT = 0.775;
+/** upright, for phones (film.mjs --tall): a taller lens, so the subject keeps its size and the picture its sides */
+export const TALL = new URLSearchParams(location.search).has('tall');
+export const lens = (f: number) => (TALL ? (2 * Math.atan(1.9 * Math.tan((f * Math.PI) / 360)) * 180) / Math.PI : f);
 
 export interface Way { c: THREE.CatmullRomCurve3; len: number; stop: number; sprint: boolean; walk: boolean }
 export interface Extra { hour?: number; fadeIn?: number; fadeOut?: number; m: Kind28; under?: boolean; hit?: boolean }
@@ -37,6 +40,10 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
   const wait = (ms: number) => new Promise<void>((r) => clock.real.setTimeout(r, ms));
   const say = (s: string) => console.log(`[tr] ${s}`);
   document.body.classList.add('tr-cut21', 'tr-cut26', 'tr-cut28');
+  if (TALL) {
+    document.body.classList.add('tr-tall');
+    g.director.baseFov = lens(g.director.baseFov);
+  }
   const overlay = document.getElementById('tr-overlay')!;
   const piece = (cls: string, html = '') => {
     const el = document.createElement('div');
@@ -332,7 +339,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
   let cur = 0, hourWas = -1;
   const marks: { at: number; len: number; kind: Kind28; under?: boolean; hit?: boolean }[] = [];
   const add: Add = (len, s) => {
-    const start = cur, setup = s.setup, after = s.after, tick = s.tick;
+    const start = cur, setup = s.setup, after = s.after, tick = s.tick, cam = s.cam;
     cur += len;
     totalSet(cur);
     marks.push({ at: start, len, kind: s.m, under: s.under, hit: s.hit });
@@ -340,6 +347,7 @@ export function frame28(S: Stage, totalSet: (s: number) => void) {
     shots.push({
       bars: false,
       ...s,
+      ...(cam && TALL ? { cam: (t: number, st: Stage) => { const c = cam(t, st); return c && { ...c, fov: lens(c.fov ?? 50) }; } } : {}),
       start,
       end: start + len,
       setup: async (st) => {

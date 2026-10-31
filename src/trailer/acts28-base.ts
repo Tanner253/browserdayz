@@ -3,7 +3,7 @@
 // owner: "for karambit only show the model dont show in hand").
 import * as THREE from 'three';
 import { BRACED, DRONE, Operator, yawTo, pitchTo } from './human';
-import { AFTERNOON, BAR, GOLDEN, SUNSET, V, ease, type Ctx } from './frame28';
+import { AFTERNOON, BAR, GOLDEN, SUNSET, TALL, V, ease, type Ctx } from './frame28';
 import { Base28, SITE } from './base28';
 import { assets } from '../core/assets';
 import { ITEMS, makeItem } from '../sim/items';
@@ -241,7 +241,8 @@ export function actBuild(c: Ctx) {
         if (pivot) pivot.rotation.y = 0.55 - t * 0.5;
       },
       cam: () => {
-        const d = Math.max(0.42, ((pivot as Any)?.long ?? 1) * 1.15);
+        // (upright, the frame is 0.6 as wide: further back, or a long gun runs off both sides)
+        const d = Math.max(0.42, ((pivot as Any)?.long ?? 1) * 1.15) * (TALL ? 1.75 : 1);
         return { p: O.clone().add(V(0, 0.06, d)), l: O.clone(), fov: 32 };
       },
       after: (t) => chipSay(t, 0.05, len - 0.02, big, small),
