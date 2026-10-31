@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T21:09:25.670Z",
+ "generated": "2026-10-31T22:31:10.456Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14919,7 +14919,7 @@
    "tags": [
     "prop"
    ],
-   "bytes": 201284,
+   "bytes": 200180,
    "srcTris": 7081,
    "tris": 7081,
    "min": [
@@ -14929,12 +14929,12 @@
    ],
    "max": [
     7.3378,
-    18,
+    22.7,
     7.2753
    ],
    "lods": [],
    "hi": "assets/models/hi/radar_dome.glb",
-   "hiBytes": 614096,
+   "hiBytes": 612992,
    "hiCard": 64
   },
   "boxcar": {

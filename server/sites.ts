@@ -203,6 +203,17 @@ export function useRide(c: Client, m: Extract<C2S, { t: 'ride' }>) {
   place(c, x, y, z, c);
 }
 
+/** An admin's: whatever is going, all it wanted turned turned, and its time up now (/site skip). */
+export function sitesSkip() {
+  for (const [id, r] of runs) {
+    if (r.phase !== 'alarm') continue;
+    const s = SITES[id];
+    s.steps?.at.forEach((_, k) => r.done.add(k));
+    if (s.steps) openRoom(doorOf(id, s));
+    r.until = Date.now();
+  }
+}
+
 /** Once a second: the waves, and what comes after them. */
 export function sitesTick(now: number) {
   for (const [g, until] of gates) {

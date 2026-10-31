@@ -91,7 +91,7 @@ export const GUN_ITEMS: ItemDef[] = [
     // forty minutes after one is taken; the owner, 2026-10-20: "the barrette is too common in T5 and same with the other
     // tappers. we dont want them to feel too hard to get but really they are special sought after weapons")
     // (the owner, 2026-10-31: tier 3 of the bunker is "the only place you can find tappers and the best loot in the game")
-    loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], restock: 2400, usage: ['Vault'], loaded: [1, 5], fitted: [['scope_50', 0.85]] },
+    loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], away: [5], restock: 2400, usage: ['Vault'], loaded: [1, 5], fitted: [['scope_50', 0.85]] },
     worth: 120,
   },
   // The M32 MGL (2026-10-17): a six-shot 40 mm grenade launcher, for admins only (the owner: "the grenade launcher
@@ -110,7 +110,7 @@ export const GUN_ITEMS: ItemDef[] = [
     desc: 'A self-loading rifle in .50 BMG. It takes its NightForce scope (four to twelve times, mil-dots, a laser rangefinder); without it, plain sights. Ten rounds, as fast as the trigger, and it kicks like a mule.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, optic: 'scope_barrett', shows: { mag_barrett: ['mag'], scope_barrett: ['scope'] } }, iconYaw: 0,
     // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
-    loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], restock: 2400, usage: ['Vault'], loaded: [2, 10], fitted: [['scope_barrett', 0.85]] },
+    loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], away: [5], restock: 2400, usage: ['Vault'], loaded: [2, 10], fitted: [['scope_barrett', 0.85]] },
     worth: 140,
   },
   // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the L96 is.
@@ -118,7 +118,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
     desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. It takes its own PSO scope (two to six times), and no other sights.',
     weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, optic: 'scope_vssk', shows: { mag_vssk: ['mag', 'bullet'], scope_vssk: ['scope'] } }, iconYaw: 0,
-    loot: { pair: 'VSS', at: [0, 0, 0, 0, 1], restock: 2400, usage: ['Vault'], loaded: [1, 5], fitted: [['scope_vssk', 0.85]] },
+    loot: { pair: 'VSS', at: [0, 0, 0, 0, 1], away: [5], restock: 2400, usage: ['Vault'], loaded: [1, 5], fitted: [['scope_vssk', 0.85]] },
     worth: 110,
   },
   // A pair of submachine guns, one in each hand (2026-10-17): the left button fires the left one, the right button the

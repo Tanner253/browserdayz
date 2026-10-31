@@ -383,9 +383,8 @@ ok('the gas and the bunker hold what they are asked, or as much as they have pla
   const kept = Object.keys(TYPES).reduce((n, id) => n + few.kept(id, 5), 0);
   assert.ok(kept <= 120 && kept >= 118, `a bunker of 120 places keeps ${kept} things`);
   for (const id of Object.keys(TYPES)) if (TYPES[id].at[4] && !TYPES[id].away?.includes(5)) assert.ok(few.kept(id, 5) >= 1, `${id} cut to nothing`);
-  // (what is the bunker's and nobody else's cut least; a dressing every village has more than a shotgun)
-  assert.ok(few.kept('barrett', 5) / TYPES.barrett.at[4] > few.kept('bandage', 5) / TYPES.bandage.at[4], 'a tapper cut more than a dressing');
-  for (const id of ['sniper50', 'barrett', 'vssk']) assert.equal(few.kept(id, 5), 1, `${id} cut`);
+  // (the tappers are Level 3's alone: a place apart, with none on the step's own)
+  for (const id of ['sniper50', 'barrett', 'vssk']) assert.deepEqual(TYPES[id].away, [5], `${id} kept on the fifth step's own`);
   // (the way down: each only where it is meant to lie)
   assert.deepEqual(TYPES.card_blue.usage, ['First']);
   for (const id of ['sniper50', 'barrett', 'vssk', 'night_vision']) assert.deepEqual(TYPES[id].usage, ['Vault']);

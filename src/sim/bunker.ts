@@ -179,7 +179,14 @@ function apart(plan: Plan, level: number) {
   const used: { r: number; f: number }[] = [];
   for (let l = 1; l < level; l++) used.push(...searched(bunkerPlan(l)));
   for (const t of searched(plan)) {
-    while (used.some((u) => Math.hypot(u.r - t.r, u.f - t.f) < 0.35)) t.r += 0.2;
+    // (along the wall it stands against: one moved straight out from a wall on the far side went through the next, a gun rack among them)
+    const q = plan.rooms.find((x) => t.r > x.r0 && t.r < x.r1 && t.f > x.f0 && t.f < x.f1);
+    const byR = !!q && (t.r - q.r0 < 1 || q.r1 - t.r < 1), mid = q ? (byR ? (q.f0 + q.f1) / 2 : (q.r0 + q.r1) / 2) : t.r;
+    const step = (byR ? t.f : t.r) > mid ? -0.2 : 0.2;
+    while (used.some((u) => Math.hypot(u.r - t.r, u.f - t.f) < 0.35)) {
+      if (byR) t.f += step;
+      else t.r += step;
+    }
     used.push(t);
   }
   return plan;

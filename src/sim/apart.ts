@@ -35,7 +35,7 @@ const APART_TOWNS = TOWNS.filter((t) => !DESERT_TOWNS.includes(t));
 // ('watchtower' and 'hunting', the towers stood about the map 2026-10-19, `watchtower_<n>` and `hunting_<n>`: part of the
 // fourth step, the eastern watchtowers took the gas's things, a keycard among them, as under the gas anything lies
 // anywhere; apart, each keeps the army's and the hunter's gear it was stood for)
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', 'kamenka', 'watchtower', 'hunting', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
+export const APART = new Set(['bunker2', 'bunker3', 'castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', 'kamenka', 'watchtower', 'hunting', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
 /** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`; Kamenka's fourth step by its kind), or null: the map's own */
 export function apartOf({ building, usage, tier }: { building: string; usage?: readonly string[]; tier?: number }): string | null {
   if (APART.has(building)) return building;
@@ -62,6 +62,10 @@ export const APART_RICH = 1.5;
 // (the new places of the map three times over are stocked as their steps are, no richer: they are new ground, not a reward)
 export const OWN: Record<string, { rich: number; lean: Record<string, number> }> = {
   cellar: { rich: 3, lean: {} },
+  // (the bunker's levels under the first: their own stock, over and above its, so that going deeper thins nothing above; the third the richest)
+  // (and no keycard: "no need for bunker to have keycards")
+  bunker2: { rich: 0.9, lean: { keycard: 0 } },
+  bunker3: { rich: 1.2, lean: { keycard: 0 } },
   // (the fort on the fifth step, half as thick as the bunker and with none of what is the bunker's alone: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
   castle: { rich: 0.5, lean: { ...APART_LEAN_OF(), ...Object.fromEntries(Object.values(ITEMS).filter((d) => d.loot?.at && d.loot.at.slice(0, 4).every((n) => !n) && (d.loot.at[4] ?? 0) > 0).map((d) => [d.id, 0])) } },
   ...Object.fromEntries(['kalat', ...APART_TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
@@ -80,6 +84,8 @@ export const APART_LEAN: Record<string, number> = APART_LEAN_OF();
 
 /** what a named place apart never has less of on its step (the fourth and up), whatever its shares come to (where it has a spot of the kind): a magazine for each rifle of its racks, and a dressing station's own; and the fort's keycard and its pile of .50, each its one (the owner, 2026-10-19: "regular rare in T5 like the castle", "very rare in the castle") */
 export const APART_LEAST: Record<string, Record<string, number>> = {
+  // (the owner, 2026-10-31: the deepest level is "the only place you can find tappers": so there is always one of each to find)
+  bunker3: { sniper50: 1, barrett: 1, vssk: 1, night_vision: 1 },
   castle: { mag_ak: 2, mag_ar: 2, mag_sniper: 1, pu_scope: 1, suppressor_762: 1, frag: 2, armor_vest: 1, stim_combat: 2, blood_bag: 2, saline: 1, firstaid: 2, keycard: 1, ammo_50bmg: 1 },
 };
 /**

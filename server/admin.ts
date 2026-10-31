@@ -2,7 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import { spawnAnimal, takeAnimal, takeAnimals } from './animals';
-import { sitesReset } from './sites';
+import { sitesReset, sitesSkip } from './sites';
 import { createHash } from 'node:crypto';
 import { heldIn } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
@@ -791,6 +791,10 @@ export async function command(c: Client, line: string) {
     }
     case 'site': {
       if (!admin) return need();
+      if (rest[0] === 'skip') {
+        sitesSkip();
+        return void sys(c, 'What was going is over.');
+      }
       sitesReset();
       return void sys(c, 'Every site is ready again.');
     }

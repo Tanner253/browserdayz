@@ -195,8 +195,8 @@ const THINGS: Record<string, TownThing[]> = {
     { kind: 'Barrel_01', x: 19, z: -9, rot: 0 }, { kind: 'barrel_03', x: 20.2, z: -9.6, rot: 0.3 }, { kind: 'portable_generator', x: 8, z: -17, rot: 0.8 }, { kind: 'concrete_road_barrier', x: 7, z: -8, rot: 0.1 },
   ],
   Kupol: [
-    // the dome, its door (+x) to the south; the reader by the strong room, its panel (+x) looking north at the yard; three breakers (+x) looking in at the dome
-    { kind: 'radar_dome', x: 0, z: 0, rot: -Q }, { kind: 'card_reader', x: -14.2, z: 10.7, rot: Q },
+    // the dome, its door (+x) to the north, where the ground comes to it, and its footing down to the lowest of the slope; the reader by the strong room, its panel (+x) looking north at the yard; three breakers (+x) looking in at the dome
+    { kind: 'radar_dome', x: 0, z: 0, rot: Q, y: 212.9 }, { kind: 'card_reader', x: -14.2, z: 10.7, rot: Q },
     { kind: 'breaker_box', x: -12, z: -8, rot: -0.588 }, { kind: 'breaker_box', x: 12, z: -12, rot: -2.356 }, { kind: 'breaker_box', x: 0, z: 22, rot: 1.571 },
     { kind: 'portable_generator', x: -18, z: 4, rot: 0.4 }, { kind: 'propane_tank', x: -20, z: 8, rot: 0 }, { kind: 'Barrel_01', x: 12, z: 18, rot: 0 }, { kind: 'wooden_military_crate', x: -7, z: 10, rot: 0.3 },
   ],

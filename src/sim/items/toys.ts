@@ -31,7 +31,7 @@ export const TOY_ITEMS: ItemDef[] = [
     id: 'card_blue', name: 'Blue Clearance Pass', model: 'clearance_pass', paint: 0x1d4f9c, w: 1, h: 1, weight: 0.03, category: 'misc',
     desc: 'A blue pass out of Bunker 17, cleared for a post on a mesa in the desert: Stolovaya. One scan at its reader, and it is cancelled.',
     // (on Level 1 and no deeper: it is the way to the rest, and one lying below it would be a lock with its key inside)
-    loot: { pair: 'ShippingContainerKeys_Blue', at: [0, 0, 0, 0, 2], away: [], lifetime: 7200, restock: 600, usage: ['First'] },
+    loot: { pair: 'ShippingContainerKeys_Blue', at: [0, 0, 0, 0, 3], away: [], lifetime: 7200, restock: 300, usage: ['First'] },
   },
   {
     id: 'card_yellow', name: 'Yellow Clearance Pass', model: 'clearance_pass', paint: 0xd9a514, w: 1, h: 1, weight: 0.03, category: 'misc',
@@ -53,7 +53,7 @@ export const TOY_ITEMS: ItemDef[] = [
   {
     id: 'night_vision', name: 'Night Vision', model: 'night_vision', w: 2, h: 2, weight: 0.9, category: 'tool',
     desc: 'A Soviet tube on a head harness, out of the vault of Bunker 17. Carried anywhere on you, N puts it to the eye: the dark goes green, and you see in it.',
-    loot: { pair: 'NVGoggles', at: [0, 0, 0, 0, 1], restock: 3600, usage: ['Vault'] },
+    loot: { pair: 'NVGoggles', at: [0, 0, 0, 0, 1], away: [5], restock: 3600, usage: ['Vault'] },
   },
   {
     id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',
