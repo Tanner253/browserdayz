@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T20:06:37.708Z",
+ "generated": "2026-10-31T21:09:25.670Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14839,16 +14839,16 @@
    "tags": [
     "prop"
    ],
-   "bytes": 342988,
+   "bytes": 343032,
    "srcTris": 1418,
    "tris": 1418,
    "min": [
-    -3,
+    -2.9994,
     0,
     -0.6482
    ],
    "max": [
-    3,
+    2.9994,
     0.2231,
     0.6482
    ],
@@ -14942,22 +14942,22 @@
    "tags": [
     "prop"
    ],
-   "bytes": 253308,
+   "bytes": 253416,
    "srcTris": 7299,
    "tris": 7299,
    "min": [
-    -1.5633,
+    -6.5,
     0,
-    -6.5
+    -1.5636
    ],
    "max": [
-    1.5633,
+    6.5,
     3.9647,
-    6.5
+    1.5636
    ],
    "lods": [],
    "hi": "assets/models/hi/boxcar.glb",
-   "hiBytes": 731040,
+   "hiBytes": 731152,
    "hiCard": 64
   },
   "rail_track": {
@@ -14965,18 +14965,18 @@
    "tags": [
     "prop"
    ],
-   "bytes": 434172,
+   "bytes": 434216,
    "srcTris": 1895,
    "tris": 1895,
    "min": [
-    -6,
+    -6.0134,
     0,
-    -1.6852
+    -1.6833
    ],
    "max": [
-    6,
+    6.0134,
     0.6422,
-    1.6852
+    1.6833
    ],
    "lods": []
   },

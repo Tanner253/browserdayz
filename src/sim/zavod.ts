@@ -30,7 +30,7 @@ export function zavodBuildings(): TownSpot[] {
 }
 
 /** A thing lying about the town, in its frame: which, where, its turn, and how high its foot is over the pad (a container stacked on another). */
-export interface TownThing { kind: string; x: number; z: number; rot: number; up?: number }
+export interface TownThing { kind: string; x: number; z: number; rot: number; up?: number; /** the height it stands at in the world, where several have to stand at one: over all else */ y?: number }
 
 /** the containers' two paints (see CONTAINER in src/world/buildings.ts) */
 const OR = 'container_shell@0', BL = 'container_shell@1';

@@ -125,7 +125,8 @@ export const frameMethods = {
     if (this.role && this.online && this.started && !this.hud.chatOpen) {
       if (input.pressed('Backquote')) this.toggleAdmin();
       if (this.role === 'admin' && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen) {
-        if (input.pressed('KeyN')) this.order('/noclip');
+        // (with night vision carried N is that, an admin's as anybody's)
+        if (input.pressed('KeyN') && this.inv.count('night_vision') < 1) this.order('/noclip');
         if (input.pressed('KeyK')) this.toggleFreecam();
         if (input.pressed('Delete')) this.deleteLooked();
       }

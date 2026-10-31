@@ -152,7 +152,7 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     if (!base.has(at)) base.set(at, y);
     // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
-    out.props.push({ kind: th.kind, x, y: y + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near, ...later });
+    out.props.push({ kind: th.kind, x, y: th.y ?? y + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near, ...later });
   }
   for (const [kind, lx, lz, scale] of townTrees(t)) {
     const [x, z] = townPoint(t, lx, lz);

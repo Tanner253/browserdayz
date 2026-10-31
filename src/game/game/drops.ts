@@ -459,8 +459,7 @@ export const dropsMethods = {
     const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
     const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
     // (a torch in the hands is lit with L itself: src/game/building/torches.ts)
-    // (N is an admin's no-clip in their own mode: frame.ts)
-    this.goggles.update(free && this.role !== 'admin' && this.input.pressed('KeyN'), this.inv.count('night_vision') > 0, (text) => this.hud.note(text, 'info'));
+    this.goggles.update(free && this.input.pressed('KeyN'), this.inv.count('night_vision') > 0, (text) => this.hud.note(text, 'info'));
     if (free && this.input.pressed('KeyL') && this.inv.held()?.id !== 'torch') {
       if (this.garage.ride) this.hud.note('It lights its own lamps while somebody drives', 'warn');
       else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');

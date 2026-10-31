@@ -156,6 +156,7 @@ export function keyHints(g: Game): KeyHints | null {
   put(rest, 'Map', [k('KeyM')], [P.up]);
   put(rest, 'Call out (hold)', [k('KeyT')], [`${P.down} held`]);
   if (w.hasLamp || g.inv.count('flashlight') > 0) put(rest, 'Light', [k('KeyL')], w.aiming ? null : [P.r3]);
+  if (g.inv.count('night_vision') > 0) put(rest, 'Night vision', [k('KeyN')], null);
   // (the panel is anyone's with a role; N and K an admin's: frame.ts)
   if (g.role && g.online) put(rest, 'Admin panel', [k('Backquote')], null);
   if (g.role === 'admin' && g.online) {
