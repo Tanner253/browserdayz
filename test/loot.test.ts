@@ -384,7 +384,7 @@ ok('the gas and the bunker hold what they are asked, or as much as they have pla
   assert.ok(kept <= 120 && kept >= 118, `a bunker of 120 places keeps ${kept} things`);
   for (const id of Object.keys(TYPES)) if (TYPES[id].at[4] && !TYPES[id].away?.includes(5)) assert.ok(few.kept(id, 5) >= 1, `${id} cut to nothing`);
   // (what is the bunker's and nobody else's cut least; a dressing every village has more than a shotgun)
-  assert.ok(few.kept('benelli', 5) / TYPES.benelli.at[4] >= few.kept('bandage', 5) / TYPES.bandage.at[4], 'the shotgun cut more than a dressing');
+  assert.ok(few.kept('benelli', 5) >= few.kept('bandage', 5), 'fewer shotguns left than dressings');
   for (const id of ['sniper50', 'barrett', 'vssk']) assert.equal(few.kept(id, 5), 1, `${id} cut`);
 });
 
