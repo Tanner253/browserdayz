@@ -115,6 +115,8 @@ export class Player {
   prevPos = new THREE.Vector3();
   vel = new THREE.Vector3();
   yaw = 0;
+  /** a floor that moves, if there is one: told where the body is going this step, moves that with it if it is on it, and says how far it was turned */
+  carry: ((next: { x: number; y: number; z: number }) => number) | null = null;
   pitch = 0;
   crouched = false;
   grounded = false;
@@ -833,6 +835,8 @@ export class Player {
       next.x = t.x;
       next.z = t.z;
     }
+    // (and a floor that moves takes it along, over and above all of that: src/game/train.ts)
+    if (this.carry) this.yaw += this.carry(next);
     this.body.setNextKinematicTranslation(next);
     const wasGrounded = this.grounded;
     this.grounded = landed;

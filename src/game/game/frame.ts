@@ -302,13 +302,16 @@ export const frameMethods = {
     this.tickZone(dt);
     physics.step(dt, (h) => {
       this.garage.step(h, moveInput);
+      this.trainCar?.step(h);
       p.step(h, moveInput);
+      this.trainCar?.placed();
       // A key press belongs to one simulation step, however many of them this frame needs:
       // seen by two, a single tap of C crouches and stands straight back up.
       input.consumeFixed();
       // (what is drawn is judged from the eye, not the body: an admin's free camera a kilometre off saw the towns' furniture with no houses round it)
       buildings.update(h, this.s.r.camera.position);
     });
+    this.trainCar?.draw(physics.alpha);
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead && !this.powers.god);
     this.lightStep(dt, playing && !uiOpen && !typing);

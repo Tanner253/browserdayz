@@ -102,6 +102,7 @@ import '../sim/injury';
 import { Base28 } from '../trailer/base28';
 import { Goggles } from './goggles';
 import { MineSite } from '../world/mine';
+import type { TrainCar } from './train';
 import { Sites } from './sites';
 import { Toys } from './toys';
 import { Traps } from './traps';
@@ -444,6 +445,8 @@ export class Game {
   sites!: Sites;
   /** the Old Mine's drifts (src/world/mine.ts) */
   oldMine!: MineSite;
+  /** the car on the line (src/game/train.ts) */
+  trainCar: TrainCar | null = null;
   /** night vision (src/game/goggles.ts) */
   goggles = new Goggles();
   /** the guns and tools in, to be held */
