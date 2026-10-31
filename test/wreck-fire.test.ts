@@ -142,8 +142,8 @@ ok('and it is nothing else: not searched, not lit, not blown up, not driven', ()
   assert.ok(!CRATE_KINDS.has(J.kind) && !SEARCHED_KINDS.has(J.kind));
   assert.ok(!fireSpots(world.props).some((q) => Math.hypot(q.x - spot.x, q.z - spot.z) < 6), 'a fireplace stands at it');
   assert.ok(!barrelSpots(world.props).some((q) => Math.hypot(q.x - spot.x, q.z - spot.z) < 6), 'a drum of fuel stands at it');
-  // (the only other jeep in the world's list is the one that went off the bridge)
-  assert.equal(world.props.filter((q) => q.kind === J.kind).length, 1 + world.bridges.length);
+  // (the only others in the world's list are the one that went off the bridge and the two left standing at Gorodok and Stolovaya)
+  assert.equal(world.props.filter((q) => q.kind === J.kind).length, 1 + world.bridges.length + 2);
 });
 
 ok('the ground the world has there takes it: near level under its wheels, open, nothing else stood on it, and the way in is clear', () => {

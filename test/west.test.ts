@@ -292,7 +292,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
 {
   const towns = world.towns!;
   // (the desert's first, since 2026-10-18: src/sim/desert.ts; and those laid later last, since 2026-10-23: LATER_TOWNS)
-  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon']);
+  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon', 'Gorodok', 'Stolovaya']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
