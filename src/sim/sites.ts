@@ -53,17 +53,17 @@ export const SITES: Record<string, Site> = {
 
 SITES.bolotnaya = {
   town: BOLOTNAYA, name: 'Bolotnaya', card: 'card_yellow', gives: 'card_red',
-  room: [0, 0], reader: [-2, 3.4], crate: [0.3, -0.6], locker: [-6, 7],
+  room: [14, -14], reader: [12, -10.6], crate: [14.3, -14.6], locker: [8, -7],
   hold: 360, again: 1800, heard: 100,
   wave: { every: 24, n: 8, most: 30, from: [20, 38] },
-  steps: { at: [[-24, 12], [26, 8], [4, -26]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4, after: 0 },
+  steps: { at: [[-24, 12], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4, after: 0 },
 };
 SITES.kupol = {
   town: KUPOL, name: 'the Kupol', card: 'card_black', gives: 'card_purple',
   room: [-12, 14], reader: [-14.2, 10.7], crate: [-11.8, 14.6], locker: [-8, 8],
   hold: 240, again: 2400, heard: 130,
   wave: { every: 20, n: 10, most: 40, from: [22, 44] },
-  steps: { at: [[-24, -6], [20, 8], [2, 24]], name: 'breakers', use: 'Throw the breaker', doing: 'Throwing the breaker', secs: 4, after: 720 },
+  steps: { at: [[-12, -8], [12, -12], [0, 22]], name: 'breakers', use: 'Throw the breaker', doing: 'Throwing the breaker', secs: 4, after: 720 },
 };
 
 /** Level 2's plant, and its armoury, as the plan lays them out */
@@ -126,7 +126,8 @@ export function atSpot(s: Spot, P: Place | null, x: number, y: number, z: number
   const [sx, , sz] = spotAt(s, P);
   if (Math.hypot(sx - x, sz - z) > reach) return false;
   if ('place' in s) return inMine(x, y, z);
-  if (!('level' in s)) return !inMine(x, y, z) && (!P || levelAt(y - P.y) === 1);
+  // (a level is only asked of the bunker: Bolotnaya's ground lies lower than its second)
+  if (!('level' in s)) return !inMine(x, y, z);
   return !!P && y < P.y - 1 && levelAt(y + 1 - P.y) === s.level;
 }
 

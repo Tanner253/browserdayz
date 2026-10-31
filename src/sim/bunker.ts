@@ -796,6 +796,8 @@ function layOut(seed: number, level = 1): Plan {
     side = -side;
   }
 
+  // (the only way out of Level 3: a ladder up the front wall, flat to it, its width across the passage as the model's is across its x)
+  if (level === 3) stood.push({ id: 'bunker_ladder', r: 0, f: H.front - 0.45, rot: 0 });
   for (const add of later) add();
   return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, H.back], cross };
 }

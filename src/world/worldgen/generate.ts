@@ -21,6 +21,7 @@
 //   1887  the fourth expansion
 //   2680  the west
 
+import { KUPOL, SIDING } from '../../sim/outposts';
 import { Simplex, RNG, smoothstep, lerp, clamp, hash2 } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
 import { type Bridge, wreckUnder } from '../../sim/bridge';
@@ -2701,6 +2702,9 @@ function* worldStages(seed: number): Generator<string, World, void> {
   for (const st of caveStashes(passPlan)) props.push({ kind: 'weapons_case', x: st.x, y: st.y, z: st.z, rot: st.rot, scale: 1, far: 40 });
   // (and where anybody starts, on the far west beach: coast-starts.ts. `starts`, the old valley's, is no longer handed out)
   const coast = coastStarts(world.heights, { trees, rocks, props, buildings });
+  // (the way down's stops stand clear of the woods: a pine grew through the boxcar. A tree is told by its number, so what is in the way is
+  // shrunk to nothing and stays on the list)
+  for (const [x, z, r] of [[SIDING.x, SIDING.z, 20], [KUPOL.x, KUPOL.z, 36]]) for (const t of trees) if (Math.hypot(t.x - x, t.z - z) < r) t.scale = 0.01;
 
   return {
     heights: world.heights,

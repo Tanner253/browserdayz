@@ -51,7 +51,7 @@ export const GUN_ITEMS: ItemDef[] = [
     // did 50 at the muzzle, and two to the body left a man standing with a sliver. At 82 it does 70: two to the
     // body are the end of anybody not in plates, and of whoever wears the armoured vest, barely.)
     weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, mag: 'mag_deagle', ergo: 56 }, iconYaw: 0,
-    loot: { pair: 'Deagle', at: [0, 0, 0, 0, 4], restock: 600, loaded: [2, 7], fitted: [['mag_deagle_ext', 0.1]] },
+    loot: { pair: 'Deagle', at: [0, 0, 0, 0, 2], restock: 600, loaded: [2, 7], fitted: [['mag_deagle_ext', 0.1]] },
     worth: 40,
   },
   {
@@ -59,7 +59,7 @@ export const GUN_ITEMS: ItemDef[] = [
     desc: 'Twelve-gauge shotgun, self-loading. Seven shells in the tube, pushed in one at a time: it takes no magazine. Nine pellets a shell: nothing is worse to meet in a corridor, and little is less use across a field. Takes a holographic sight, a suppressor and a light.',
     weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 7, ergo: 52, action: 'self', tube: true, shows: { red_dot: ['sight'], suppressor_12: ['silencer'] } }, iconYaw: 0,
     // The shotgun and the Desert Eagle: the bunker's, and nobody else's.
-    loot: { pair: 'Mp133Shotgun', at: [0, 0, 0, 0, 4], restock: 600, loaded: [3, 7], fitted: [['red_dot', 0.25], ['gun_light', 0.2]] },
+    loot: { pair: 'Mp133Shotgun', at: [0, 0, 0, 0, 2], restock: 600, loaded: [3, 7], fitted: [['red_dot', 0.25], ['gun_light', 0.2]] },
     worth: 45,
   },
   // The submachine gun (2026-10-11): a MAC-pattern 9 mm with a railed fore-end, its magazine up its grip. It fires
@@ -90,7 +90,8 @@ export const GUN_ITEMS: ItemDef[] = [
     // (the heavy snipers are special and sought after: one in the bunker, now and then on the fort's racks, and back
     // forty minutes after one is taken; the owner, 2026-10-20: "the barrette is too common in T5 and same with the other
     // tappers. we dont want them to feel too hard to get but really they are special sought after weapons")
-    loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], restock: 2400, loaded: [1, 5], rack: { fort: 0.2 }, fitted: [['scope_50', 0.85]] },
+    // (the owner, 2026-10-31: tier 3 of the bunker is "the only place you can find tappers and the best loot in the game")
+    loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], restock: 2400, usage: ['Vault'], loaded: [1, 5], fitted: [['scope_50', 0.85]] },
     worth: 120,
   },
   // The M32 MGL (2026-10-17): a six-shot 40 mm grenade launcher, for admins only (the owner: "the grenade launcher
@@ -109,7 +110,7 @@ export const GUN_ITEMS: ItemDef[] = [
     desc: 'A self-loading rifle in .50 BMG. It takes its NightForce scope (four to twelve times, mil-dots, a laser rangefinder); without it, plain sights. Ten rounds, as fast as the trigger, and it kicks like a mule.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, optic: 'scope_barrett', shows: { mag_barrett: ['mag'], scope_barrett: ['scope'] } }, iconYaw: 0,
     // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
-    loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], restock: 2400, loaded: [2, 10], rack: { fort: 0.15 }, fitted: [['scope_barrett', 0.85]] },
+    loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], restock: 2400, usage: ['Vault'], loaded: [2, 10], fitted: [['scope_barrett', 0.85]] },
     worth: 140,
   },
   // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the L96 is.
@@ -117,7 +118,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
     desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. It takes its own PSO scope (two to six times), and no other sights.',
     weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, optic: 'scope_vssk', shows: { mag_vssk: ['mag', 'bullet'], scope_vssk: ['scope'] } }, iconYaw: 0,
-    loot: { pair: 'VSS', at: [0, 0, 0, 0, 1], restock: 2400, loaded: [1, 5], rack: { fort: 0.25 }, fitted: [['scope_vssk', 0.85]] },
+    loot: { pair: 'VSS', at: [0, 0, 0, 0, 1], restock: 2400, usage: ['Vault'], loaded: [1, 5], fitted: [['scope_vssk', 0.85]] },
     worth: 110,
   },
   // A pair of submachine guns, one in each hand (2026-10-17): the left button fires the left one, the right button the
@@ -200,7 +201,7 @@ export const GUN_ITEMS: ItemDef[] = [
     weapon: { kind: 'auto', ammo: 'ammo_739', capacity: 30, mag: 'mag_ak', ergo: 46, modes: ['auto', 'semi'], shows: { mag_ak: ['mag'] } }, iconYaw: 0,
     // The two assault rifles: the gas's, and the bunker's racks and lockers (see crates.ts). In Kamenka one of each,
     // where the army and the police kept things, seldom with a magazine in it, and a long time coming back.
-    loot: { pair: 'AKM', at: [0, 0, 2, 5, 0], restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON, on: { 3: { restock: 2700, mag: 0.15 } }, fitted: [['red_dot', 0.1], ['suppressor_739', 0.05], ['drum_ak', 0.04]], rack: { fort: 2 }, lean: 3 },
+    loot: { pair: 'AKM', at: [0, 0, 0, 5, 0], restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON, fitted: [['red_dot', 0.1], ['suppressor_739', 0.05], ['drum_ak', 0.04]], rack: { fort: 2 }, lean: 3 },
     worth: 55,
   },
   {

@@ -99,8 +99,9 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // (nor what is only got by work: a log off a tree, stone off a boulder, src/sim/gather.ts; a key, cut at its lock)
   // (nor what is only made, smelted or salvaged: src/sim/items/craft.ts)
   // (nor the karambit: bought at the store, a knife of one's own made one, never found)
+  // (nor the clearance passes past the first: each is handed over at the stop before it, src/sim/sites.ts)
   const hunted = new Set(KINDS.flatMap((k) => yieldOf(k, 1).map(([id]) => id)));
-  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'm32', 'ammo_40mm', 'log', 'stone', 'key', 'loot_bag', 'karambit', ...MADE_ONLY].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
+  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'm32', 'ammo_40mm', 'log', 'stone', 'key', 'loot_bag', 'karambit', 'card_yellow', 'card_red', 'card_black', 'card_purple', ...MADE_ONLY].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
   const { ruled: on, e } = worlds[0];
   // (new things join the pools and the rest are a little rarer for it, the owner, 2026-10-25: "every item has a
@@ -195,8 +196,8 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
       assert.equal(on(gun, 1) + on(gun, 2), 0, `a ${gun} below Kamenka`);
       // (one in Kamenka and one in the village, since the village is of the third step; and no AR-15 there since
       // 2026-10-19, the owner: "AR's should only be T4+")
-      if (gun === 'ar15') assert.equal(on(gun, 3), 0, `${on(gun, 3)} of ${gun} in Kamenka`);
-      else assert.ok(on(gun, 3) >= 1 && on(gun, 3) <= TYPES[gun].at[2], `${on(gun, 3)} of ${gun} in Kamenka`);
+      // (and no AK since the way down's rebalance, 2026-10-31: the plan the owner took, "AK leaves Tier 3")
+      assert.equal(on(gun, 3), 0, `${on(gun, 3)} of ${gun} in Kamenka`);
       assert.ok(on(mag, 3) >= 1 && on(mag, 3) <= TYPES[mag].at[2], `${on(mag, 3)} of ${mag} in Kamenka`);
       // (but the AR-15's rounds, kept by a rate where the police and the army were: see TypeRule.per)
       // (light by the place: the third step has eight times the gas's places)
@@ -208,7 +209,7 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
       // (a floor and not a count: every sort is cut to fit a full step, the owner's word, and which of them comes up short is the dice's)
       assert.ok(on(gun, 4) >= 1 && on(mag, 4) >= 2, `${on(gun, 4)} of ${gun} and ${on(mag, 4)} of ${mag} under the gas`);
       // (the AR-15 is not kept on the third step at all since 2026-10-19)
-      assert.ok((gun === 'ar15' || TYPES[gun].on![3]!.restock! >= 2400) && TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
+      assert.ok(TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
     }
     // (they lie where the army and the police kept things, and in nobody's kitchen)
     for (const { id, p } of all) if ((id === 'ak' || id === 'ar15' || id === 'mosin') && p.tier === 3 && !p.keeps) assert.ok(kind(p, ...KEPT_GUNS), `a ${id} in ${p.building}`);
@@ -229,7 +230,7 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
     // (the showcase is gone: nothing of the bunker's or the gas's is in the town's houses)
     for (const id of ['benelli', 'box_12', 'suppressor_12', 'drum_ak', 'mag_ar_60', 'suppressor_739', 'suppressor_556', 'keycard']) assert.equal(on(id, 3), 0, `a ${id} in Kamenka`);
   }
-  assert.ok(rifles > 100 && withMag / rifles > 0.05 && withMag / rifles < 0.25, `${withMag} of ${rifles} rifles put down in Kamenka had a magazine in them`);
+  assert.equal(rifles, 0, `${rifles} rifles put down in Kamenka`);
 });
 
 ok('the shotgun, the Desert Eagle, the heavy armour and the K6-3 are the bunker\'s and nobody else\'s; the rucksack is not below the fourth step', () => {
@@ -383,7 +384,7 @@ ok('the gas and the bunker hold what they are asked, or as much as they have pla
   assert.ok(kept <= 120 && kept >= 118, `a bunker of 120 places keeps ${kept} things`);
   for (const id of Object.keys(TYPES)) if (TYPES[id].at[4] && !TYPES[id].away?.includes(5)) assert.ok(few.kept(id, 5) >= 1, `${id} cut to nothing`);
   // (what is the bunker's and nobody else's cut least; a dressing every village has more than a shotgun)
-  assert.ok(few.kept('benelli', 5) / TYPES.benelli.at[4] > few.kept('bandage', 5) / TYPES.bandage.at[4], 'the shotgun cut more than a dressing');
+  assert.ok(few.kept('barrett', 5) / TYPES.barrett.at[4] > few.kept('bandage', 5) / TYPES.bandage.at[4], 'a tapper cut more than a dressing');
   for (const id of ['sniper50', 'barrett', 'vssk']) assert.equal(few.kept(id, 5), 1, `${id} cut`);
 });
 

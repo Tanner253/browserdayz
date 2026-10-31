@@ -46,7 +46,7 @@ export const GORODOK: Town = { name: 'Gorodok', x: -1450, z: -320, pad: [62, 62]
 export const STOLOVAYA: Town = { name: 'Stolovaya', x: -2580, z: 380, pad: [46, 36], rot: 0.2, asIs: true };
 // (the way down's other stops, on the ground as it lies. Each mine portal is turned to look straight out of the rock it stands against:
 // the ground's own fall there; the siding runs along the contour)
-export const BOLOTNAYA: Town = { name: 'Bolotnaya', x: -2024, z: 666, pad: [40, 30], rot: 0, asIs: true };
+export const BOLOTNAYA: Town = { name: 'Bolotnaya', x: -1950, z: 650, pad: [40, 30], rot: 0, asIs: true };
 export const KUPOL: Town = { name: 'Kupol', x: 720, z: -540, pad: [30, 30], rot: 0, asIs: true };
 export const SIDING: Town = { name: 'Kupol Siding', x: 708, z: -474, pad: [20, 8], rot: -0.873, asIs: true };
 export const MINE_W: Town = { name: 'Old Mine', x: -2389, z: 540, pad: [8, 8], rot: 2.53, asIs: true };
@@ -82,15 +82,19 @@ const BUILDINGS: Record<string, TownSpot[]> = {
   ],
   Bolotnaya: [
     // (the pump house, its door to the south and the sunken room under it; the keeper's shed; a barn the swamp has had)
-    { type: 'guardpost', x: 0, z: 0, rot: N },
-    { type: 'shed', x: 14, z: -8, rot: 0.3 },
-    { type: 'barn_sunk', x: -26, z: -16, rot: 0.3 },
+    // (each on the hummocks, its floor over the swamp's water at 17.3: the pad of a town on the ground as it lies is far under it)
+    { type: 'guardpost', x: 14, z: -14, rot: N, up: 4.2 },
+    { type: 'shed', x: 28, z: -20, rot: 0.3, up: 4 },
+    { type: 'barn_sunk', x: -26, z: -16, rot: 0.3, up: 3.3 },
   ],
   Kupol: [
     // (the crew's strong room, its door to the dome and the reader by it; a hut for the watch)
-    { type: 'guardpost', x: -12, z: 14, rot: S },
+    { type: 'guardpost', x: -12, z: 14, rot: S, up: 6.4 },
     { type: 'hut', x: 6, z: 30, rot: S },
   ],
+  'Kupol Siding': [],
+  'Old Mine': [],
+  'Old Mine East': [],
   Kolodets: [
     // (the pump house over the well's pipe, the herders' bunkhouse, their two tents)
     { type: 'shed', x: -10, z: -7, rot: N + 0.1 },
@@ -184,14 +188,14 @@ const THINGS: Record<string, TownThing[]> = {
   ],
   Bolotnaya: [
     // the works of the pumps, and the reader by the door. A valve's wheel is its +z: each looks in at the pump house; the reader's panel, its +x, looks south
-    { kind: 'card_reader', x: -2, z: 3.4, rot: -Q },
-    { kind: 'valve_stand', x: -24, z: 12, rot: 2.03 }, { kind: 'valve_stand', x: 26, z: 8, rot: -1.87 }, { kind: 'valve_stand', x: 4, z: -26, rot: -0.15 },
-    { kind: 'Barrel_01', x: 5, z: 4, rot: 0 }, { kind: 'barrel_03', x: 6.2, z: 3.4, rot: 0.3 }, { kind: 'portable_generator', x: -6, z: -5, rot: 0.8 }, { kind: 'concrete_road_barrier', x: -7, z: 6, rot: 0.1 }, { kind: 'old_tyre', x: 12, z: 6, rot: 0.5 },
+    { kind: 'card_reader', x: 12, z: -10.6, rot: -Q },
+    { kind: 'valve_stand', x: -24, z: 12, rot: 2.17 }, { kind: 'valve_stand', x: 8, z: 16, rot: 2.94 }, { kind: 'valve_stand', x: 0, z: -24, rot: 0.95 },
+    { kind: 'Barrel_01', x: 19, z: -9, rot: 0 }, { kind: 'barrel_03', x: 20.2, z: -9.6, rot: 0.3 }, { kind: 'portable_generator', x: 8, z: -17, rot: 0.8 }, { kind: 'concrete_road_barrier', x: 7, z: -8, rot: 0.1 },
   ],
   Kupol: [
     // the dome, its door (+x) to the south; the reader by the strong room, its panel (+x) looking north at the yard; three breakers (+x) looking in at the dome
     { kind: 'radar_dome', x: 0, z: 0, rot: -Q }, { kind: 'card_reader', x: -14.2, z: 10.7, rot: Q },
-    { kind: 'breaker_box', x: -24, z: -6, rot: -0.245 }, { kind: 'breaker_box', x: 20, z: 8, rot: 2.76 }, { kind: 'breaker_box', x: 2, z: 24, rot: 1.65 },
+    { kind: 'breaker_box', x: -12, z: -8, rot: -0.588 }, { kind: 'breaker_box', x: 12, z: -12, rot: -2.356 }, { kind: 'breaker_box', x: 0, z: 22, rot: 1.571 },
     { kind: 'portable_generator', x: -18, z: 4, rot: 0.4 }, { kind: 'propane_tank', x: -20, z: 8, rot: 0 }, { kind: 'Barrel_01', x: 12, z: 18, rot: 0 }, { kind: 'wooden_military_crate', x: -7, z: 10, rot: 0.3 },
   ],
   'Kupol Siding': [

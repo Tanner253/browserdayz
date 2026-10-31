@@ -29,8 +29,8 @@ ok('twelve shut in the bunker, as before: six by the passages, six still in the 
   assert.equal(rooms.n, 6);
   assert.ok(passages.inside!.length >= 7 && rooms.inside!.length >= 12, `${passages.inside!.length} passage spots, ${rooms.inside!.length} room spots`);
   // (and the map's other homes as they were: nothing else is marked the bunker's)
-  // (the first level's, and one each for the two under it)
-  assert.equal(homes.filter((h) => h.still).length, 3);
+  // (the first level's, one each for the two under it, and the mine's)
+  assert.equal(homes.filter((h) => h.still).length, 4);
 });
 
 ok('the passage ones stand in the two passages, this side of the far rooms, on the floor', () => {

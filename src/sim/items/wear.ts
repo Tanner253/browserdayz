@@ -407,7 +407,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'heavy_armor', name: 'Heavy Armour', model: 'heavy_armor', w: 3, h: 3, weight: 8.5, category: 'clothing', slot: 'vest',
     desc: 'Plates front, back and sides, and a collar. Half the damage from every hit to the body. It weighs what it looks as if it weighs, and carries 12 slots.', wear: { cargo: [4, 3], armor: 0.5 },
-    loot: { pair: 'PlateCarrierVest', at: [0, 0, 0, 0, 3], lifetime: 7200, restock: 1800 },
+    loot: { pair: 'PlateCarrierVest', at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800 },
     worth: 32,
   },
   {

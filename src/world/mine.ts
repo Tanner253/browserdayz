@@ -26,7 +26,7 @@ function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vec
   }
   for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
     const q = i + j * (nw + 1), r = q + 1, s = q + nw + 1, t = s + 1;
-    idx.push(q, r, t, q, t, s);
+    idx.push(q, t, r, q, s, t);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
