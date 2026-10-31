@@ -99,6 +99,11 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   frag: FRAG_RULE,
   // (a 40 mm grenade from the M32: a frag's blast a little smaller, from as far as it can be fired)
   ammo_40mm: { damage: 180, melee: false, range: 500, interval: 0, falloff: 1, blast: 7, car: 0.8 },
+  // (the smoke grenade and the flare hurt nobody: a blast that reaches nothing, so that they go by a grenade's rules of throwing)
+  smoke_grenade: { damage: 0, melee: false, range: 70, interval: 0, falloff: 1, blast: 0.1, car: 0 },
+  ammo_flare: { damage: 0, melee: false, range: 500, interval: 0, falloff: 1, blast: 0.1, car: 0 },
+  // (a land mine: the end of a car, and of anybody on it; src/sim/traps.ts)
+  land_mine: { damage: 300, melee: false, range: 70, interval: 0, falloff: 1, blast: 7, car: 1 },
   // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away. (140 and 8 m until
   // 2026-10-13: "exploding barrels should have larger explosion SFX and do more damage", then "barrell blast radius
   // should be larger with damage gradient": more than a grenade's at its middle, and reaching half as far again,

@@ -366,7 +366,8 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   // (and none from a death no other player caused: the owner, 2026-10-18, of the bots that lived out the tag's time
   // and then had their own game say they "died of wounds", leaving a tag for their partner to take. A player's hit
   // within TAG_CAUSE_MS counts, so one who bleeds out from a gunshot still leaves theirs.)
-  const hitter = c.lastHitBy && c.lastHitBy.id !== c.id && Date.now() - c.lastHitBy.at < TAG_CAUSE_MS ? c.lastHitBy : null;
+  // (nobody's, id 0, is a land mine's: server/traps.ts. What a trap kills leaves no tag)
+  const hitter = c.lastHitBy && c.lastHitBy.id !== c.id && c.lastHitBy.id !== 0 && Date.now() - c.lastHitBy.at < TAG_CAUSE_MS ? c.lastHitBy : null;
   const nobody = TAG_NEEDS_KILLER && !hitter && !fresh;
   // (and an admin who has chosen so leaves no tag of their own either, however long they lived, unless an admin above
   // them has chosen for them (tagLock); or nothing at all of what they carried but the tags they took off other people)

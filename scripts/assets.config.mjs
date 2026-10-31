@@ -1028,6 +1028,27 @@ export const LOCAL_MODELS = {
     changes: 'Stood on the ground about its own middle, at the size it was made, simplified to about 10,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
     credit: { name: 'Forge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Forge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
   },
+  // (the small wins of 2026-10-31, made in Higgsfield and sized at intake by progress/tools/intake.mjs)
+  bear_trap: {
+    dir: '../incoming/higgsfield/toys', file: 'bear_trap_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Bear trap', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Bear trap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  land_mine: {
+    dir: '../incoming/higgsfield/toys', file: 'land_mine_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Land mine', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Land mine" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  smoke_grenade: {
+    dir: '../incoming/higgsfield/toys', file: 'smoke_grenade_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Smoke grenade', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Smoke grenade" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  flare_round: {
+    dir: '../incoming/higgsfield/toys', file: 'flare_round_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Signal flare', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Signal flare" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
   // (made for crafting in Higgsfield, 2026-10-25, sized at intake by progress/tools/intake.mjs: a slim sledgehammer, a coil of
   // hemp rope and a bundle of rags, in place of the downloads judged too thick, untextured and whole clothes)
   sledgehammer_slim: {
@@ -1356,6 +1377,25 @@ export const WEAPON_PACKS = {
   // The Desert Eagle came as a pistol and nothing else: it is held in the other pistol's
   // hands and moved as that pistol is, like the Pistol 43. Its barrel is part of its frame
   // (the slide runs back round it), and the cartridge that came lying in it is the .50's own model.
+  // (the small wins of 2026-10-31: one piece, the body, made in Higgsfield. "the flare gun looks liek a revolver, not a flare gun lol": this is the second go, the orange lifeboat kind)
+  flare_gun: {
+    dir: '../incoming/higgsfield/toys',
+    file: 'flare_b_sized.glb',
+    tex: 1024,
+    fp: false,
+    length: 0.22,
+    forward: [0.456, 0, 0.89],
+    up: [0, 1, 0],
+    fit: { to: 'm9', piece: 'base' },
+    parts: { 'tripo_node_02921246-7196-47d3-909f-b312f89172d9': 'base' },
+    credit: {
+      name: 'Flare gun',
+      url: 'https://higgsfield.ai',
+      author: 'ZONA (Higgsfield, Tripo text-to-3D)',
+      line: '"Flare gun" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31.',
+      changes: 'Made at its true size, laid along the barrel; textures capped at 1024; geometry compressed.',
+    },
+  },
   desert_eagle: {
     dir: 'desert_eagle',
     file: 'scene.gltf',

@@ -51,6 +51,7 @@ import { animalsTick, startAnimals } from './animals';
 import { regrowing } from './gather';
 import { keepBases, restoreBases, sighting } from './build';
 import { charges } from './raid';
+import { trapSight, trapsTick } from './traps';
 import { upkeep } from './claims';
 import { ROT } from '../src/sim/build/upkeep';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
@@ -445,6 +446,9 @@ setInterval(() => standing(Date.now()), 500);
 setInterval(() => inHands(Date.now()), 250);
 // (the charges stuck to bases: server/raid.ts)
 setInterval(() => charges(Date.now()), 250);
+// (traps: whoever has stepped on one, and which each game is told of: server/traps.ts)
+setInterval(() => trapsTick(Date.now()), 120);
+setInterval(() => trapSight(), 1000);
 
 // felled trees standing again, out of everybody's sight (server/gather.ts); bases told to whoever comes near them (server/build.ts)
 setInterval(() => regrowing(), 30_000);

@@ -175,7 +175,7 @@ export const dropsMethods = {
     const blast = !!WEAPON_RULES[m.w]?.blast || m.w === 'fire';
     const melee = !blast && !ITEMS[m.w]?.weapon;
     const sick = m.w === 'infected', beast = KIND[m.w];
-    p.damage(amount, beast ? `a ${beast.name.toLowerCase()}` : sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
+    p.damage(amount, beast ? `a ${beast.name.toLowerCase()}` : sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'trap' ? 'a bear trap' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
     this.glass = 0;
     this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
@@ -187,6 +187,8 @@ export const dropsMethods = {
     if (!p.dead && (beast ? !!m.bleed : Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4))) p.bleed(woundOf(sick || beast ? 'bite' : blast ? 'blast' : melee ? (blade ? 'cut' : 'blunt') : 'shot', m.zone));
     // in the legs, a bullet as often as not breaks one, and so now and then does something swung (not their hands, and not a blast)
     if (!blast && !sick && !beast && m.w !== 'fists' && m.w !== 'jeep' && breaksOnHit(m.zone, melee, Math.random())) p.breakLeg();
+    // (a bear trap's jaws always do)
+    if (m.w === 'trap' && !p.dead) p.breakLeg();
     this.weapons.flinch(melee ? 0.5 : 1);
     this.lastHit = { x: m.dir[0], z: m.dir[2], at: performance.now() };
     // Bullets in this world pass through your own body (the server said you were hit, not

@@ -100,6 +100,8 @@ import { Fires } from './fires';
 import { Lockers } from './lockers';
 import '../sim/injury';
 import { Base28 } from '../trailer/base28';
+import { Toys } from './toys';
+import { Traps } from './traps';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
@@ -433,6 +435,9 @@ export class Game {
   traders: Traders | null = null;
   /** the trader camp (src/game/camp.ts) */
   camp!: TraderCamp;
+  /** what the small wins leave in the air (src/game/toys.ts), and the traps on the ground (src/game/traps.ts) */
+  toys!: Toys;
+  traps!: Traps;
   /** the recyclers (src/game/craft-recyclers.ts) */
   recyclers!: RecyclerView;
   /** talking to whoever is near: hold V (src/game/voice.ts) */
@@ -651,7 +656,18 @@ export class Game {
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
-    this.grenades.onExplode = (at, mine, id) => this.explode(at, mine, id === 'frag' ? 'frag' : id === 'ammo_40mm' ? 'ammo_40mm' : 'grenade');
+    this.toys = new Toys(r.scene, this.effects, this.lamps);
+    this.traps = new Traps({
+      scene: r.scene, models: this.loot.models, online: () => this.online, send: (m) => this.net.send(m), pressed: (code) => this.input.pressed(code),
+      note: (text) => this.hud.note(text, 'info'), work: (label, seconds, item, done) => this.startUse(label, seconds, item, 'open', null, done),
+      feet: () => this.player.pos, facing: () => this.s.r.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(),
+    });
+    this.grenades.onFlare = (at, dt) => this.toys.rising(at, dt);
+    this.grenades.onExplode = (at, mine, id) => {
+      if (id === 'smoke_grenade') return this.toys.smoke(at);
+      if (id === 'ammo_flare') return this.toys.flare(at);
+      this.explode(at, mine, id === 'frag' ? 'frag' : id === 'ammo_40mm' ? 'ammo_40mm' : 'grenade');
+    };
     this.throwing = new Throwing({
       scene: r.scene,
       models: this.loot.models,

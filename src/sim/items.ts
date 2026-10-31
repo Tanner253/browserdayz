@@ -7,6 +7,7 @@ import { TOOL_ITEMS } from './items/tools';
 import { HUNT_ITEMS } from './items/hunt';
 import { BUILD_ITEMS } from './items/build';
 import { CRAFT_ITEMS } from './items/craft';
+import { TOY_ITEMS } from './items/toys';
 import type { LootRule } from './items/rules';
 import { lookOf } from '../../api/_lib/shop-items';
 import type { Region } from './survivor';
@@ -166,7 +167,7 @@ export interface ItemDef {
 
 // (the items themselves are in src/sim/items/, by sort, each with its loot rule and its price)
 
-const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS, ...BUILD_ITEMS, ...CRAFT_ITEMS];
+const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS, ...BUILD_ITEMS, ...CRAFT_ITEMS, ...TOY_ITEMS];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));
 

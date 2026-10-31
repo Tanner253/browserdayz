@@ -28,6 +28,7 @@ import { FIRE } from '../../sim/fires';
 import { heightAt } from '../../world/worldgen';
 import { COOKS, COOK_KINDS, FUEL, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
 import { POISON, fallsIll } from '../../sim/sickness';
+import { isTrap } from '../../sim/traps';
 import { WHEEL_REACH, type TimedAction, type Game } from '../game';
 import { chosen } from '../survivors';
 
@@ -260,6 +261,7 @@ export const itemsMethods = {
     // (A grenade is not used over a time as other things are: its pin is pulled, and from then it is live. With the
     // button that began it still down, it is held; chosen out of the pockets, it is thrown the moment the pin is out.)
     if (def.throw) return this.pullPin(item, now);
+    if (isTrap(item.id)) return this.traps.begin(item);
     // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both, a bag of blood lies in the palm as a roll of dressing does
     const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : isBag(item.id) ? 'drip' : u.sound;
     const sound: TimedAction['sound'] = def.look || def.call ? null : u.sound;
@@ -400,7 +402,8 @@ export const itemsMethods = {
       // Held to the end of its fuse: it goes off in the hand. (Said to the server as a grenade that has left the
       // hand and is not moving: it has counted the fuse itself, and knows what that means.)
       this.net.send({ t: 'nade', o: o.toArray(), v: [0, 0, 0] });
-      this.explode(o, true, c.id === 'frag' ? 'frag' : 'grenade', undefined, true);
+      if (c.id === 'smoke_grenade') this.toys.smoke(o);
+      else this.explode(o, true, c.id === 'frag' ? 'frag' : 'grenade', undefined, true);
       return;
     }
     this.grenades.throw(o, v, left, true, c.id);
@@ -626,7 +629,7 @@ export const itemsMethods = {
    * @param skip what went up, if it is still standing in the way of its own blast
    * @param inHand a grenade of this player's own that was never thrown: it went off in the hand that held it
    */
-  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' | 'c4' | 'satchel' = 'grenade', skip?: Barrel['collider'], inHand = false) {
+  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' | 'c4' | 'satchel' | 'land_mine' = 'grenade', skip?: Barrel['collider'], inHand = false) {
     // (a jeep goes up as a drum of fuel does; online the server says who it reached)
     const jeep = what === 'jeep';
     const drum = what === 'barrel' || jeep;
@@ -636,7 +639,7 @@ export const itemsMethods = {
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
     // (a C4 goes up as a frag does, a satchel charge as a stick grenade: src/sim/build/raid.ts)
-    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' || what === 'c4' ? 'frag' : 'grenade');
+    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' || what === 'c4' || what === 'land_mine' ? 'frag' : 'grenade');
     audio.explosion(at, far, drum);
     if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
     /** how much of the blast reaches a point: nothing through a wall, less with every metre */

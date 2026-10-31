@@ -810,6 +810,49 @@ export class Effects {
     }
   }
 
+  /**
+   * A smoke grenade pouring (src/game/toys.ts): low, wide and thick, spreading from where it lies, and enough of it to
+   * stand behind. @param age how long it has been pouring, seconds
+   */
+  smokeScreen(at: THREE.Vector3, state: { owed: number }, dt: number, age: number) {
+    state.owed = Math.min(4, state.owed + dt * 11);
+    while (state.owed >= 1) {
+      state.owed -= 1;
+      const a = Math.random() * Math.PI * 2, r = Math.min(7, 1 + age * 0.7) * Math.sqrt(Math.random()), k = 0.82 + Math.random() * 0.12;
+      this.spawn({
+        p: new THREE.Vector3(at.x + Math.cos(a) * r, at.y + 0.4 + Math.random() * 1.3, at.z + Math.sin(a) * r),
+        v: new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.3 + Math.random() * 0.3, (Math.random() - 0.5) * 0.5),
+        max: 13 + Math.random() * 5,
+        size: 3,
+        grow: 0.9,
+        color: new THREE.Color(k, k, k * 0.97),
+        alpha: 0.66,
+        gravity: -0.12,
+        drag: 0.6,
+      });
+    }
+  }
+
+  /** the thin smoke a flare leaves behind it */
+  flareTrail(at: THREE.Vector3, state: { owed: number }, dt: number) {
+    state.owed = Math.min(2, state.owed + dt * 9);
+    while (state.owed >= 1) {
+      state.owed -= 1;
+      const k = 0.7 + Math.random() * 0.15;
+      this.spawn({
+        p: at.clone(),
+        v: new THREE.Vector3((Math.random() - 0.5) * 0.3, 0.2, (Math.random() - 0.5) * 0.3),
+        max: 5 + Math.random() * 2,
+        size: 0.5,
+        grow: 0.7,
+        color: new THREE.Color(k, k * 0.86, k * 0.84),
+        alpha: 0.4,
+        gravity: -0.05,
+        drag: 0.4,
+      });
+    }
+  }
+
   /** drops off an open wound: a few fall, and one lands */
   drip(from: THREE.Vector3) {
     for (let i = 0; i < 2; i++) {

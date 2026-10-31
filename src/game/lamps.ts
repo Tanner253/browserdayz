@@ -317,7 +317,7 @@ export class Lamps {
     // among the nearest few, and the rest go to the nearest without one; a light given to another lamp fades out first
     // and in again, so walking about a base its torches' lights never jump from one to another (the owner, 2026-10-25:
     // "when I move around my base the torch lighting is really inconsistent, I think we need simpler lighting").
-    const near = glows.filter((w) => w.d2 < 70 * 70).slice(0, POINTS + KEEP_OVER), mine: (Glow | null)[] = this.points.map(() => null), taken = new Set<Glow>();
+    const near = glows.filter((w) => w.d2 < Math.max(70, w.reach) ** 2).slice(0, POINTS + KEEP_OVER), mine: (Glow | null)[] = this.points.map(() => null), taken = new Set<Glow>();
     this.points.forEach((_, i) => {
       const was = this.kept[i];
       const w = was ? near.find((q) => !taken.has(q) && q.pos.distanceToSquared(was) < 0.25) : undefined;

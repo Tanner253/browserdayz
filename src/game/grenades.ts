@@ -34,6 +34,8 @@ export class Grenades {
   private list: Flying[] = [];
   /** it went off: where, whether it was the local player's, and which grenade it was */
   onExplode: (at: THREE.Vector3, mine: boolean, id: string) => void = () => {};
+  /** a flare, each frame of its climb */
+  onFlare: (at: THREE.Vector3, dt: number) => void = () => {};
 
   constructor(private scene: THREE.Scene, private models: ItemModels) {}
 
@@ -76,6 +78,7 @@ export class Grenades {
           } else g.pos.add(step);
         }
         g.obj.position.copy(g.pos);
+        if (g.id === 'ammo_flare') this.onFlare(g.pos, dt);
       }
       if (g.fuse <= 0) {
         g.obj.removeFromParent();

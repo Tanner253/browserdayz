@@ -205,7 +205,8 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
       // ("more common in the T4")
       // (the magazines a little short, where every place is spoken for; and since base building's plates and C4 joined the
       // army's pools, 2026-10-25, a gun now and then too)
-      assert.ok(on(gun, 4) >= 2 && on(mag, 4) >= 2, `${on(gun, 4)} of ${gun} and ${on(mag, 4)} of ${mag} under the gas`);
+      // (a floor and not a count: every sort is cut to fit a full step, the owner's word, and which of them comes up short is the dice's)
+      assert.ok(on(gun, 4) >= 1 && on(mag, 4) >= 2, `${on(gun, 4)} of ${gun} and ${on(mag, 4)} of ${mag} under the gas`);
       // (the AR-15 is not kept on the third step at all since 2026-10-19)
       assert.ok((gun === 'ar15' || TYPES[gun].on![3]!.restock! >= 2400) && TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
     }

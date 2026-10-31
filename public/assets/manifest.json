@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-26T10:02:41.939Z",
+ "generated": "2026-10-31T11:25:26.424Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14603,6 +14603,146 @@
    "hi": "assets/models/hi/trader_stall.glb",
    "hiBytes": 2646348,
    "hiCard": 85
+  },
+  "bear_trap": {
+   "url": "assets/models/bear_trap.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 337132,
+   "srcTris": 4902,
+   "tris": 4902,
+   "min": [
+    -0.23,
+    0,
+    -0.2298
+   ],
+   "max": [
+    0.23,
+    0.0844,
+    0.2298
+   ],
+   "lods": [
+    {
+     "url": "assets/models/bear_trap_lod1.glb",
+     "tris": 2082,
+     "far": 2,
+     "of": "337132:1793442573834"
+    }
+   ]
+  },
+  "land_mine": {
+   "url": "assets/models/land_mine.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 167472,
+   "srcTris": 3820,
+   "tris": 3820,
+   "min": [
+    -0.1557,
+    0,
+    -0.16
+   ],
+   "max": [
+    0.1557,
+    0.0803,
+    0.16
+   ],
+   "lods": [
+    {
+     "url": "assets/models/land_mine_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "167472:1793442574668"
+    }
+   ]
+  },
+  "smoke_grenade": {
+   "url": "assets/models/smoke_grenade.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 207804,
+   "srcTris": 3354,
+   "tris": 3354,
+   "min": [
+    -0.0309,
+    0,
+    -0.0348
+   ],
+   "max": [
+    0.0309,
+    0.15,
+    0.0348
+   ],
+   "lods": [
+    {
+     "url": "assets/models/smoke_grenade_lod1.glb",
+     "tris": 1908,
+     "far": 2,
+     "of": "207804:1793442575550"
+    }
+   ]
+  },
+  "flare_gun": {
+   "url": "assets/models/flare_gun.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 151640,
+   "srcTris": 4659,
+   "tris": 4659,
+   "min": [
+    -0.0287,
+    -0.0715,
+    -0.0306
+   ],
+   "max": [
+    0.192,
+    0.0909,
+    0.0387
+   ],
+   "lods": [
+    {
+     "url": "assets/models/flare_gun_lod1.glb",
+     "tris": 2490,
+     "far": 2,
+     "of": "151640:1793445926420"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.072,
+     -0.018,
+     0.032
+    ],
+    "left": [
+     -0.06924,
+     -0.07081,
+     -0.0353
+    ]
+   }
+  },
+  "flare_round": {
+   "url": "assets/models/flare_round.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 132560,
+   "srcTris": 1343,
+   "tris": 1343,
+   "min": [
+    -0.01,
+    0,
+    -0.0099
+   ],
+   "max": [
+    0.01,
+    0.07,
+    0.0099
+   ],
+   "lods": []
   }
  }
 }

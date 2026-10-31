@@ -102,7 +102,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // leaves them standing where they were last)
 // (77, 2026-10-27: a report from the death screen ('report'): a server of 76 hears none)
 // (78, 2026-10-30: the language a page reads ('lang', and on 'hello'), a line's `orig` and `mid` and its late translation 'chatx')
-export const PROTOCOL = 78;
+// (79, 2026-10-31: traps ('trap', 'untrap', 'traps', 'trapok', 'trapback', 'trapgo'); a flare is launched by anybody with the gun)
+export const PROTOCOL = 79;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -442,6 +443,9 @@ export type C2S =
   /** where a charge this player threw came to rest: `n` the face it stuck to's outward line (up, lying on the ground) */
   | { t: 'bstick'; i: number; at: [number, number, number]; n: [number, number, number] }
   | { t: 'blight'; i: number }
+  /** a trap set before the player (src/sim/traps.ts): which, the item it was, where and which way */
+  | { t: 'trap'; k: string; uid: string; o: [number, number, number]; yaw: number }
+  | { t: 'untrap'; i: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string; /** what sprang it: the reader's stack, or the hooking code (src/net/bait.ts) */ proof?: string }
@@ -562,6 +566,13 @@ export type S2C =
   /** `v`: still in the air, thrown from `o` this fast (every game flies it till its thrower says where it stuck) */
   | { t: 'bcharge'; i: number; w: string; o: [number, number, number]; n: [number, number, number]; f: number; by: number; v?: [number, number, number] }
   | { t: 'bboom'; i: number; w: string; o: [number, number, number]; by: number }
+  /** the traps within sight of this player: number, kind, where, which way */
+  | { t: 'traps'; near: [number, string, number, number, number, number][] }
+  /** their trap is set: the item may go */
+  | { t: 'trapok'; uid: string }
+  /** the trap they took up: it goes back in their pockets */
+  | { t: 'trapback'; k: string }
+  | { t: 'trapgo'; i: number; k: string; o: [number, number, number]; how: 'snap' | 'boom' | 'take' }
   | { t: 'bfizz'; i: number }
   /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */
   | { t: 'bkeep'; b: number; s: number; dry: boolean; day: [string, number][] }

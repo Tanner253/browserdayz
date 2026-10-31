@@ -63,6 +63,7 @@ import { recycle } from './recycle';
 import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
+import { setTrap, takeTrap } from './traps';
 import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
 import { knock, swing } from './doors';
@@ -169,7 +170,8 @@ export function handle(c: Client, m: C2S) {
     case 'launch': {
       // A grenade fired from a launcher. The launcher is for admins only (the owner: "the grenade launcher and its
       // ammo is an admin only weapon"): from anybody else it is not believed, nor anything its blast is said to reach.
-      if (!c.alive || roleOf(c) !== 'admin' || !isVec3(m.o) || !isVec3(m.v) || typeof m.w !== 'string' || !LAUNCHED[m.w]) return;
+      // (a flare is anybody's who has the gun for it)
+      if (!c.alive || !isVec3(m.o) || !isVec3(m.v) || typeof m.w !== 'string' || !LAUNCHED[m.w] || (m.w === 'ammo_flare' ? !carries(c.inv, 'flare_gun') : roleOf(c) !== 'admin')) return;
       if (!launch(c.nades, m.w, m.o, m.v, [c.pose[0], c.pose[1], c.pose[2]], Date.now())) return;
       broadcast({ t: 'launch', id: c.id, o: m.o, v: m.v, w: m.w }, c);
       return;
@@ -426,6 +428,10 @@ export function handle(c: Client, m: C2S) {
       return useBench(c, m);
     case 'recy':
       return recycle(c, m);
+    case 'trap':
+      return setTrap(c, m);
+    case 'untrap':
+      return takeTrap(c, m);
     case 'trade':
       return trade(c, m);
     case 'book':

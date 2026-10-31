@@ -381,6 +381,7 @@ const IN_SMG: Record<string, { /** how big it is drawn in these hands, of its ow
   m9: { size: 0.88, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
   colt: { size: 1, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
   deagle: { size: 0.85, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
+  flare_gun: { size: 0.72, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
 };
 /**
  * The tops of that pack's arms, let down out of the picture (the eye's space: x right, y up, -z away; metres). Its
@@ -1307,6 +1308,8 @@ const VOICE: Record<string, Voice> = {
   mpa: { rate: 1.06, gain: 1.05, rec: 'shot_pistol' },
   // (a .45: the pistol's recording, lower and a little louder)
   colt: { rate: 0.9, gain: 1.2 },
+  // (a flare goes with a pop and no crack)
+  flare_gun: { rate: 1.45, gain: 0.6 },
   // (the weapons pass's, each its own: see scripts/sounds.mjs for what each is a recording of)
   aks74u: { rate: 1, gain: 1.4, rec: 'shot_aks' },
   // (the 9A-91: the AKS's recording a little deeper; with its can on, the VSSK's quieted one. Its rounds are the AK's,
@@ -1333,7 +1336,7 @@ const VOICE: Record<string, Voice> = {
  * guns an Uzi's (the owner, 2026-10-17: "the uzi reload can be applied to both submachine guns") */
 const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', a91: 'ak', ar15: 'ar', mpa: 'uzi', scorpion: 'uzi', mp7a1: 'uzi', dual_smg: 'uzi', dual_mac10: 'uzi' };
 /** guns that throw no case as they fire: a revolving launcher, and shotguns broken open to be emptied */
-const NO_CASE = new Set(['m32', 'db12', 'dual_sawnoff']);
+const NO_CASE = new Set(['flare_gun', 'm32', 'db12', 'dual_sawnoff']);
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */
 /** The red dot's dot: round, soft at its edge and lit, whatever the hour; drawn over the glass as the holographic sight's mark is. */
@@ -1851,6 +1854,7 @@ export class Weapons {
     await inSmg('m9', 'm9', 0.2, { hammer: smgRide.base, trigger: smgRide.base, stopper: smgRide.base });
     await inSmg('colt', 'colt_1911', 0.22, { hammer: smgRide.base });
     await inSmg('deagle', 'desert_eagle', 0.3);
+    await inSmg('flare_gun', 'flare_gun', 0.3);
     // And the shotgun, in the rifle's hands: every piece of it rides on the rifle's body (nothing
     // on it moves by itself), in place of the rifle and everything on the rifle.
     this.models.set('benelli', await this.packGun({
@@ -2555,7 +2559,7 @@ export class Weapons {
     // its body, bipod and all, the eye was put low on it, and the .50s and the VSSK came up to the eye too high, the
     // owner: "the ads animation places the sniper too high during the transition from rest to ADS")
     const ownScope = long && !!ITEMS[o.item].weapon?.ownScope && hung.has('scope');
-    const sight = long ? (hung.has('sight') ? boxOf('sight', 'base') : ownScope ? boxOf('scope', 'base') : hung.has('base') ? boxOf('base', 'base') : rig.box('glass')) : boxOf('slide', 'slide');
+    const sight = long ? (hung.has('sight') ? boxOf('sight', 'base') : ownScope ? boxOf('scope', 'base') : hung.has('base') ? boxOf('base', 'base') : rig.box('glass')) : boxOf(hung.has('slide') ? 'slide' : 'base', 'slide'); // (a gun with no slide, the flare gun, is aimed along the top of its body)
     const frame = boxOf('base', 'base');
     for (const [obj, parent] of fittedOn) parent!.add(obj);
     rig.root.updateMatrixWorld(true);

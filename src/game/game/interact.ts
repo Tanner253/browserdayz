@@ -61,6 +61,14 @@ export const interactMethods = {
         return;
       }
     }
+    // at a trap on the ground (src/game/traps.ts)
+    if (!this.br && this.started && !this.garage.ride && !this.use) {
+      const trap = this.traps.prompt(!this.hud.chatOpen);
+      if (trap) {
+        this.prompt = trap;
+        return;
+      }
+    }
     // at the way down to the second level: it is not to be opened yet, and says so
     {
       const sealed = this.bunker.sealedAt(_sealed);

@@ -8,7 +8,7 @@ import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { shown } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
-import { ITEMS, GEAR_SLOTS, holds, type ItemInstance } from '../../sim/items';
+import { ITEMS, GEAR_SLOTS, holds, makeItem, type ItemInstance } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
@@ -352,6 +352,23 @@ export const onlineMethods = {
     net.on('trade', (m) => this.camp.onTrade(m));
     net.on('tday', (m) => this.camp.onDay(m));
     net.on('recy', (m) => this.recyclers.onRun(m));
+    // (traps: src/game/traps.ts)
+    net.on('traps', (m) => this.traps.onNear(m.near));
+    net.on('trapok', (m) => {
+      const it = this.traps.set(m.uid);
+      if (it) this.inv.remove(it);
+      this.meDirty = true;
+    });
+    net.on('trapback', (m) => {
+      if (!this.inv.add(makeItem(m.k, 1))) this.hud.note('No room for it: it lies at your feet', 'warn');
+      this.meDirty = true;
+    });
+    net.on('trapgo', (m) => {
+      this.traps.gone(m.i);
+      const at = new THREE.Vector3(...m.o);
+      if (m.how === 'boom') this.explode(at.setY(at.y + 0.15), false, 'land_mine');
+      else if (m.how === 'snap') audio.impact('metal', at, 0);
+    });
     net.on('learn', (m) => this.craft.onLearn(m));
     net.on('forge', (m) => this.forges.onForge(m));
     net.on('salvage', (m) => this.salvage.onSalvage(m));

@@ -36,7 +36,12 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
      (`npx tsx scripts/zona-ways.ts`, `... picture`), 68 m wide, soft corners, about a quarter more land. It is a tag rule, so this drop
      deploys site AND server. Under a slow load some gun scenes are left out at random (a model not yet come when the table is made,
      as the shovel's was): seen headless, not fixed.
-  2. Toys: bear traps, land mines, smoke grenades, a flare gun.
+  2. Toys: DONE on battle-royale, NOT deployed (PROTOCOL 79). Smoke grenade (a grenade with a rule that hurts nobody: src/game/toys.ts),
+     flare gun and rounds (the launcher path, `launches`; anybody may fire it, 'launch' in server/handle.ts; a real light of reach 130,
+     lamps.ts lets a long-reaching glow past its 70 m), bear trap and land mine (src/sim/traps.ts, server/traps.ts, src/game/traps.ts:
+     the server keeps them, tells each game only those within 60 m, not kept over a restart; a trap's kill is nobody's, id 0, so no tag
+     in server/acts.ts). Offline a trap cannot be set: it needs a server. Five Higgsfield models, `assets-src/incoming/higgsfield/toys`.
+     Loot: all on low tiers but the mine (Tier 5, one): Tier 4 and 5 were full and pushed sniper rifles out. Tests traps, traps-server.
   3. The camp in the gas over the bunker (radio tower, barracks, decon tents, watchtower, motor pool, hatch hut), blue card, Stolovaya.
   4. The Old Mine, Bolotnaya, Level 2 and the generator; tappers Level 2 only, Deagle, Benelli, heavy armour 2 each, AK out of Tier 3.
   5. Kupol, the train, Level 3, night vision; tappers Level 3 only. COMING SOON moves a door deeper each drop. Then the owner's optimise pass.

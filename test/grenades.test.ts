@@ -51,7 +51,7 @@ ok('the frag grenade is a thing: one place in a pocket, and it does more than th
     assert.equal(d.throw!.damage, WEAPON_RULES[d.id].damage, `${d.name}: its item and its rule do not agree on what it does`);
     assert.equal(d.throw!.radius, WEAPON_RULES[d.id].blast, `${d.name}: its item and its rule do not agree on how far`);
   }
-  assert.deepEqual(Object.keys(THROWN).sort(), ['frag', 'grenade'], 'what is thrown');
+  assert.deepEqual(Object.keys(THROWN).sort(), ['frag', 'grenade', 'smoke_grenade'], 'what is thrown');
 });
 
 ok('"2 stick grenades or 1 frag grenade blows up a car"', () => {
@@ -85,7 +85,8 @@ ok('the fuse runs from the pin: what is left when it is thrown is what was not s
 });
 
 ok('one that goes off in the hand is the end of whoever held it, whatever they wear', () => {
-  for (const id of Object.keys(THROWN)) {
+  // (a smoke grenade hurts nobody: test/traps.test.ts)
+  for (const id of Object.keys(THROWN).filter((k) => k !== 'smoke_grenade')) {
     assert.equal(inHandDamage(id), WEAPON_RULES[id].damage);
     assert.ok(inHandDamage(id) >= 100, `${id}: somebody could hold it to the end and walk away`);
   }

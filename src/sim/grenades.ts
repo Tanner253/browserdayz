@@ -85,6 +85,8 @@ export const NADE = {
  */
 export const LAUNCHED: Record<string, { speed: number; flight: number }> = {
   ammo_40mm: { speed: 76, flight: 8 },
+  // (a flare: up, and it lights near the top of its climb. src/game/toys.ts)
+  ammo_flare: { speed: 40, flight: 2.2 },
 };
 
 /** a thing that is thrown: how long the hands take to get its pin out, and how long its fuse then runs, seconds */
