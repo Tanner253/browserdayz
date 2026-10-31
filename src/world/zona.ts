@@ -9,7 +9,13 @@
 // one carried outside the Zona is void (ZONA_VOID in src/sim/items.ts). The loot still goes by the line alone
 // (`eastOfLine`: nothing of the fourth step or above west of it, src/sim/economy.ts), so no loot changed.
 //
+// The corridors follow ground a body can walk, and the shapes run into one another with soft corners (the owner,
+// 2026-10-31: "some of the zona connections ... runs across veryhard to traverse terrian", "border-radius needs softening",
+// "so the player isnt forced to walk up and down insane cliffs"): straight lines between places until then.
+//
 // Sums only: nothing of the page or of the renderer is known here.
+
+import { WAYS } from './zona-ways';
 
 /** the Zona's west line: everything east of it is inside */
 export const ZONA_WEST = -1950;
@@ -39,7 +45,7 @@ export function eastOfLine(x: number, z: number, margin = 0): boolean {
 }
 
 /** each place's round: where, and how far out (its own size and 35 to 45 m more; the fort and the bunker more) */
-const ROUNDS: [string, number, number, number][] = [
+export const ROUNDS: [string, number, number, number][] = [
   ['Zelenaya Dolina', 30, 10, 150], ['Military Checkpoint', -175, 175, 80], ["Hunter's Cabin", 235, -195, 65],
   ["Forester's Lodge", 326, 98, 75], ['Kamenka Farm', 150, 290, 75], ['South Ranger Post', -77, 264, 75],
   ['Old Sawmill', -279, 144, 75], ["Trapper's Camp", -270, -130, 75], ['Berezovo Dacha', -106, -286, 75],
@@ -51,15 +57,19 @@ const ROUNDS: [string, number, number, number][] = [
   ['Ozerki', -1250, -120, 132], ['Mokroye', -1855, 585, 146], ["Mel'nitsa", -1760, -505, 79],
   ['Khutor', -1560, -575, 79], ['Kordon', -1300, -480, 72],
 ];
-/** the corridors that join them, 22 m either side of the line between two places: the shortest set that joins all */
-const BANDS: [number, number, number, number][] = [
-  [179, 174, 326, 98], [-279, 144, -368, 368], [326, -89, 537, -371], [326, 98, 625, 365], [-368, 368, -1180, 350],
-  [-1180, 350, -1250, -120], [-1250, -120, -1450, -320], [-1450, -320, -1300, -480], [-1250, -120, -1507, 8],
-  [-1507, 8, -1850, -30], [-1450, -320, -1560, -575], [-1560, -575, -1760, -505], [-1850, -30, -1855, 585],
-];
-const BAND = 22;
-/** and the middle of the valley, round the settlements about Zelenaya Dolina, filled in whole */
-const MIDDLE: [number, number][] = [[-106, -286], [128, -268], [235, -195], [326, -89], [326, 98], [150, 290], [-77, 264], [-175, 175], [-279, 144], [-240, 5], [-270, -130]];
+/** how far either side of its line a corridor reaches (the lines are src/world/zona-ways.ts, from scripts/zona-ways.ts) */
+const BAND = 34;
+/** how soft the corners are, metres: where two shapes meet, the width of ground over which the one eases into the other */
+const SOFT = 70;
+/** and where the Zona meets the west line */
+const SOFT_LINE = 30;
+/** each corridor's box, to leave out the ones nowhere near */
+const BOXES = WAYS.map((w) => {
+  const xs = w.map((p) => p[0]), zs = w.map((p) => p[1]), m = BAND + SOFT;
+  return [Math.min(...xs) - m, Math.max(...xs) + m, Math.min(...zs) - m, Math.max(...zs) + m];
+});
+/** and the middle of the valley, round the settlements about Zelenaya Dolina, filled in whole; out to the mountain road on the east, or the ways to the fort and Kamenka shut a pocket of wilderness in the Zona, where a tag carried across it would stop counting */
+export const MIDDLE: [number, number][] = [[-106, -286], [128, -268], [235, -195], [326, -89], [440, -215], [560, -190], [575, 240], [440, 210], [326, 98], [150, 290], [-77, 264], [-175, 175], [-279, 144], [-240, 5], [-270, -130]];
 
 /** how far a point is from a segment */
 function segDist(x: number, z: number, ax: number, az: number, bx: number, bz: number) {
@@ -78,12 +88,24 @@ function middleDepth(x: number, z: number): number {
   return inside ? d : -d;
 }
 
+/** the larger of two, eased over `k` where they are close: the join of two shapes, corner rounded, and never less than either */
+function softMax(a: number, b: number, k: number) {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.max(a, b) + (h * h * k) / 4;
+}
+
 /** how far inside the Zona a place is, metres (less than none: how far outside it): the deepest it is in any of its shapes, and never west of the line */
 export function zonaDepth(x: number, z: number): number {
   let d = middleDepth(x, z);
-  for (const [, cx, cz, r] of ROUNDS) d = Math.max(d, r - Math.hypot(x - cx, z - cz));
-  for (const [ax, az, bx, bz] of BANDS) d = Math.max(d, BAND - segDist(x, z, ax, az, bx, bz));
-  return Math.min(d, eastDepth(x, z));
+  for (const [, cx, cz, r] of ROUNDS) d = softMax(d, r - Math.hypot(x - cx, z - cz), SOFT);
+  for (let w = 0; w < WAYS.length; w++) {
+    const way = WAYS[w], b = BOXES[w];
+    if (x < b[0] || x > b[1] || z < b[2] || z > b[3]) continue;
+    let near = Infinity;
+    for (let i = 1; i < way.length; i++) near = Math.min(near, segDist(x, z, way[i - 1][0], way[i - 1][1], way[i][0], way[i][1]));
+    d = softMax(d, BAND - near, SOFT);
+  }
+  return -softMax(-d, -eastDepth(x, z), SOFT_LINE);
 }
 
 /** is this place inside the Zona, by `margin` metres at least (less than none: or within that much outside it) */

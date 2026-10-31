@@ -150,7 +150,8 @@ export class Bases {
     // (where it stands in the world: not in a town, on a road, by a building; not on a tree or a rock)
     const [wx, , wz] = toWorld(base, spot.x, spot.y, spot.z);
     const no = this.land.why(wx, wz);
-    if (no) return no;
+    // (a claimed base the Zona's corridors came to lie over is still its owners' to build on: the line moved, they did not)
+    if (no && !(no === 'Inside the Zona' && base.claim)) return no;
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
     if (theirs && !admin && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";

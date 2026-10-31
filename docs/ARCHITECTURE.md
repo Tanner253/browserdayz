@@ -134,7 +134,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `clip.ts` | 138 | Cutting pictures and short films out of a film that is already made, in a browser: there is no other cutter on the machine. |
 | `fit.ts` | 108 | Fitting what is worn on the chest to the body, by measure and not by eye (dev only). |
 | `flight-record.ts` | 119 | A play session recorded to be played again, exactly, by the tests (development builds only, never shipped). |
-| `harness.ts` | 607 | Development-only test harness (window.T). |
+| `harness.ts` | 608 | Development-only test harness (window.T). |
 | `loading-film.ts` | 76 | The page's half of scripts/loading-film.mjs: the loading screen's short film for socials (the owner, 2026-10-20: |
 | `look.ts` | 294 | Development-only tools for LOOKING at the game (window.D), beside the harness that drives it (window.T). |
 | `overlap.ts` | 131 | Where two faces lie in one plane, facing the same way, over the same ground: the two are drawn turn and turn about and the wall flickers there ("z-fighting"). |
@@ -305,7 +305,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `boot.ts` | 5 | Imported first by src/main.ts: the catalog is in before anything is drawn, so nobody sees English go by. |
-| `index.ts` | 151 | / <reference types="vite/client" /> The game's words in the player's language (2026-10-30, the owner: |
+| `index.ts` | 156 | / <reference types="vite/client" /> The game's words in the player's language (2026-10-30, the owner: |
 
 ## src/
 
@@ -347,7 +347,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `bases.ts` | 454 | Every base on the map, as the server keeps them (server/build.ts) and as a game played alone keeps its own (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. |
+| `bases.ts` | 455 | Every base on the map, as the server keeps them (server/build.ts) and as a game played alone keeps its own (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. |
 | `beds.ts` | 40 | How often a bed or a sleeping bag may be woken at, and how many a player may have (the owner, 2026-10-25: |
 | `blueprints.ts` | 176 | Blueprints (2026-10-24, base building's fourth step). |
 | `charges.ts` | 67 | THE ONE PLACE A CHARGE IS TUNED (the owner, 2026-10-25: |
@@ -727,4 +727,5 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `zavod-plans.ts` | 193 | Zavod, the brick works by the river (2026-10-16): its buildings. |
-| `zona.ts` | 154 | The Zona, where tags are earned: a round about each town, site and settlement east of a line across the map, joined by corridors, the middle of the valley filled in whole; and everywhere else is wilderness, for bases... |
+| `zona-ways.ts` | 20 | The Zona's corridors, each a walkable line over the world's ground. |
+| `zona.ts` | 176 | The Zona, where tags are earned: a round about each town, site and settlement east of a line across the map, joined by corridors, the middle of the valley filled in whole; and everywhere else is wilderness, for bases... |
