@@ -1106,7 +1106,7 @@ export class InventoryUI {
     // (what is worn that has room is set For a kind with the chip by its name, the kinds offered under it: inv-types.ts)
     const kind = typable(c) ? bagFor(c) : undefined;
     const forBtn = kind !== undefined ? `<button type="button" class="inv-for${kind ? ' set' : ''}" title="What goes in here first: things of this kind you take, buy or sort go here by themselves">${kind ? BAG_FOR.find((k) => k.id === kind)!.label : 'For…'}</button>` : '';
-    const bar = `<h4 title="${tip}${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}" data-tail="${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${forBtn}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
+    const bar = `<h4 title="${tip}${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}" data-tail="${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small data-sense="slot">${where}</small>` : ''}${forBtn}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
     const grid = shut ? null : this.gridEl(c);
     if (kept.said === bar + (this.typing === c.id ? '|t' : '')) {
       if (grid && box.lastChild !== grid) box.appendChild(grid);
@@ -1361,7 +1361,7 @@ export class InventoryUI {
     // (2026-10-11 the floating numbers over the places were taken off: "not intuitive". Its key is said again
     // before the place's name, drawn as the same key as on the hot keys, so which gun is on which key is matched at
     // a glance: Fettah 2026-10-18, "so it's clear like which one is which shortcut")
-    s.innerHTML = `<div class="slot-label">${slotKey(key)}${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
+    s.innerHTML = `<div class="slot-label" data-sense="slot">${slotKey(key)}${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + this.mark(item) + (this.actions.inHands() === item ? ' active' : '');

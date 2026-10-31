@@ -65,9 +65,14 @@ export function tr(text: string): string {
 export const t = (text: string, ...parts: (string | number)[]) => tr(text).replace(/\{(\d+)\}/g, (_, i) => String(parts[Number(i)] ?? ''));
 
 const held = (n: Node) => !n.parentElement || n.parentElement.closest('[data-raw],script,style,textarea') !== null;
+/** A word with two meanings in English has a line for each ('Back|slot'), and the element it stands in says which (data-sense). */
+function inSense(n: Text, source: string): string {
+  const of = n.parentElement?.dataset.sense, word = source.trim(), hit = of && exact.get(`${word}|${of}`);
+  return hit ? source.replace(word, hit) : tr(source);
+}
 function textNode(n: Text) {
   const v = n.nodeValue ?? '', was = shown.get(n);
-  const source = was && was[1] === v ? was[0] : v, out = tr(source);
+  const source = was && was[1] === v ? was[0] : v, out = inSense(n, source);
   if (out === v || held(n)) return;
   shown.set(n, [source, out]);
   n.nodeValue = out;

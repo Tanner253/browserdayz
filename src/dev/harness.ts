@@ -164,7 +164,8 @@ export function installHarness(g: Game) {
       for (const id of ['box_739', 'box_739', 'box_556', 'box_556', 'red_dot', 'suppressor_739', 'bandage', 'bandage', 'stim', 'stim_stamina', 'beans', 'flask']) one(id);
       // (and both grenades, two of each, on keys 8 and 9: hold the left button to cook one, let go to throw)
       for (const id of ['frag', 'frag', 'grenade', 'grenade']) one(id);
-      inv.hot = [];
+      // (every key kept, empty: a shorter list leaves holes under the binds below, and the HUD fell on them each frame)
+      inv.hot = inv.hot.map(() => null);
       anyG.autoHot?.();
       const first = (id: string) => got.find((it) => it.id === id) ?? null;
       inv.bind(3, first('mag_ak'));
