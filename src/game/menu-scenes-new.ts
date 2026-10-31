@@ -193,13 +193,16 @@ const siteOf = (m: MenuScenes) => (shared?.key === m ? shared.site : (shared = {
 /** a place in front of the house, in the base's own measure: `right` along its front, `out` from it */
 const front = (b: Base28, right: number, out: number) => b.at(CELL + right, 0, CELL * 2.5 + out);
 
-/** A raid: a charge on the base's metal door at dusk, two men going to ground, and in through the smoke. */
+/**
+ * A raid: a charge on the base's metal door at dusk, two men going to ground, and in through the smoke. Said as coming, for
+ * so it is: C4 and satchels are held back until raiding opens (src/sim/build/raid.ts HELD_BACK; the owner, 2026-10-29).
+ */
 export function raid(m: MenuScenes): Vignette | null {
   const s = siteOf(m), one = m.men[2], two = m.men[1], seconds = 9, BLOWS = 2.7;
   if (!one || !two) return null;
   let blown = false, eye: THREE.Vector3 | null = null;
   return {
-    caption: 'Raids · C4 from a level III bench, through the door of a base',
+    caption: 'Coming soon · C4 and satchel charges, for when raiding opens',
     seconds,
     hour: DUSK,
     lead: 6,
