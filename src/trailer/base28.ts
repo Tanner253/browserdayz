@@ -144,6 +144,15 @@ export class Base28 {
     for (const b of this.batches()) b();
     this.fit();
   }
+  /** its front door, blown in or hung again (the menu's raid) */
+  door(on: boolean) {
+    const b = this.base!, d = [...b.pieces.values()].find((p) => p.k === 'door_metal');
+    if (on && !d) this.lay1('door_metal', CELL, 0, CELL * 2.5);
+    else if (!on && d) {
+      this.B.draw.remove(b.id, [d.id]);
+      b.pieces.delete(d.id);
+    }
+  }
   /** what stands, by kind: said for the film's notes */
   tally() {
     const n: Record<string, number> = {};

@@ -629,7 +629,7 @@ export const frameMethods = {
     else if (this.deathSent && this.input.locked && now - this.diedAt > 250) this.input.unlock();
 
     // the hour: before a game has begun it is always day behind the menu
-    const hour = hourAt(this.started ? this.hourNow() : DAY.menu);
+    const hour = hourAt(this.started ? this.hourNow() : this.menu.hour);
     // (an admin's night vision: what is seen is the day behind the menu; what hour it is, is as it was)
     const seen = this.nightSight && this.started ? hourAt(DAY.menu) : hour;
     atmo.setHour(seen.light, seen.low);

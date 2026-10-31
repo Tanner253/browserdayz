@@ -99,6 +99,7 @@ import { Hearths } from '../sim/fires';
 import { Fires } from './fires';
 import { Lockers } from './lockers';
 import '../sim/injury';
+import { Base28 } from '../trailer/base28';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
@@ -1505,6 +1506,7 @@ export class Game {
         st.spawn(await this.loot.models.get(st.item), r.scene);
         return st;
       },
+      base: () => new Base28(this, () => {}),
       // (the lamp of somebody in a scene: said as another player's is, with no disc of light at it)
       beam: (pos, dir, power, wide) => this.lamps.beam(pos, dir, power, wide, 0),
     });

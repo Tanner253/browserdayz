@@ -37,7 +37,7 @@ const MODEL: Record<string, string> = { forge: 'forge_hf', research_table: 'rese
 /** how far off a forge is drawn, and its fire seen */
 const SEEN = { model: 160, fire: 90 };
 /** its fire (of a campfire's 1) where its door is, and its light (of a street lamp's 1, and how far it reaches) */
-const FIRE = { size: 0.22, at: [0, 0.28, 0.3] as [number, number, number], power: 0.9, reach: 14 };
+export const FIRE = { size: 0.22, at: [0, 0.28, 0.3] as [number, number, number], power: 0.9, reach: 14 };
 const WARM = new THREE.Color(1, 0.55, 0.22);
 /** a forge the server last said burns is taken to be out this long after, s (it is told again every 5 s while it burns) */
 const STALE = 12;

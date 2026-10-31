@@ -61,6 +61,9 @@ import { infectedMoves } from './infected-moves';
 import { infectedLook } from './infected-look';
 import type { Stash } from './loot';
 import { menuOrder, recall, remember, visit, type SceneRow } from './menu-order';
+import { bearCharge, canyon, forge, fortFlight, raid, sawLogs, wolfPack } from './menu-scenes-new';
+import { DAY } from '../sim/daynight';
+import type { Base28 } from '../trailer/base28';
 
 export interface MenuHost {
   world: World;
@@ -73,6 +76,8 @@ export interface MenuHost {
   wear(body: Avatar, ids: string[]): Promise<void>;
   /** a stash case, a suitcase or a bag stood on the ground as the game stands one (its `setBuried` puts it under; whoever asked for it takes it away again) */
   stash(item: string, x: number, z: number, rot: number): Promise<Stash>;
+  /** a base laid by the game's own rules, for the scenes of one (nobody's: it is taken away with the menu) */
+  base(): Base28;
   /** a lamp somebody carries, lit for this frame: where it is and which way it shines (see Lamps.beam) */
   beam(pos: THREE.Vector3, dir: THREE.Vector3, power: number, wide: number): void;
 }
@@ -87,7 +92,7 @@ const SHARP_AHEAD = 3.5;
 // ------------------------------------------------------------ a scene
 
 interface View { p: THREE.Vector3; l: THREE.Vector3; fov: number }
-interface Vignette {
+export interface Vignette {
   /** said in the corner of the menu while it is shown: a plain thing about the game, which can be checked */
   caption: string;
   seconds: number;
@@ -103,6 +108,8 @@ interface Vignette {
   /** what has to be going before it is cut to (smoke takes its time to stand): done each frame for the last `lead` seconds of whatever is shown before it */
   early?(dt: number): void;
   lead?: number;
+  /** the hour it is set at, a share of the day (src/sim/daynight.ts): the menu's own day, unless it says */
+  hour?: number;
 }
 interface Row extends SceneRow {
   /** a phone is shown it too (a phone has the least room: the big buildings and the second rifles are left out there) */
@@ -165,8 +172,8 @@ export class MenuScenes {
   /** how far the picture is faded to black for a cut, 0..1 */
   fade = 0;
   private ready = false;
-  private gone = false;
-  private men: Extra[] = [];
+  gone = false;
+  men: Extra[] = [];
   private sick: Extra[] = [];
   /** the bunker's own infected, in their suits */
   private suited: Extra[] = [];
@@ -190,13 +197,17 @@ export class MenuScenes {
   private soon: { v: Vignette; drops: (() => void)[] } | null = null;
   /** the cases stood in the world for the scenes that have one */
   private stashes: Stash[] = [];
+  /** what a scene stood in the world for itself, taken away with the menu */
+  props: THREE.Object3D[] = [];
+  /** and anything else to be undone then */
+  undo: (() => void)[] = [];
   /** trunks, rocks and what else stands on the ground, by the square it stands on (see `index`) */
   private stood = new Map<number, { x: number; z: number; tree: boolean }[]>();
   /** development: a scene asked for by its id, and a lens held where it was put */
   private asked: string | null = null;
   private spy: View | null = null;
 
-  constructor(private h: MenuHost) {
+  constructor(readonly h: MenuHost) {
     this.rp = h.world.road.points;
     const c = h.world.pois[0];
     for (let i = 0; i < this.rp.length / 3; i++) if (Math.hypot(this.rp[i * 3] - c.x, this.rp[i * 3 + 2] - c.z) < Math.hypot(this.rp[this.mid * 3] - c.x, this.rp[this.mid * 3 + 2] - c.z)) this.mid = i;
@@ -308,6 +319,8 @@ export class MenuScenes {
     this.soon = null;
     for (const st of this.stashes) st.dispose(this.h.scene);
     this.stashes = [];
+    for (const o of this.props.splice(0)) this.h.scene.remove(o);
+    for (const f of this.undo.splice(0)) f();
     if (import.meta.env.DEV) delete (window as unknown as { __menu?: unknown }).__menu;
   }
 
@@ -348,14 +361,14 @@ export class MenuScenes {
     };
   }
   /** development: why a scene is not among those shown */
-  private no(id: string, why: string): null {
+  no(id: string, why: string): null {
     if (import.meta.env.DEV) console.warn(`menu: the scene '${id}' is left out: ${why}`);
     return null;
   }
 
   // ------------------------------------------------------------ places
 
-  private ground(x: number, z: number) {
+  ground(x: number, z: number) {
     return heightAt(this.h.world.heights, x, z);
   }
   /** a place on the road so many metres along it from the middle of the village, and which way the road runs there */
@@ -390,7 +403,7 @@ export class MenuScenes {
     return this.h.world.buildings.find((q) => q.type === type) ?? null;
   }
   /** a place on the ground, at the ground's own height */
-  private on(x: number, z: number) {
+  on(x: number, z: number) {
     return V(x, this.ground(x, z), z);
   }
 
@@ -411,7 +424,7 @@ export class MenuScenes {
     for (const p of w.props) add(p, false);
   }
   /** how many trees stand within so far of a place (`all`: and the rocks and the rest with them) */
-  private count(x: number, z: number, r: number, all = false) {
+  count(x: number, z: number, r: number, all = false) {
     let n = 0;
     for (let qx = Math.floor((x - r) / SQUARE); qx <= Math.floor((x + r) / SQUARE); qx++) {
       for (let qz = Math.floor((z - r) / SQUARE); qz <= Math.floor((z + r) / SQUARE); qz++) {
@@ -421,13 +434,13 @@ export class MenuScenes {
     return n;
   }
   /** nothing stands within so far of the straight line from one place to another */
-  private open(a: THREE.Vector3, b: THREE.Vector3, r: number) {
+  open(a: THREE.Vector3, b: THREE.Vector3, r: number) {
     const n = Math.max(1, Math.ceil(a.distanceTo(b) / r));
     for (let k = 0; k <= n; k++) if (this.count(mix(a.x, b.x, k / n), mix(a.z, b.z, k / n), r, true)) return false;
     return true;
   }
   /** how far the ground rises and falls within a few steps of a place, metres */
-  private rough(x: number, z: number, r: number) {
+  rough(x: number, z: number, r: number) {
     let lo = this.ground(x, z), hi = lo;
     for (let k = 0; k < 8; k++) {
       const h = this.ground(x + Math.cos(k * 0.785) * r, z + Math.sin(k * 0.785) * r);
@@ -452,7 +465,7 @@ export class MenuScenes {
    * Nothing solid between two places: no wall, no shut door, no cupboard, no trunk, no rise of the ground. A lens
    * is not carried through one, nor a body walked through it. @param short metres at the far end that are not asked about
    */
-  private clear(a: THREE.Vector3, b: THREE.Vector3, short = 0) {
+  clear(a: THREE.Vector3, b: THREE.Vector3, short = 0) {
     const d = new THREE.Vector3().subVectors(b, a), len = d.length() - short;
     return len <= 0 || !physics.raycast(a, d.normalize(), len, SIGHT_GROUPS);
   }
@@ -469,7 +482,7 @@ export class MenuScenes {
   // ------------------------------------------------------------ people
 
   /** what it holds: its own, unless a scene hands it something else ('none': nothing) */
-  private arm(e: Extra, key = 'own') {
+  arm(e: Extra, key = 'own') {
     if (e.kit === key) return;
     if (key === 'none') {
       e.body.setHeld(null, null, 'rifle', true);
@@ -484,7 +497,7 @@ export class MenuScenes {
     e.weapon = k.kind === 'pistol' ? 'pistol' : 'rifle';
     e.quiet = k.quiet;
   }
-  private put(e: Extra, x: number, z: number, yaw: number) {
+  put(e: Extra, x: number, z: number, yaw: number) {
     this.arm(e);
     e.pos.set(x, this.ground(x, z), z);
     e.vel.set(0, 0, 0);
@@ -507,7 +520,7 @@ export class MenuScenes {
     e.body.update(0.05, e.pos, e.vel, e.yaw, false, false);
   }
   /** on its feet toward a place at so many metres a second */
-  private go(e: Extra, x: number, z: number, speed: number, dt: number) {
+  go(e: Extra, x: number, z: number, speed: number, dt: number) {
     const dx = x - e.pos.x, dz = z - e.pos.z, d = Math.hypot(dx, dz);
     if (d < 0.05 || e.dead) return e.vel.set(0, 0, 0);
     const s = Math.min(speed, d / Math.max(dt, 1e-3));
@@ -523,7 +536,7 @@ export class MenuScenes {
    * those, down to all but nothing as they arrive. (Told to go at one speed until they are there, a body stops
    * dead from a walk, and a lens that goes with it stops dead too.)
    */
-  private pace(e: Extra, to: THREE.Vector3, speed: number) {
+  pace(e: Extra, to: THREE.Vector3, speed: number) {
     return Math.min(speed, 0.25 + Math.hypot(to.x - e.pos.x, to.z - e.pos.z) * 1.5);
   }
   /** as `go`, across a floor that is not the ground's: it keeps the height it stands at */
@@ -533,7 +546,7 @@ export class MenuScenes {
     e.pos.y = y;
   }
   /** a shot: the flash of it, and (if it is meant to land) what it does to whoever it is at */
-  private fire(from: Extra, at: Extra | null) {
+  fire(from: Extra, at: Extra | null) {
     const m = from.muzzle(_a);
     const dir = at ? at.chest(_b).sub(m).normalize() : from.fwd(_b);
     this.h.effects.muzzle(m, dir, from.weapon === 'rifle', from.quiet, from.quiet ? 0 : from.weapon === 'rifle' ? 0.42 : 0.2);
@@ -550,7 +563,7 @@ export class MenuScenes {
    * A lens that keeps what it is looking at in the right-hand part of the picture: the menu
    * has the left. (`right` is how far over, as a part of half the picture's width.)
    */
-  private lens(p: THREE.Vector3, subject: THREE.Vector3, fov: number, right = 0.3): View {
+  lens(p: THREE.Vector3, subject: THREE.Vector3, fov: number, right = 0.3): View {
     const to = _a.copy(subject).sub(p), dist = to.length();
     const side = _b.set(-to.z, 0, to.x).normalize();
     const half = Math.tan((fov * Math.PI) / 360) * (innerWidth / Math.max(1, innerHeight));
@@ -1194,6 +1207,9 @@ export class MenuScenes {
    */
   private bury(): Vignette | null {
     const man = this.men[0], watch = this.men[1];
+    // (it is asked for again here: its model may not have come when the cast was made, and the scene was being lost)
+    const spade = this.h.held('shovel', []);
+    if (spade && !man.kits.has('shovel')) man.kits.set('shovel', { ...spade, quiet: false });
     if (!man.kits.has('shovel')) return this.no('bury', 'there is no shovel to be held');
     const g = this.glade();
     if (!g) return this.no('bury', 'no glade was found to bury anything in');
@@ -1562,22 +1578,29 @@ export class MenuScenes {
    * test reads the table as it is written, since this file cannot be run without the game: test/menu-order.test.ts.)
    */
   private static readonly TABLE: Row[] = [
+    { id: 'raid', added: '2026-10-25', phone: false, make: raid },
     { id: 'chase', added: '2026-10-08', phone: true, make: (m) => m.chase() },
     { id: 'headquarters', added: '2026-10-12', phone: false, make: (m) => m.headquarters() },
     { id: 'ak', added: '2026-10-11', phone: false, make: (m) => m.rifle(m.men[1], 'ak', 'The AK · thirty rounds, for as long as the trigger is held', -176, 4) },
+    { id: 'wolves', added: '2026-10-24', phone: false, make: wolfPack },
     { id: 'bury', added: '2026-10-11', phone: true, make: (m) => m.bury() },
     { id: 'firefight', added: '2026-10-01', phone: true, make: (m) => m.firefight() },
     { id: 'snow', added: '2026-10-13', phone: false, make: (m) => m.snow() },
+    { id: 'felling', added: '2026-10-25', phone: false, make: sawLogs },
     { id: 'cells', added: '2026-10-12', phone: false, make: (m) => m.cells() },
     { id: 'deagle', added: '2026-10-09', phone: true, make: (m) => m.sidearm() },
     { id: 'campfire', added: '2026-10-09', phone: true, make: (m) => m.campfire() },
+    { id: 'canyon', added: '2026-10-17', phone: false, make: canyon },
     { id: 'stand', added: '2026-10-08', phone: true, make: (m) => m.stand() },
+    { id: 'bear', added: '2026-10-24', phone: false, make: bearCharge },
     { id: 'hospital', added: '2026-10-12', phone: false, make: (m) => m.hospital() },
     { id: 'ar15', added: '2026-10-11', phone: false, make: (m) => m.rifle(m.men[2], 'ar15', 'The AR-15 · holographic sight, foregrip and a light', 14, 2, true) },
+    { id: 'forge', added: '2026-10-25', phone: false, make: forge },
     { id: 'gasbank', added: '2026-10-13', phone: false, make: (m) => m.gasbank() },
     { id: 'ward', added: '2026-10-12', phone: false, make: (m) => m.ward() },
     { id: 'drop', added: '2026-10-06', phone: true, make: (m) => m.drop() },
     { id: 'benelli', added: '2026-10-09', phone: true, make: (m) => m.shotgun() },
+    { id: 'fort', added: '2026-10-14', phone: false, make: fortFlight },
     { id: 'street', added: '2026-10-12', phone: true, make: (m) => m.street() },
     { id: 'morgue', added: '2026-10-12', phone: false, make: (m) => m.morgue() },
     { id: 'works', added: '2026-10-09', phone: true, make: (m) => m.works() },
@@ -1586,6 +1609,11 @@ export class MenuScenes {
   ];
 
   // ------------------------------------------------------------ each frame
+
+  /** the hour behind the menu now: the scene's own, or the menu's day */
+  get hour() {
+    return (this.ready && this.at >= 0 ? this.order[this.at]?.v.hour : undefined) ?? DAY.menu;
+  }
 
   /** the round that is shown next: what this visitor has not been shown first (see `menuOrder`) */
   private round() {

@@ -1092,7 +1092,7 @@ function fromModel(scene: THREE.Group, kind = 0) {
  * (`md500_rotor`, `md500_tail`) each about its hub. They are lifted out to be turned; its glass is made glass, as a
  * car's is. (Heli.build sets it down where the simulation's body is.)
  */
-function fromHeli(scene: THREE.Group) {
+export function fromHeli(scene: THREE.Group) {
   const root = scene.clone(true);
   const wheels = ['md500_rotor', 'md500_tail'].map((name) => {
     const o = root.getObjectByName(name);

@@ -237,7 +237,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 310 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 2164 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 2166 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -278,7 +278,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `look.ts` | 262 | What a survivor looks like: jacket and trouser colours, skin, hair. |
 | `loot.ts` | 1176 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
 | `menu-order.ts` | 90 | Which of the menu's scenes are shown first, which are said to be new, and what a browser remembers of having been shown. |
-| `menu-scenes.ts` | 1709 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
+| `menu-scenes-new.ts` | 440 | The menu's scenes of what came to the game after 2026-10-13 (the owner, 2026-10-31: |
+| `menu-scenes.ts` | 1737 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
 | `mocap-switch.ts` | 8 | The hands on motion capture (the blow, the jab, the sips and a grenade's follow-through in first person, and the body's blow, jab and drink seen by everybody: src/game/held-mocap.ts, the slash and the drink of... |
 | `modes.ts` | 144 | The three games of one page (the owner, 2026-10-21: |
 | `muzzle.ts` | 131 | The flash at a muzzle: burning gas, seen for two or three frames. |
@@ -500,7 +501,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `acts28-world.ts` | 135 | The twenty-eighth film's third act: |
 | `acts29.ts` | 673 | The twenty-ninth film's shots, "Friendly" (shots29.ts). |
 | `arena26.ts` | 180 | The gameplay trailer's Arena (shots26.ts): one round at the fort, as the eleventh film made the Arena (shots11.ts: its measure of the fort, blue's two up the ramp and in at the gate, red on the keep's landing, and... |
-| `base28.ts` | 154 | The base of the twenty-eighth film, laid by the game's own rules (Bases.lay, snap.ts spots): every piece goes where a player's could go, in the order a player would, on the meadow north of Pokrov with the pines round it. |
+| `base28.ts` | 163 | The base of the twenty-eighth film, laid by the game's own rules (Bases.lay, snap.ts spots): every piece goes where a player's could go, in the order a player would, on the meadow north of Pokrov with the pines round it. |
 | `brbots.ts` | 68 | The other players in the battle royale's film (shots25.ts): sockets this page opens to the film's arena server (tools/br-film/vclock.mjs, whose clock the film moves on frame by frame) and moves itself, as people move... |
 | `director.ts` | 953 | The trailer's director. |
 | `footage.ts` | 88 | Footage one cut lays into another (2026-10-23, for the gameplay trailer, shots26.ts): the pictures another take kept frame by frame (film.mjs --frames <dir>: tools/trailer/out/<dir>/<frame>.jpg and sounds.json),... |
