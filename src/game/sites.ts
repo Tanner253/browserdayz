@@ -1,5 +1,5 @@
 // The way down's stops as this game has them (the rules are src/sim/sites.ts, and the server runs them: server/sites.ts): the
-// reader's prompt, the strong room's lock, and the siren for as long as it goes.
+// reader's prompt, the strong room's lock, and the siren for as long as it goes. A pass is scanned, not put in: see scripts/clearance-pass.mjs.
 
 import * as THREE from 'three';
 import { audio } from '../core/audio';
@@ -62,9 +62,9 @@ export class Sites {
       const phase = this.phase(id), name = ITEMS[s.card].name;
       if (phase === 'alarm') return `<small>The alarm is going · ${this.left(id)}</small>`;
       if (phase === 'spent') return `<small>Spent · back on line in ${this.left(id)}</small>`;
-      if (!this.h.has(s.card)) return `<small>Locked. A ${name.toLowerCase()} opens it: they are kept down Bunker 17</small>`;
-      if (free && this.h.pressed('KeyF')) this.h.work(`Putting in the ${name.toLowerCase()}`, 2, s.card, () => this.h.send({ t: 'site', s: id }));
-      return `<kbd>F</kbd>Put in the ${name.toLowerCase()}`;
+      if (!this.h.has(s.card)) return `<small>Locked. It scans a ${name.toLowerCase()}: they are kept down Bunker 17</small>`;
+      if (free && this.h.pressed('KeyF')) this.h.work(`Scanning the ${name.toLowerCase()}`, 2, s.card, () => this.h.send({ t: 'site', s: id }));
+      return `<kbd>F</kbd>Scan the ${name.toLowerCase()}`;
     }
     return null;
   }

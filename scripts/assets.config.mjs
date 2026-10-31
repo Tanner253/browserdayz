@@ -1049,6 +1049,11 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
     credit: { name: 'Signal flare', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Signal flare" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
+  clearance_pass: {
+    dir: '../incoming/higgsfield/toys', file: 'clearance_pass.glb', scale: 1, tex: 512, tags: ['loot'],
+    changes: 'The badge holder laid down face up, with a printed pass in its window (scripts/clearance-pass.mjs); textures capped at 512; geometry compressed.',
+    credit: { name: 'Clearance pass', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Clearance pass" made for ZONA with Higgsfield (Tripo text-to-3D), its print drawn for the game, 2026-10-31.' },
+  },
   card_reader: {
     dir: '../incoming/higgsfield/toys', file: 'card_reader_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',

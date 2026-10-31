@@ -25,15 +25,16 @@ export const TOY_ITEMS: ItemDef[] = [
     loot: { pair: 'Ammo_Flare', at: [0, 2, 5, 0, 0], restock: 600, usage: ['Military', 'Police', 'Village'] },
     worth: 3,
   },
-  // (the way down's cards, src/sim/sites.ts. The blue one is kept down Bunker 17, and goes out to the desert)
+  // (the way down's clearance passes, src/sim/sites.ts: no keycard, an ID badge with a code on it, scanned at a reader. The blue one
+  // is kept down Bunker 17, and goes out to the desert. One model: its bands are each pass's own `paint`)
   {
-    id: 'card_blue', name: 'Blue Access Card', model: '@card_blue', w: 1, h: 1, weight: 0.02, category: 'misc',
-    desc: 'A blue card out of Bunker 17, stamped for a post on a mesa in the desert: Stolovaya. Its reader takes it, once.',
+    id: 'card_blue', name: 'Blue Clearance Pass', model: 'clearance_pass', paint: 0x1d4f9c, w: 1, h: 1, weight: 0.03, category: 'misc',
+    desc: 'A blue pass out of Bunker 17, cleared for a post on a mesa in the desert: Stolovaya. One scan at its reader, and it is cancelled.',
     loot: { pair: 'ShippingContainerKeys_Blue', at: [0, 0, 0, 0, 2], away: [], lifetime: 7200, restock: 600, usage: ['Bunker'] },
   },
   {
-    id: 'card_yellow', name: 'Yellow Access Card', model: '@card_yellow', w: 1, h: 1, weight: 0.02, category: 'misc',
-    desc: 'A yellow card from the locker at Stolovaya, stamped for a gate in the canyon wall.',
+    id: 'card_yellow', name: 'Yellow Clearance Pass', model: 'clearance_pass', paint: 0xd9a514, w: 1, h: 1, weight: 0.03, category: 'misc',
+    desc: 'A yellow pass from the locker at Stolovaya, cleared for the gate of the Old Mine in the canyon wall, and the pumps at Bolotnaya beyond it.',
   },
   {
     id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',

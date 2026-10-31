@@ -50,6 +50,7 @@ const VARIANTS: Record<string, ((node: string) => boolean)[]> = {
 const BED_TOP = 0.6;
 /** props that block movement and bullets: surface type + footprint shrink factor */
 const SOLID: Record<string, [Surface, number]> = {
+  card_reader: ['metal', 0.9],
   tree_stump_01: ['wood', 0.8],
   dead_tree_trunk: ['wood', 0.8],
   Barrel_01: ['metal', 0.9],
