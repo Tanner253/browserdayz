@@ -100,6 +100,7 @@ import { Fires } from './fires';
 import { Lockers } from './lockers';
 import '../sim/injury';
 import { Base28 } from '../trailer/base28';
+import { MineSite } from '../world/mine';
 import { Sites } from './sites';
 import { Toys } from './toys';
 import { Traps } from './traps';
@@ -440,6 +441,8 @@ export class Game {
   toys!: Toys;
   /** the way down's stops (src/game/sites.ts) */
   sites!: Sites;
+  /** the Old Mine's drifts (src/world/mine.ts) */
+  oldMine!: MineSite;
   /** the guns and tools in, to be held */
   gunsIn: Promise<unknown> = Promise.resolve();
   traps!: Traps;
@@ -548,6 +551,7 @@ export class Game {
     this.lamps.canLight = (lit) => r.readyToLight(lit);
     this.lamps.held = (lit) => r.warming(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid, (o) => r.ready(o).then(() => r.send(o)));
+    this.oldMine = new MineSite(atmo, r.scene);
     // (the army's field posts by the western roads: src/world/posts.ts)
     void new FieldPosts(world.posts ?? [], atmo, r.scene);
     this.cellars = new Cellars(r.scene, world.basements ?? []);
@@ -670,7 +674,13 @@ export class Game {
     const game = this;
     this.sites = new Sites({
       online: () => this.online, send: (m) => this.net.send(m), pressed: (code) => this.input.pressed(code), note: (text, kind) => this.hud.note(text, kind ?? 'info'),
-      work: (label, seconds, item, done) => this.startUse(label, seconds, item, 'swipe', null, done), feet: () => this.player.pos, noise: (x, z, heard) => this.horde.noise(x, z, heard), has: (id) => this.inv.count(id) > 0,
+      work: (label, seconds, item, done) => (item ? this.startUse(label, seconds, item, 'swipe', null, done) : void (this.use = { label, t: 0, dur: seconds, sound: null, soundT: 0, done })), feet: () => this.player.pos, noise: (x, z, heard, y) => this.horde.noise(x, z, heard, y), stand: async (kind, x, y, z) => {
+        const o = (await assets.model(kind)).clone();
+        o.position.set(x, y, z);
+        o.rotation.y = 0.5;
+        this.s.r.scene.add(o);
+        return o;
+      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), has: (id) => this.inv.count(id) > 0,
       doorAt: (i) => {
         const p = this.s.buildings.doors[i]?.pivot.position;
         return p ? [p.x, p.z] : null;

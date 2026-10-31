@@ -77,14 +77,6 @@ export const interactMethods = {
         return;
       }
     }
-    // at the way down to the second level: it is not to be opened yet, and says so
-    {
-      const sealed = this.bunker.sealedAt(_sealed);
-      if (sealed && sealed.distanceTo(cam.position) < 3.2 && _sealedDir.copy(sealed).sub(cam.position).normalize().dot(_sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion)) > 0.75) {
-        this.prompt = '<small>Locked · requires a Level 2 keycard · coming soon</small>';
-        return;
-      }
-    }
     // at the bunker's door, shut: a keycard is what F does there
     const door = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
     if (door && door.distanceTo(cam.position) < 2.6 && !this.garage.ride) {

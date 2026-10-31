@@ -19,7 +19,7 @@ const world = generateWorld();
 const P = bunkerPlace(world)!;
 const plan = bunkerPlan(), W = bunkerWays();
 const homes = infectedHomes(world);
-const ours = homes.filter((h) => h.bunker);
+const ours = homes.filter((h) => h.bunker).slice(0, 2);
 const passages = ours.find((h) => !h.still)!, rooms = ours.find((h) => h.still)!;
 const local = (s: readonly (number | undefined)[]) => bunkerLocal(P, s[0]!, s[1]!, s[2]!);
 
@@ -29,7 +29,8 @@ ok('twelve shut in the bunker, as before: six by the passages, six still in the 
   assert.equal(rooms.n, 6);
   assert.ok(passages.inside!.length >= 7 && rooms.inside!.length >= 12, `${passages.inside!.length} passage spots, ${rooms.inside!.length} room spots`);
   // (and the map's other homes as they were: nothing else is marked the bunker's)
-  assert.equal(homes.filter((h) => h.still).length, 1);
+  // (the first level's, and one each for the two under it)
+  assert.equal(homes.filter((h) => h.still).length, 3);
 });
 
 ok('the passage ones stand in the two passages, this side of the far rooms, on the floor', () => {
@@ -94,10 +95,10 @@ ok('the director stands them all, the still ones marked so for every game, and p
   const still = all.filter((b) => b.home === k), pass = all.filter((b) => b.home === homes.indexOf(passages));
   assert.equal(still.length, 6);
   assert.equal(pass.length, 6);
-  assert.ok(still.every((b) => b.w === 1) && all.every((b) => b.home === k || !b.w));
+  assert.ok(still.every((b) => b.w === 1) && all.every((b) => b.home === k || homes[b.home].still || !b.w));
   const listed = d.list();
-  assert.ok(listed.filter((b) => b.w === 1).length === 6);
-  assert.ok(listed.filter((b) => b.w !== undefined).length === 6, 'only the still ones carry it');
+  assert.ok(listed.filter((b) => b.w === 1).length >= 6);
+  assert.ok(listed.filter((b) => b.w !== undefined).length === listed.filter((b) => b.w === 1).length, 'only the still ones carry it');
   // two killed, one of each: with the door open neither comes back, nor does anybody else's wait on it
   const gone = [still[0], pass[0]];
   for (const b of gone) d.hurt(b.i, 1e6, 30_000);

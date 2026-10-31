@@ -1054,6 +1054,51 @@ export const LOCAL_MODELS = {
     changes: 'The badge holder laid down face up, with a printed pass in its window (scripts/clearance-pass.mjs); textures capped at 512; geometry compressed.',
     credit: { name: 'Clearance pass', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Clearance pass" made for ZONA with Higgsfield (Tripo text-to-3D), its print drawn for the game, 2026-10-31.' },
   },
+  mine_portal: {
+    dir: '../incoming/higgsfield/toys', file: 'mine_portal_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Mine portal', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Mine portal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  mine_timber: {
+    dir: '../incoming/higgsfield/toys', file: 'mine_timber_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Mine timber set', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Mine timber set" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  mine_rail: {
+    dir: '../incoming/higgsfield/toys', file: 'mine_rail_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Mine rail', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Mine rail" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  ore_cart: {
+    dir: '../incoming/higgsfield/toys', file: 'ore_cart_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Ore cart', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Ore cart" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  valve_stand: {
+    dir: '../incoming/higgsfield/toys', file: 'valve_stand_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Valve stand', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Valve stand" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  breaker_box: {
+    dir: '../incoming/higgsfield/toys', file: 'breaker_box_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Breaker cabinet', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Breaker cabinet" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  radar_dome: {
+    dir: '../incoming/higgsfield/toys', file: 'radar_dome_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Radar dome', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Radar dome" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  boxcar: {
+    dir: '../incoming/higgsfield/toys', file: 'boxcar_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Freight boxcar', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Freight boxcar" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  rail_track: {
+    dir: '../incoming/higgsfield/toys', file: 'rail_track_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
+    credit: { name: 'Railway track', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Railway track" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
   card_reader: {
     dir: '../incoming/higgsfield/toys', file: 'card_reader_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',

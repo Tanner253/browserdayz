@@ -1,6 +1,7 @@
 // The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait).
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
+import { inMine } from '../src/sim/mine';
 import { ITEMS, TAG_OUT, ZONA_VOID, type ItemInstance } from '../src/sim/items';
 import { COOKS } from '../src/sim/cooking';
 import { keepHotHeld, type SerializedInventory } from '../src/sim/inventory';
@@ -379,7 +380,7 @@ const UNDER = { deep: 1.1, grace: 3, void: 10, off: 8 };
 export function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
-  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.coverAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z) && !world.basementUnder(x, y, z) && !world.caveUnder(x, y, z);
+  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.coverAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z) && !inMine(x, y, z) && !world.basementUnder(x, y, z) && !world.caveUnder(x, y, z);
   if (!down) {
     c.underAt = 0;
     return;

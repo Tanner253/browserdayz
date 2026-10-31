@@ -1,11 +1,13 @@
 // The way down's stops as this game has them (the rules are src/sim/sites.ts, and the server runs them: server/sites.ts): the
-// reader's prompt, the strong room's lock, and the siren for as long as it goes. A pass is scanned, not put in: see scripts/clearance-pass.mjs.
+// prompts at readers, gates and rides, the strong room's lock, the plant on Level 2, and the siren for as long as it goes. A pass is
+// scanned, not put in: see scripts/clearance-pass.mjs.
 
 import * as THREE from 'three';
 import { audio } from '../core/audio';
 import type { C2S, S2C } from '../net/protocol';
+import type { Place } from '../sim/bunker';
 import { ITEMS } from '../sim/items';
-import { SITES, sitePoint, strongDoor, type SitePhase } from '../sim/sites';
+import { GATES, RIDES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, type SitePhase } from '../sim/sites';
 
 export interface SiteHost {
   online(): boolean;
@@ -16,11 +18,18 @@ export interface SiteHost {
   work(label: string, seconds: number, item: string, done: () => void): void;
   feet(): THREE.Vector3;
   /** a noise that the infected go to */
-  noise(x: number, z: number, heard: number): void;
+  noise(x: number, z: number, heard: number, y?: number): void;
   has(id: string): boolean;
   /** the world's doors: where each stands */
   doorAt(i: number): [number, number] | null;
   doors: number;
+  /** where the bunker is */
+  bunker(): Place | null;
+  /** Level 2's plant, and the door at the passage's far end */
+  power(on: boolean): void;
+  sealed(open: boolean): void;
+  /** what lies at a site, stood where it lies */
+  stand(kind: string, x: number, y: number, z: number): Promise<THREE.Object3D>;
 }
 
 /** how near a reader the prompt comes, metres */
@@ -32,10 +41,13 @@ const TOLD = 1500;
 const _at = new THREE.Vector3();
 
 export class Sites {
-  private state = new Map<string, { phase: SitePhase; until: number }>();
+  private state = new Map<string, { phase: SitePhase; until: number; fuel: boolean; done: number[] }>();
+  private gates = new Map<string, { open: boolean; until: number }>();
   private doors = new Map<number, string>();
   private found = false;
   private siren = 0;
+  /** what lies at each site, once it has been fetched */
+  private lying = new Map<string, THREE.Object3D | null>();
 
   constructor(private h: SiteHost) {}
 
@@ -45,32 +57,87 @@ export class Sites {
 
   /** what the server says of one */
   onSite(m: Extract<S2C, { t: 'site' }>) {
-    const was = this.phase(m.s), s = SITES[m.s];
-    this.state.set(m.s, { phase: m.phase, until: performance.now() + m.left * 1000 });
+    const was = this.phase(m.s), s = SITES[m.s], before = this.state.get(m.s)?.done.length ?? 0;
+    this.state.set(m.s, { phase: m.phase, until: performance.now() + m.left * 1000, fuel: !!m.fuel, done: m.done ?? [] });
+    if (s?.steps && m.phase === 'alarm') {
+      const me = this.h.feet(), [sx, sz] = sitePoint(s, s.reader), done = m.done?.length ?? 0, n = s.steps.at.length;
+      if (Math.hypot(sx - me.x, sz - me.z) < 300) {
+        if (was !== 'alarm') this.h.note(`${n} ${s.steps.name} to turn before the time is up. They are round the place`, 'warn');
+        else if (done > before) this.h.note(done < n ? `${done} of ${n} ${s.steps.name}` : `All ${n} ${s.steps.name}: the strong room is open${s.steps.after ? ', and now hold it' : ''}`, 'good');
+      }
+    }
+    if (s?.level === 2) this.h.power(m.phase !== 'idle');
+    if (s?.fuel) {
+      const had = this.lying.get(m.s);
+      if (had) had.visible = !!m.fuel;
+      else if (had === undefined) {
+        this.lying.set(m.s, null);
+        const [x, y, z] = spotAt(siteSpot(s, s.fuel.at), this.h.bunker());
+        void this.h.stand(ITEMS[s.fuel.item].model, x, y ?? 0, z).then((o) => {
+          o.visible = this.state.get(m.s)?.fuel ?? false;
+          this.lying.set(m.s, o);
+        });
+      }
+    }
     if (!s || was === m.phase) return;
     const [x, z] = sitePoint(s, s.reader), me = this.h.feet(), d = Math.hypot(x - me.x, z - me.z);
-    if (m.phase === 'alarm' && d < TOLD) this.h.note(`A siren is going at ${s.name}`, 'warn');
+    if (m.phase === 'alarm' && d < TOLD && !s.quiet) this.h.note(`A siren is going at ${s.name}`, 'warn');
+    if (m.phase === 'alarm' && s.level && d < 90) this.h.note('The plant turns over and the lamps come up. Everything down here heard it', 'warn');
     if (m.phase === 'spent' && d < 120) this.h.note(`The locker at ${s.name} has opened`, 'good');
   }
 
-  /** the prompt at a reader, if one is near; and the card goes in if F has just gone down */
-  prompt(free: boolean): string | null {
+  /** what the server says of a gate */
+  onGate(m: Extract<S2C, { t: 'gate' }>) {
+    this.gates.set(m.g, { open: m.open, until: performance.now() + m.left * 1000 });
+    if (m.g === 'lift') this.h.sealed(m.open);
+  }
+
+  private at(spot: Parameters<typeof atSpot>[0], reach = NEAR) {
     const me = this.h.feet();
+    return atSpot(spot, this.h.bunker(), me.x, me.y, me.z, reach);
+  }
+
+  /** the prompt at a reader, a gate or a ride, if one is near; and it is done if F has just gone down */
+  prompt(free: boolean): string | null {
+    const go = free && this.h.pressed('KeyF');
     for (const [id, s] of Object.entries(SITES)) {
-      const [x, z] = sitePoint(s, s.reader);
-      if (Math.hypot(x - me.x, z - me.z) > NEAR) continue;
-      const phase = this.phase(id), name = ITEMS[s.card].name;
-      if (phase === 'alarm') return `<small>The alarm is going · ${this.left(id)}</small>`;
-      if (phase === 'spent') return `<small>Spent · back on line in ${this.left(id)}</small>`;
-      if (!this.h.has(s.card)) return `<small>Locked. It scans a ${name.toLowerCase()}: they are kept down Bunker 17</small>`;
-      if (free && this.h.pressed('KeyF')) this.h.work(`Scanning the ${name.toLowerCase()}`, 2, s.card, () => this.h.send({ t: 'site', s: id }));
-      return `<kbd>F</kbd>Scan the ${name.toLowerCase()}`;
+      if (s.steps && this.phase(id) === 'alarm') {
+        const k = s.steps.at.findIndex((at, n) => !this.state.get(id)?.done.includes(n) && this.at(siteSpot(s, at), 1.9));
+        if (k >= 0) {
+          if (go) this.h.work(s.steps.doing, s.steps.secs, '', () => this.h.send({ t: 'sitestep', s: id, k }));
+          return `<kbd>F</kbd>${s.steps.use}`;
+        }
+      }
+      if (s.fuel && this.at(siteSpot(s, s.fuel.at)) && this.state.get(id)?.fuel) {
+        if (go) this.h.send({ t: 'sitefuel', s: id });
+        return `<kbd>F</kbd>Take the ${ITEMS[s.fuel.item].name.toLowerCase()}`;
+      }
+      if (!this.at(siteSpot(s, s.reader), s.level ? 2.6 : NEAR)) continue;
+      const phase = this.phase(id), name = ITEMS[s.card].name.toLowerCase();
+      if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : 'The alarm is going'} · ${this.left(this.state.get(id)?.until)}</small>`;
+      if (phase === 'spent') return `<small>Spent · back on line in ${this.left(this.state.get(id)?.until)}</small>`;
+      if (!this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}: they are kept down Bunker 17`}</small>`;
+      if (go) this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? 6 : 2, s.card, () => this.h.send({ t: 'site', s: id }));
+      return `<kbd>F</kbd>${s.what?.use ?? `Scan the ${name}`}`;
+    }
+    for (const [id, g] of Object.entries(GATES)) {
+      if (!this.at(g.at, 1.8) && !(g.also && this.at(g.also, 1.8))) continue;
+      const state = this.gates.get(id), name = ITEMS[g.card].name.toLowerCase();
+      if (state?.open) return `<small>Open · ${this.left(state.until)}</small>`;
+      if (!this.h.has(g.card)) return `<small>Locked. It scans a ${name}</small>`;
+      if (go) this.h.work(`Scanning the ${name}`, 2, g.card, () => this.h.send({ t: 'gate', g: id }));
+      return `<kbd>F</kbd>Scan the ${name}`;
+    }
+    for (const [id, w] of Object.entries(RIDES)) {
+      if (!this.at(w.from, 1.8) || (w.gate && !this.gates.get(w.gate)?.open)) continue;
+      if (go) this.h.work(w.doing, w.secs, '', () => this.h.send({ t: 'ride', w: id }));
+      return `<kbd>F</kbd>${w.label}`;
     }
     return null;
   }
 
-  private left(id: string) {
-    const s = Math.max(0, Math.round(((this.state.get(id)?.until ?? 0) - performance.now()) / 1000));
+  private left(until = 0) {
+    const s = Math.max(0, Math.round((until - performance.now()) / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
@@ -79,6 +146,7 @@ export class Sites {
     if (!this.found) {
       this.found = true;
       for (const [id, s] of Object.entries(SITES)) {
+        if (s.level) continue;
         const d = strongDoor(s, this.h.doorAt, this.h.doors);
         if (d >= 0) this.doors.set(d, id);
       }
@@ -94,6 +162,11 @@ export class Sites {
     for (const [id, s] of Object.entries(SITES)) {
       if (this.phase(id) !== 'alarm') continue;
       const [x, z] = sitePoint(s, s.reader);
+      if (s.level) {
+        const [, y] = spotAt(siteSpot(s, s.reader), this.h.bunker());
+        this.h.noise(x, z, s.heard, y ?? undefined);
+        continue;
+      }
       _at.set(x, cam.y, z);
       audio.alarm(_at, _at.distanceTo(cam), true);
       this.h.noise(x, z, s.heard);
@@ -102,5 +175,6 @@ export class Sites {
 
   reset() {
     this.state.clear();
+    this.gates.clear();
   }
 }

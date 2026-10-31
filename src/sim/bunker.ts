@@ -2,7 +2,8 @@
 // A concrete pad in a hollow of the hills, a hut on it, a stair down, and behind a steel
 // door that only a keycard opens, the first level: a long passage with another across it,
 // rooms off both and rooms behind rooms, no daylight, and lamps that mostly work. The two
-// levels under it are sealed, for now, behind the door at the passage's far end.
+// levels under it are the same concrete floor over floor, reached by the goods lift behind the
+// door at the passage's far end (Level 2) and by the carriage line alone (Level 3).
 //
 // The level is not drawn by hand: it is laid out by rule from a number (`BUNKER.seed`), the
 // same on the server and in every game, so that everything that has to agree about it does:
@@ -71,8 +72,14 @@ export function bunkerLocal(p: Place, x: number, y: number, z: number): [number,
   return [dx * Math.cos(p.rot) - dz * Math.sin(p.rot), dx * Math.sin(p.rot) + dz * Math.cos(p.rot), y - p.y];
 }
 
-/** the floor of the first level, above the pad (so: a negative number) */
-export const levelY = () => -BUNKER.depth;
+/** how far each level lies under the one over it, and how many there are */
+export const LEVELS = { step: 3.8, last: 3 };
+/** the floor of a level, above the pad (so: a negative number) */
+export const levelY = (level = 1) => -BUNKER.depth - (level - 1) * LEVELS.step;
+/** which level a height above the pad is on, a body's head or its feet (1 too anywhere above the first) */
+export const levelAt = (h: number) => (h < levelY(3) + 2.6 ? 3 : h < levelY(2) + 2.6 ? 2 : 1);
+/** the goods lift's cab behind the door at the passage's far end, on every level */
+export const CAB = { r: 1.5, back: -30.4, front: -28.5 };
 
 /**
  * How far under the ground a point is, as the light goes: 0 in the open and at the head of
@@ -157,13 +164,37 @@ export interface Plan {
 }
 
 let made: Plan | null = null;
-/** The first level as it is laid out. (Worked out once: it is the same every time.) */
-export function bunkerPlan(): Plan {
+const deeper: Plan[] = [];
+/** A level as it is laid out. (Worked out once: it is the same every time.) */
+export function bunkerPlan(level = 1): Plan {
+  if (level > 1) return (deeper[level] ??= apart(layOut(BUNKER.seed, level), level));
   return (made ??= layOut(BUNKER.seed));
 }
 
-function layOut(seed: number): Plan {
-  const B = BUNKER, H = B.hall, T = 0.3, GAP = 0.95, Y = levelY();
+/** what is searched is told by where it stands on the map, whatever level it is on: nothing on a level stands right under something on the one above */
+function apart(plan: Plan, level: number) {
+  const searched = (p: Plan) => [...p.made.filter((m) => SEARCHED[m.kind]), ...p.stood.filter((s) => SEARCHED[s.id])];
+  const used = new Set<string>();
+  for (let l = 1; l < level; l++) for (const t of searched(bunkerPlan(l))) used.add(`${t.r},${t.f}`);
+  for (const t of searched(plan)) {
+    while (used.has(`${t.r},${t.f}`)) t.r += 0.15;
+    used.add(`${t.r},${t.f}`);
+  }
+  return plan;
+}
+
+/** what the rooms of the levels under the first are, by lot; the biggest is always the plant and the deepest in the armoury */
+const DEEP_ROOMS: Record<number, RoomKind[]> = {
+  2: ['medical', 'archive', 'control', 'cells', 'medical', 'stores', 'workshop', 'quarters', 'archive', 'washroom', 'cells', 'stores', 'medical', 'stores'],
+  3: ['armoury', 'cells', 'control', 'stores', 'armoury', 'archive', 'medical', 'stores', 'quarters', 'cells', 'washroom', 'stores', 'armoury', 'stores'],
+};
+const DEEP_WRITING: Record<number, string[]> = {
+  2: ['NO POWER NO LIGHT', 'FEED THE PLANT|CAN IN THE STORE', 'DO NOT WAKE THEM', 'BATCH 18 FAILED', 'THE CURE WAS NEVER HERE', 'COUNT YOUR ROUNDS'],
+  3: ['VAULT 17', 'NO LIFT DOWN HERE', 'LADDER BY THE FRONT WALL', 'THEY KEPT THE BEST', 'TRAIN WONT WAIT', 'ALL OF US VOLUNTEERED'],
+};
+
+function layOut(seed: number, level = 1): Plan {
+  const B = BUNKER, H = B.hall, T = 0.3, GAP = 0.95, Y = levelY(level);
   let s = seed >>> 0;
   const rnd = () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -310,6 +341,14 @@ function layOut(seed: number): Plan {
       if (join(a, b)) more++;
     }
   }
+  // The same concrete floor over floor, so that every way through is where it is on the level above and the infected's ways
+  // are the same ways: what the rooms ARE is another matter, and from here on each level draws its own lots.
+  if (level > 1) {
+    s = (seed + level * 7919) >>> 0;
+    const biggest = [...rooms].sort((a, b) => area(b) - area(a))[0], far = [...rooms].filter((q) => q !== biggest && area(q) > 30).sort((a, b) => depth(b) - depth(a))[0];
+    const list = [...DEEP_ROOMS[level]];
+    for (const q of rooms) q.kind = q === biggest ? 'plant' : q === far ? 'armoury' : list.length ? list.splice(Math.floor(rnd() * Math.min(4, list.length)), 1)[0] : 'stores';
+  }
   const count = new Map<RoomKind, number>();
   for (const q of rooms) {
     const n = (count.get(q.kind) ?? 0) + 1;
@@ -321,7 +360,7 @@ function layOut(seed: number): Plan {
   const D = B.door.half;
   walls.push({ r0: -H.r - 0.5, r1: -H.r, f0: H.back - 0.5, f1: H.front }, { r0: H.r, r1: H.r + 0.5, f0: H.back - 0.5, f1: H.front });
   walls.push({ r0: -H.r, r1: -D, f0: H.back - 0.5, f1: H.back }, { r0: D, r1: H.r, f0: H.back - 0.5, f1: H.back }, { r0: -D, r1: D, f0: H.back - 0.5, f1: H.back, y0: B.door.tall });
-  walls.push({ r0: -H.r, r1: -D, f0: H.front - 0.4, f1: H.front }, { r0: D, r1: H.r, f0: H.front - 0.4, f1: H.front }, { r0: -D, r1: D, f0: H.front - 0.4, f1: H.front, y0: B.door.tall });
+  walls.push({ r0: -H.r, r1: -D, f0: H.front - 0.4, f1: H.front }, { r0: D, r1: H.r, f0: H.front - 0.4, f1: H.front }, { r0: -D, r1: D, f0: H.front - 0.4, f1: H.front, y0: level > 1 ? undefined : B.door.tall });
   for (const l of lines) {
     const gaps = [...l.gaps].sort((a, b) => a - b);
     let from = l.from;
@@ -706,7 +745,7 @@ function layOut(seed: number): Plan {
   for (let f = H.front - 3; f > H.back + 1; f -= 6.5) lamps.push([0, f, Y + B.tall - 0.25, pick([0.4, 0, 0, 0.3, 0, 0])]);
   for (const r of [-14.5, -8, 8, 14.5]) lamps.push([r, cross, Y + B.tall - 0.25, pick([0.3, 0, 0, 0])]);
   // (one over the door, on the ceiling of the stair's shaft: the door and its reader are seen by whoever comes down the stair)
-  lamps.push([0, H.front + B.door.lamp, Y + B.depth + B.pad.top - 0.45 - 0.25, 1]);
+  if (level === 1) lamps.push([0, H.front + B.door.lamp, Y + B.depth + B.pad.top - 0.45 - 0.25, 1]);
   builtList.push({ kind: 'pipe', r: -B.passage + 0.4, f: (H.back + H.front) / 2, rot: 0, w: 0.16, d: H.front - H.back - 0.6, h: 0.16, y: B.tall - 0.32, solid: false });
   builtList.push({ kind: 'pipe', r: -B.passage + 0.68, f: (H.back + H.front) / 2, rot: 0, w: 0.1, d: H.front - H.back - 0.6, h: 0.1, y: B.tall - 0.26, solid: false });
   builtList.push({ kind: 'duct', r: B.passage - 0.5, f: (H.back + H.front) / 2, rot: 0, w: 0.55, d: H.front - H.back - 0.6, h: 0.35, y: B.tall - 0.4, solid: false });
@@ -730,12 +769,13 @@ function layOut(seed: number): Plan {
       return;
     }
   };
-  daub(-1, H.back + 2.6, 'THE CURE IS BELOW', 0);
-  daub(1, H.back + 3.2, 'DO NOT OPEN|LEVEL 2', 1, 2.2);
-  daub(1, H.front - 3.4, 'MASKS ON', 0, 2.0);
-  daub(-1, cross + 5.5, 'THEY HEAR THE DOOR', 1);
-  daub(1, cross - 5.5, 'BATCH 17 HOLDS', 0, 2.4);
-  daub(-1, cross - 6.5, 'COUNT YOUR ROUNDS', 0);
+  const say = DEEP_WRITING[level] ?? ['THE CURE IS BELOW', 'DO NOT OPEN|LEVEL 2', 'MASKS ON', 'THEY HEAR THE DOOR', 'BATCH 17 HOLDS', 'COUNT YOUR ROUNDS'];
+  daub(-1, H.back + 2.6, say[0], 0);
+  daub(1, H.back + 3.2, say[1], 1, 2.2);
+  daub(1, H.front - 3.4, say[2], 0, 2.0);
+  daub(-1, cross + 5.5, say[3], 1);
+  daub(1, cross - 5.5, say[4], 0, 2.4);
+  daub(-1, cross - 6.5, say[5], 0);
   const kept = (side: number, f: number) => written.some(([s2, f2]) => s2 === side && Math.abs(f2 - f) < 2.1);
   for (let f = H.front - 5; f > H.back + 3; f -= between(5, 9)) {
     const side = rnd() < 0.5 ? -1 : 1, r = side * (B.passage - 0.5);
@@ -744,7 +784,7 @@ function layOut(seed: number): Plan {
     stood.push({ id: pick(['wooden_military_crate', 'Barrel_01', 'cardboard_box_01', 'metal_trash_can', 'old_military_crate']), r, f, rot: between(-0.3, 0.3) + (rnd() < 0.5 ? 0 : Math.PI / 2) });
   }
   for (const f of [H.front - 2.5, cross + 4, cross - 5, H.back + 2.5]) spots.push({ r: pick([-0.9, 0.9]), f, y: Y, floor: true });
-  builtList.push({ kind: 'sign', r: 0, f: H.back + 0.02, rot: 0, w: 2.2, d: 0.02, h: 0.4, y: 2.42, text: 'LEVEL 2', solid: false });
+  builtList.push({ kind: 'sign', r: 0, f: H.back + 0.02, rot: 0, w: 2.2, d: 0.02, h: 0.4, y: 2.42, text: level === 1 ? 'LEVEL 2' : level === 2 ? 'GOODS LIFT' : 'CARRIAGE LINE', solid: false });
   builtList.push({ kind: 'grate', r: 0, f: cross, rot: 0, w: 1.6, d: 1.6, h: 0.03, solid: false });
   // (the works of the place run down its walls: clusters of pipes, wherever there is neither a way through nor something standing)
   let side = 1;
@@ -771,14 +811,26 @@ const SEARCHED: Record<string, string> = { locker: 'locker', rack: 'gun_rack', p
  * here.) The same on the server and in every game: it is all in the plan.
  */
 export function bunkerCrates(p: Place): { kind: string; x: number; y: number; z: number; rot: number }[] {
-  const plan = bunkerPlan(), out: { kind: string; x: number; y: number; z: number; rot: number }[] = [];
-  const add = (kind: string | undefined, r: number, f: number, rot: number) => {
-    if (!kind) return;
-    const [x, y, z] = bunkerAt(p, r, f, levelY());
-    out.push({ kind, x, y, z, rot: p.rot + rot });
-  };
-  for (const m of plan.made) add(SEARCHED[m.kind], m.r, m.f, m.rot);
-  for (const s of plan.stood) add(SEARCHED[s.id], s.r, s.f, s.rot);
+  const out: { kind: string; x: number; y: number; z: number; rot: number }[] = [];
+  for (let level = 1; level <= LEVELS.last; level++) {
+    const plan = bunkerPlan(level);
+    const add = (kind: string | undefined, r: number, f: number, rot: number) => {
+      if (!kind) return;
+      const [x, y, z] = bunkerAt(p, r, f, levelY(level));
+      out.push({ kind, x, y, z, rot: p.rot + rot });
+    };
+    for (const m of plan.made) add(SEARCHED[m.kind], m.r, m.f, m.rot);
+    for (const s of plan.stood) add(SEARCHED[s.id], s.r, s.f, s.rot);
+  }
+  return out;
+}
+
+/** where the infected of a site's waves are stood on a level: clear spots down the passages, [right, forward] */
+export function levelSpots(level: number): [number, number][] {
+  const H = BUNKER.hall, plan = bunkerPlan(level), out: [number, number][] = [];
+  const clear = (r: number, f: number) => !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.4) && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1 + Math.max(m.w, m.d) / 2);
+  for (let f = H.front - 4; f > H.back + 3; f -= 5) if (clear(0, f)) out.push([0, f]);
+  for (const r of [-15, -10, 10, 15]) if (clear(r, plan.cross)) out.push([r, plan.cross]);
   return out;
 }
 

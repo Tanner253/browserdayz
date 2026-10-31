@@ -15,7 +15,8 @@ import { PILLBOX, POST_ROOM, postAt, postFoot, postYaw } from '../sim/posts';
 import type { Tier } from '../sim/tiers';
 import { watchtowerTier } from '../sim/watchtowers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
-import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
+import { bunkerAt, bunkerPlan, LEVELS, levelY } from '../sim/bunker';
+import { mineProps } from '../sim/mine';
 import { wreckUnder } from '../sim/bridge';
 import { LATER_TOWNS, TOWNS } from '../sim/towns';
 import { castleLoot, castleProps } from '../sim/castle';
@@ -41,7 +42,7 @@ const VALLEY_FROM = -700;
 // and a clinic's shelves held hats and tins, the shop's held hatchets and Kamenka's hospital held rifles. And a
 // hospital is a kind of its own beside a clinic: "the small medical buildings should lean heavy on bandages and
 // stims and less medkits and the hospital should be medkit abundant and lots of stims".)
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Hospital' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Hospital' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'Lab' | 'Vault' | 'East';
 
 export interface LootPoint {
   x: number;
@@ -1633,12 +1634,15 @@ export class Buildings {
     // said to be kept in the bunker lies there.
     const at = bunkerPlace(this.world);
     if (at) {
-      const plan = bunkerPlan(), Y = levelY();
+      // (Level 2 and Level 3 after the first, so that none of its places is renumbered; what is kept only on them is marked so)
+      const MARKS: Record<number, Usage[]> = { 1: ['Bunker'], 2: ['Bunker', 'Lab'], 3: ['Bunker', 'Lab', 'Vault'] };
+      for (let level = 1; level <= LEVELS.last; level++) {
+      const plan = bunkerPlan(level), Y = levelY(level);
       const point = (r: number, f: number, y: number, floor: boolean, surf?: LootPoint['surf']) => {
         const [x, wy, z] = bunkerAt(at, r, f, y);
         // (on the floor a thing lies a finger over it, as everywhere; on a table or a shelf it lies ON it: that
         // finger, and a mess table whose top was taken to be a metre up, had things hanging in the air over them)
-        this.lootPoints.push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: ['Bunker'], building: 'bunker', floor, tier: 5, ...(surf ? { surf } : {}) });
+        this.lootPoints.push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: MARKS[level], building: 'bunker', floor, tier: 5, ...(surf ? { surf } : {}) });
       };
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
@@ -1664,7 +1668,10 @@ export class Buildings {
         }
       }
       for (const sp of plan.spots) point(sp.r, sp.f, sp.y, sp.floor);
+      }
     }
+    // (what stands in the Old Mine's drifts: src/sim/mine.ts)
+    if (this.world.towns) for (const p of mineProps()) this.world.props.push({ ...p, scale: 1, far: 46 });
     // And the places on the boards of the racks (RACKS): after every other place on the map, the bunker's too, so
     // that not one of those is renumbered. Each is of the kind its building is, and on the step of the map that
     // building stands on, as that building's other places are.

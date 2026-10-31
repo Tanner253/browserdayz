@@ -64,7 +64,7 @@ import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
 import { setTrap, takeTrap } from './traps';
-import { doorLocked, useSite } from './sites';
+import { doorLocked, takeFuel, useGate, useRide, useSite, useStep } from './sites';
 import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
 import { knock, swing } from './doors';
@@ -435,6 +435,14 @@ export function handle(c: Client, m: C2S) {
       return takeTrap(c, m);
     case 'site':
       return useSite(c, m);
+    case 'sitefuel':
+      return takeFuel(c, m);
+    case 'sitestep':
+      return useStep(c, m);
+    case 'gate':
+      return useGate(c, m);
+    case 'ride':
+      return useRide(c, m);
     case 'trade':
       return trade(c, m);
     case 'book':

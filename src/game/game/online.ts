@@ -355,6 +355,7 @@ export const onlineMethods = {
     net.on('recy', (m) => this.recyclers.onRun(m));
     // (the way down's stops: src/game/sites.ts)
     net.on('site', (m) => this.sites.onSite(m));
+    net.on('gate', (m) => this.sites.onGate(m));
     net.on('siteok', (m) => {
       this.inv.take(m.card, 1);
       this.meDirty = true;

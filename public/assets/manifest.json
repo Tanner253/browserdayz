@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T19:02:39.142Z",
+ "generated": "2026-10-31T19:41:10.486Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14790,6 +14790,195 @@
      "of": "159068:1793473359137"
     }
    ]
+  },
+  "mine_portal": {
+   "url": "assets/models/mine_portal.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 272152,
+   "srcTris": 7162,
+   "tris": 7162,
+   "min": [
+    -0.5787,
+    0,
+    -2.7
+   ],
+   "max": [
+    0.5787,
+    4.3979,
+    2.7
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/mine_portal.glb",
+   "hiBytes": 881876,
+   "hiCard": 64
+  },
+  "mine_timber": {
+   "url": "assets/models/mine_timber.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 215052,
+   "srcTris": 1435,
+   "tris": 1435,
+   "min": [
+    -0.3281,
+    0,
+    -1.7
+   ],
+   "max": [
+    0.3281,
+    3.3346,
+    1.7
+   ],
+   "lods": []
+  },
+  "mine_rail": {
+   "url": "assets/models/mine_rail.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 342988,
+   "srcTris": 1418,
+   "tris": 1418,
+   "min": [
+    -3,
+    0,
+    -0.6482
+   ],
+   "max": [
+    3,
+    0.2231,
+    0.6482
+   ],
+   "lods": []
+  },
+  "ore_cart": {
+   "url": "assets/models/ore_cart.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 236012,
+   "srcTris": 4661,
+   "tris": 4661,
+   "min": [
+    -0.75,
+    0,
+    -0.4586
+   ],
+   "max": [
+    0.75,
+    0.9362,
+    0.4586
+   ],
+   "lods": []
+  },
+  "valve_stand": {
+   "url": "assets/models/valve_stand.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 276304,
+   "srcTris": 2954,
+   "tris": 2954,
+   "min": [
+    -0.3026,
+    0,
+    -0.4142
+   ],
+   "max": [
+    0.3026,
+    1.5,
+    0.4142
+   ],
+   "lods": []
+  },
+  "breaker_box": {
+   "url": "assets/models/breaker_box.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 240780,
+   "srcTris": 2716,
+   "tris": 2716,
+   "min": [
+    -0.4152,
+    0,
+    -0.3028
+   ],
+   "max": [
+    0.4152,
+    1.7,
+    0.3028
+   ],
+   "lods": []
+  },
+  "radar_dome": {
+   "url": "assets/models/radar_dome.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 201284,
+   "srcTris": 7081,
+   "tris": 7081,
+   "min": [
+    -7.3378,
+    0,
+    -7.2753
+   ],
+   "max": [
+    7.3378,
+    18,
+    7.2753
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/radar_dome.glb",
+   "hiBytes": 614096,
+   "hiCard": 64
+  },
+  "boxcar": {
+   "url": "assets/models/boxcar.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 253308,
+   "srcTris": 7299,
+   "tris": 7299,
+   "min": [
+    -1.5633,
+    0,
+    -6.5
+   ],
+   "max": [
+    1.5633,
+    3.9647,
+    6.5
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/boxcar.glb",
+   "hiBytes": 731040,
+   "hiCard": 64
+  },
+  "rail_track": {
+   "url": "assets/models/rail_track.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 434172,
+   "srcTris": 1895,
+   "tris": 1895,
+   "min": [
+    -6,
+    0,
+    -1.6852
+   ],
+   "max": [
+    6,
+    0.6422,
+    1.6852
+   ],
+   "lods": []
   }
  }
 }

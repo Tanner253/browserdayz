@@ -5,13 +5,14 @@
 // after them round whatever is in the way, and strikes when it has them. One that is some
 // other game's is drawn where that game says it is, a moment in the past, like another player.
 
+import { inMine } from '../sim/mine';
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
-import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelY, type Place } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelAt, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
 import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, roundSpot, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
@@ -194,7 +195,7 @@ export class Infected implements Damageable {
     this.fallTo = y;
     this.still = info.w === 1;
     // (the still ones live on the bunker's floor, whatever height they were found at)
-    if (this.still) this.home.y = this.horde.floorY ?? y;
+    if (this.still && this.horde.byBunker(this.home)) this.home.y = this.horde.floorOf(y) ?? y;
     // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
     const kind = kindOf(this.host.world(), this.i, this.home.x, this.home.z);
     this.avatar.zombieMoves = await infectedMoves(kind, this.i);
@@ -479,6 +480,8 @@ export class Infected implements Damageable {
     const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, PLAYER_GROUPS, this.blocker);
     const f = hit ? y + 1.25 - hit.toi : -1e9;
     if (f > ground + 0.04) return f;
+    // (a level under the first, or the mine: all of it is under the map's ground, and what is under the feet is the floor)
+    if (hit && y < ground - 1) return f;
     // Nothing under it but the ground: over the bunker that is its lid, the ground as it is seen, for one that was up
     // on it (the bottom of the hole under the lid is five metres down: at a seam in the lid one fell through it).
     const top = heightAt(world.surface, x, z);
@@ -975,6 +978,11 @@ export class Horde {
     return this.bunker ? this.bunker.y + levelY() : undefined;
   }
 
+  /** the height of the floor of the level a height is on (undefined: this world has no bunker) */
+  floorOf(y: number): number | undefined {
+    return this.bunker ? this.bunker.y + levelY(levelAt(y - this.bunker.y)) : undefined;
+  }
+
   /** whether a spot is in or about the bunker: down in it, or on the ground over it, round its house */
   byBunker(at: THREE.Vector3): boolean {
     const P = this.bunker;
@@ -1019,6 +1027,7 @@ export class Horde {
   below(at: THREE.Vector3): boolean {
     const P = this.bunker;
     if (!P) return false;
+    if (inMine(at.x, at.y + 1, at.z)) return true;
     const [r, f, h] = bunkerLocal(P, at.x, at.y + 1, at.z);
     return bunkerWays().part(r, f, h) !== bunkerWays().world;
   }

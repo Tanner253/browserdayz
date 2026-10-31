@@ -37,6 +37,18 @@ export const TOY_ITEMS: ItemDef[] = [
     desc: 'A yellow pass from the locker at Stolovaya, cleared for the gate of the Old Mine in the canyon wall, and the pumps at Bolotnaya beyond it.',
   },
   {
+    id: 'card_red', name: 'Red Clearance Pass', model: 'clearance_pass', paint: 0xb02424, w: 1, h: 1, weight: 0.03, category: 'misc',
+    desc: 'A red pass out of the sunken room at Bolotnaya, cleared for the goods lift at the far end of Bunker 17.',
+  },
+  {
+    id: 'card_black', name: 'Black Clearance Pass', model: 'clearance_pass', paint: 0x34363c, w: 1, h: 1, weight: 0.03, category: 'misc',
+    desc: 'A black pass out of the safe on Level 2, cleared for the radar dome above the snow line: the Kupol.',
+  },
+  {
+    id: 'card_purple', name: 'Purple Clearance Pass', model: 'clearance_pass', paint: 0x6f35b5, w: 1, h: 1, weight: 0.03, category: 'misc',
+    desc: 'A purple pass from the Kupol. It calls the carriage, and the carriage line is the only way into Level 3.',
+  },
+  {
     id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',
     desc: 'Toothed steel on a spring. Set on the ground it waits for whoever steps on it, and breaks the leg. Held F takes up one that is set.',
     use: { verb: 'Set', time: 3, sound: 'bandage' },

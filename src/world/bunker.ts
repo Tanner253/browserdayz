@@ -11,7 +11,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Atmosphere } from './atmosphere';
 import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BUNKER, bunkerAt, bunkerPlan, inBunker, lampBurns, levelY, type Place } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerPlan, inBunker, lampBurns, levelY, type Place, CAB, LEVELS, levelAt, type Plan } from '../sim/bunker';
 
 function painted(w: number, h: number, draw: (g: CanvasRenderingContext2D, rnd: () => number) => void, seed: number, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -28,7 +28,7 @@ function painted(w: number, h: number, draw: (g: CanvasRenderingContext2D, rnd: 
 }
 
 /** poured concrete: the grey of it, the lines the boards left, damp and rust run down from the fixings */
-function concretePaint(seed: number, tone: [number, number, number]) {
+export function concretePaint(seed: number, tone: [number, number, number]) {
   return painted(512, 512, (g, rnd) => {
     g.fillStyle = `rgb(${tone[0]}, ${tone[1]}, ${tone[2]})`;
     g.fillRect(0, 0, 512, 512);
@@ -374,7 +374,13 @@ export class BunkerSite {
     // (what stops a body is the doorway shut: it is there while the door is shut or all but, and not while it moves)
     d.collider.setEnabled(d.slide < 0.12);
   }
-  private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number }[] = [];
+  private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number; level: number }[] = [];
+  /** the levels under the first, each drawn only with the eye on it */
+  private deep = new Map<number, THREE.Group>();
+  /** the door at the passage's far end: it slides aside for the red pass (see the site's gate, src/sim/sites.ts) */
+  private sealed: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; open: boolean; lamp: THREE.MeshStandardMaterial } | null = null;
+  /** Level 2's plant is running */
+  power = false;
   /** the light on the card reader beside the door */
   private readerLamp: THREE.MeshStandardMaterial | null = null;
   private clock = 0;
@@ -401,6 +407,8 @@ export class BunkerSite {
     const group = new THREE.Group();
     group.position.set(P.x, P.y, P.z);
     group.rotation.y = P.rot;
+    /** what `block` adds to: the place, or a level under the first */
+    let into = group;
 
     /** a block, from corner to corner in the bunker's own measure: drawn, and solid unless told not to be */
     const block = (r0: number, r1: number, f0: number, f1: number, y0: number, y1: number, m: THREE.Material | THREE.Material[], o: { solid?: boolean; shadow?: boolean; surface?: 'concrete' | 'metal'; /** its picture is painted for it: once across each face, whatever its size */ whole?: boolean } = {}) => {
@@ -412,7 +420,7 @@ export class BunkerSite {
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
-      group.add(mesh);
+      into.add(mesh);
       let collider: RAPIER.Collider | null = null;
       if (o.solid !== false) {
         const [x, y, z] = bunkerAt(P, (r0 + r1) / 2, (f0 + f1) / 2, (y0 + y1) / 2);
@@ -519,9 +527,19 @@ export class BunkerSite {
 
     // ---- the first level: floor, ceiling, and its walls as they are laid out (see bunkerPlan)
     const L = B.hall, T = Y + B.tall, plan = bunkerPlan();
-    block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, Y - 0.3, Y, floor);
-    block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, T, T + 0.3, inside);
-    for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), T, inside);
+    const shell = (plan: Plan, Y: number) => {
+      const T = Y + B.tall;
+      block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, Y - 0.3, Y, floor);
+      block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, T, T + 0.3, inside);
+      for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), T, inside);
+      // (the goods lift's cab behind the door at the passage's far end: the same on every level)
+      block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, L.back - 0.5, Y - 0.3, Y, floor);
+      block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, L.back - 0.5, T, T + 0.3, inside);
+      block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, CAB.back, Y, T, steel, { surface: 'metal' });
+      block(-CAB.r - 0.3, -CAB.r, CAB.back, L.back - 0.5, Y, T, steel, { surface: 'metal' });
+      block(CAB.r, CAB.r + 0.3, CAB.back, L.back - 0.5, Y, T, steel, { surface: 'metal' });
+    };
+    shell(plan, Y);
     // a dado round the passages: the lower third of the walls painted, as such places are
     const Dr = B.door;
 
@@ -545,6 +563,8 @@ export class BunkerSite {
     /** shapes waiting to be drawn, by what they are made of: all of one stuff is one thing to draw */
     const heap = new Map<THREE.Material, THREE.BufferGeometry[]>();
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
+    const furnish = (plan: Plan, Y: number) => {
+    heap.clear();
     for (const m of plan.made) {
       const base = new THREE.Matrix4().compose(new THREE.Vector3(m.r, Y + (m.y ?? 0), m.f), Q.setFromAxisAngle(UP, m.rot), ONE);
       /** a piece of it: a shape, set down in the thing's own measure (x across, y up from its foot, z to its front) */
@@ -700,7 +720,7 @@ export class BunkerSite {
           plate.applyMatrix4(base);
           plate.matrixAutoUpdate = false;
           plate.updateMatrix();
-          group.add(plate);
+          into.add(plate);
           break;
         }
       }
@@ -710,8 +730,10 @@ export class BunkerSite {
       mesh.castShadow = false;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
-      group.add(mesh);
+      into.add(mesh);
     }
+    };
+    furnish(plan, Y);
 
     // ---- the door a keycard opens: steel, on a track, sliding aside into the wall
     {
@@ -764,24 +786,42 @@ export class BunkerSite {
     }
     // ---- and the way down to the levels below, at the far end of the passage: shut, for now
     {
-      const sealed = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 2', 'LEVEL 2 KEYCARD REQUIRED', 'COMING SOON'], 73), roughness: 0.6, metalness: 0.55 }));
-      block(-Dr.half, Dr.half, L.back - 0.32, L.back - 0.1, Y, Y + Dr.tall, [steel, steel, steel, steel, sealed, sealed], { surface: 'metal', whole: true });
-      // its reader, on the passage's wall beside it: red, and it stays red
+      const sealed = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 2', 'GOODS LIFT', 'RED CLEARANCE ONLY'], 73), roughness: 0.6, metalness: 0.55 }));
+      const leaf = block(-Dr.half, Dr.half, L.back - 0.32, L.back - 0.1, Y, Y + Dr.tall, [steel, steel, steel, steel, sealed, sealed], { surface: 'metal', whole: true });
+      leaf.mesh.matrixAutoUpdate = true;
+      // its scanner, on the passage's wall beside it: red, until a red pass is shown to it
       block(Dr.half + 0.18, Dr.half + 0.46, L.back, L.back + 0.07, Y + 1.08, Y + 1.44, steel, { solid: false });
-      block(Dr.half + 0.28, Dr.half + 0.36, L.back + 0.07, L.back + 0.08, Y + 1.34, Y + 1.39, atmo.register(new THREE.MeshStandardMaterial({ color: 0x111111, emissive: new THREE.Color(1, 0.1, 0.05), emissiveIntensity: 2.2 })), { solid: false });
+      const lamp = atmo.register(new THREE.MeshStandardMaterial({ color: 0x111111, emissive: new THREE.Color(1, 0.1, 0.05), emissiveIntensity: 2.2 })) as THREE.MeshStandardMaterial;
+      block(Dr.half + 0.28, Dr.half + 0.36, L.back + 0.07, L.back + 0.08, Y + 1.34, Y + 1.39, lamp, { solid: false });
+      this.sealed = { mesh: leaf.mesh, collider: leaf.collider!, slide: 0, open: false, lamp };
     }
 
     // ---- the lamps: a caged fitting on the ceiling for each, lit as it burns (the ones that burn steadily share one glow)
-    const fittings: { at: [number, number, number]; glow: THREE.Material; made: THREE.Mesh[] }[] = [];
+    const fittings: { at: [number, number, number]; glow: THREE.Material; made: THREE.Mesh[]; on: THREE.Object3D }[] = [];
     const steady = new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 3.2, roughness: 0.5 });
     atmo.register(steady);
-    plan.lamps.forEach(([r, f, y, how]) => {
-      const m = how >= 1 ? steady : (atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 0, roughness: 0.5 })) as THREE.MeshStandardMaterial);
+    const hang = (plan: Plan, level: number) => plan.lamps.forEach(([r, f, y, how]) => {
+      const m = how >= 1 && level === 1 ? steady : (atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 0, roughness: 0.5 })) as THREE.MeshStandardMaterial);
       const made = [block(r - 0.3, r + 0.3, f - 0.08, f + 0.08, y + 0.13, y + 0.2, m, { solid: false }).mesh, block(r - 0.36, r + 0.36, f - 0.12, f + 0.12, y + 0.2, y + 0.25, dark, { solid: false }).mesh];
       const [x, wy, z] = bunkerAt(P, r, f, y);
-      this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0 });
-      fittings.push({ at: [r, y + 0.25, f], glow: m, made });
+      this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0, level });
+      fittings.push({ at: [r, y + 0.25, f], glow: m, made, on: into });
     });
+    hang(plan, 1);
+    // ---- and the levels under the first: the same walls, their own rooms, lamps and what stands in them. Each is a group of its
+    // own, drawn only with the eye on it, and none has a share in the painted light below: nothing is seen by it (Level 2 is dark
+    // until its plant runs, and Level 3 has only what still burns), and only the lamps nearest the eye are lit.
+    for (let level = 2; level <= LEVELS.last; level++) {
+      const deep = Object.assign(new THREE.Group(), { name: `bunker level ${level}`, visible: false });
+      group.add(deep);
+      into = deep;
+      this.deep.set(level, deep);
+      const plan = bunkerPlan(level), Y = levelY(level);
+      shell(plan, Y);
+      furnish(plan, Y);
+      hang(plan, level);
+    }
+    into = group;
     // The fittings themselves are a model (a caged lamp out of the bunker pack), hung from the
     // ceiling upside down as it was made to stand; the boxes above are what is there until it has
     // come, and if it never does. Its glass is each lamp's own glow; the rest of it is one stuff.
@@ -798,7 +838,7 @@ export class BunkerSite {
       });
       if (!parts.length) return;
       for (const ft of fittings) {
-        for (const old of ft.made) group.remove(old);
+        for (const old of ft.made) ft.on.remove(old);
         for (const p of parts) {
           const mesh = new THREE.Mesh(p.geo, p.glass ? ft.glow : p.stuff);
           mesh.position.set(ft.at[0], ft.at[1], ft.at[2]);
@@ -806,7 +846,7 @@ export class BunkerSite {
           mesh.receiveShadow = true;
           mesh.matrixAutoUpdate = false;
           mesh.updateMatrix();
-          group.add(mesh);
+          ft.on.add(mesh);
         }
       }
     }).catch(() => {});
@@ -849,7 +889,7 @@ export class BunkerSite {
         // (what stands above the ground is lit by the sky, not by these: it is all laid on a corner of the plan where nothing burns)
         let high = -Infinity;
         for (let i = 0; i < pos.count; i++) high = Math.max(high, v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix).y);
-        if (high <= under + 0.01) {
+        if (high <= under + 0.01 && o.parent === group) {
           for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
             uv1[i * 2] = (v.x - R0) / span;
@@ -891,16 +931,33 @@ export class BunkerSite {
       if (under.parent !== all) all.add(under);
       const box = new THREE.Box3();
       for (const c of [...all.children]) {
-        if (c === under || box.setFromObject(c).isEmpty() || box.max.y > P.y - 0.5) continue;
+        if (c === under || [...this.deep.values()].includes(c as THREE.Group) || box.setFromObject(c).isEmpty() || box.max.y > P.y - 0.5) continue;
         under.add(c);
       }
       this.pieces = all.children.length;
-      if (this.ready) void this.ready(under).catch(() => {});
+      if (this.ready) for (const g of [under, ...this.deep.values()]) void this.ready(g).catch(() => {});
     }
     // (and always from inside it: its back corners are over thirty metres from its middle, and the map's own ground is
     // cut away over it, so neither of the others held there and the whole of it went, the map seen through its walls:
     // the owner, 2026-10-20, "if you go to the back corners of the bunker it completleyd erenders")
-    if (this.under) this.under.visible = (near < OPEN_FROM && eye.y < P.y + 4) || inBunker(P, eye.x, eye.y, eye.z, 3) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
+    const on = levelAt(eye.y - P.y);
+    if (this.under) this.under.visible = on === 1 && ((near < OPEN_FROM && eye.y < P.y + 4) || inBunker(P, eye.x, eye.y, eye.z, 3) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1));
+    for (const [level, g] of this.deep) g.visible = level === on;
+  }
+
+  /** Level 2's plant, running or stopped. */
+  setPower(on: boolean) {
+    this.power = on;
+    if (!on) for (const x of this.fixtures) if (x.level === 2) x.mat.emissiveIntensity = 0;
+  }
+
+  /** The door at the passage's far end. */
+  setSealed(open: boolean) {
+    const d = this.sealed;
+    if (!d) return;
+    d.open = open;
+    d.lamp.emissive.setRGB(open ? 0.1 : 1, open ? 1 : 0.1, 0.05);
+    d.collider.setEnabled(!open);
   }
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */
@@ -951,12 +1008,22 @@ export class BunkerSite {
         this.doorSet();
       }
     }
+    const q = this.sealed;
+    if (q && q.slide !== (q.open ? 1 : 0)) {
+      q.slide = Math.min(1, Math.max(0, q.slide + (q.open ? dt : -dt) / 3));
+      q.mesh.position.x = q.slide * (BUNKER.door.half * 2 + 0.1);
+    }
     // (the lamps are not looked at from across the map)
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
+    const on = levelAt(eye.y - P.y);
     this.fixtures.forEach((x, k) => {
+      if (x.level !== on) return;
+      // (Level 2 is dark until its plant runs, and then every lamp it has is lit)
+      if (x.level === 2 && !this.power) return;
+      const how = x.level === 2 ? 1 : x.how;
       // (a dead one is a fitting on the ceiling and no more)
-      if (x.how <= 0) return;
-      x.burn = lampBurns(x.how, k, this.clock);
+      if (how <= 0) return;
+      x.burn = lampBurns(how, k, this.clock);
       x.mat.emissiveIntensity = x.burn * 3.2;
       // (said whether it burns this instant or not: which lamps are given the real lights must not change with every flicker)
       lit(x.pos, x.burn > 0.2 ? x.burn : 0);

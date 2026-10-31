@@ -449,6 +449,13 @@ export type C2S =
   | { t: 'untrap'; i: number }
   /** a card in a site's reader (src/sim/sites.ts) */
   | { t: 'site'; s: string }
+  /** something taken at a site: what lies there (src/sim/sites.ts) */
+  | { t: 'sitefuel'; s: string }
+  /** one of what is to be turned at a site */
+  | { t: 'sitestep'; s: string; k: number }
+  /** a pass shown to a gate, and a ride taken */
+  | { t: 'gate'; g: string }
+  | { t: 'ride'; w: string }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string; /** what sprang it: the reader's stack, or the hooking code (src/net/bait.ts) */ proof?: string }
@@ -576,7 +583,9 @@ export type S2C =
   /** the trap they took up: it goes back in their pockets */
   | { t: 'trapback'; k: string }
   /** how a site stands, and how long it has left so, seconds */
-  | { t: 'site'; s: string; phase: 'idle' | 'alarm' | 'spent'; left: number }
+  | { t: 'site'; s: string; phase: 'idle' | 'alarm' | 'spent'; left: number; fuel?: boolean; done?: number[] }
+  /** how a gate stands, and how long it has left open, seconds */
+  | { t: 'gate'; g: string; open: boolean; left: number }
   /** the reader took their card */
   | { t: 'siteok'; card: string }
   | { t: 'trapgo'; i: number; k: string; o: [number, number, number]; how: 'snap' | 'boom' | 'take' }

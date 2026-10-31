@@ -14,6 +14,7 @@
 // cannot do is hurt anybody from further off than an arm, or faster than an arm swings:
 // the director believes a blow only when the two are standing together.
 
+import { MINE, mineSpots } from './mine';
 import { BUILDING_FOOTPRINT, bunkerPlace, onWorld, heightAt, type World } from '../world/worldgen';
 
 /** how far from the middle one may be said to be: the edge of the ground, and a little */
@@ -274,14 +275,14 @@ const WORKS_REACH = 62;
  * 2026-10-19: "i want the zombies to be all throughout the bunker not just sitting by the front door or in the center
  * halls"). The levels under the first are sealed: there is nowhere below to stand one.
  */
-export function bunkerSpots(world: World, rooms = false): Spot[] {
+export function bunkerSpots(world: World, rooms = false, level = 1): Spot[] {
   const P = bunkerPlace(world);
   if (!P) return [];
-  const plan = bunkerPlan(), H = BUNKER.hall, W = bunkerWays(), out: Spot[] = [];
+  const plan = bunkerPlan(level), Y = levelY(level), H = BUNKER.hall, W = bunkerWays(), out: Spot[] = [];
   const clear = (r: number, f: number) => Math.abs(r) < H.r - 0.8 && f > H.back + 0.8 && f < H.front - 0.8
     && !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.4)
     && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1.0 + Math.max(m.w, m.d) / 2);
-  const put = (r: number, f: number) => void (clear(r, f) && out.push([...bunkerAt(P, r, f, levelY()), W.part(r, f, levelY() + 1)]));
+  const put = (r: number, f: number) => void (clear(r, f) && out.push([...bunkerAt(P, r, f, Y), W.part(r, f, Y + 1)]));
   if (!rooms) {
     for (let f = H.front - 6; f >= plan.cross - 2; f -= 4) put(0, f);
     for (let r = -9; r <= 9; r += 4) if (Math.abs(r) > BUNKER.passage + 1.5) put(r, plan.cross);
@@ -412,6 +413,9 @@ export function infectedHomes(world: World): Home[] {
   }
   // (and the fort's, last: about its ruined village, and in the dark under its terrace)
   for (const h of fort) homes.push(h);
+  // (and the levels under the first: asleep in their rooms, and more of them the deeper it goes)
+  if (world.towns) homes.push({ x: MINE.hall.x, z: MINE.z, r: 120, n: mineSpots().length, inside: mineSpots(), still: true });
+  if (bunker) for (const [level, n] of [[2, 9], [3, 12]]) homes.push({ x: bunker.x, z: bunker.z, r: 30, n, inside: bunkerSpots(world, true, level), bunker: true, still: true });
   return homes.filter((h) => h.n > 0);
 }
 
