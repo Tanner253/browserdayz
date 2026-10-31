@@ -2,6 +2,7 @@
 //   node scripts/i18n.mjs check                 how much of each feature each language has
 //   node scripts/i18n.mjs list <feature> <file> writes the feature's English, one line each, for what is missing in any language
 //   node scripts/i18n.mjs merge <lang> <english file> <translated file>   line N of the one is line N of the other
+//   node scripts/i18n.mjs rows <file> [es,pt,...]  a table by hand: English|es|pt|ru|de|fr|tr|zh
 //   node scripts/i18n.mjs fill [lang]           asks the same model as the chat for what is missing (TRANSLATE_API_KEY)
 // A catalog is English -> theirs, nothing else. A template's ${...} is {0}, {1}, ... in the order they stand: what src/i18n/index.ts
 // matches a line the game wrote against. To add a string by hand: add its line to each lang/*.json; no code changes.
@@ -147,6 +148,21 @@ if (cmd === 'check') {
   });
   save(a, d);
   console.log(`${a}: ${Object.keys(d).length} entries, ${bad} lines left out`);
+} else if (cmd === 'rows') {
+  // a table written by hand: English|es|pt|ru|de|fr|tr|zh, one string a line
+  const order = (b ?? 'es,pt,ru,de,fr,tr,zh').split(','), dicts = Object.fromEntries(order.map((l) => [l, load(l)]));
+  const holes = (x) => (x.match(/\{\d+\}/g) ?? []).sort().join();
+  let n = 0, bad = 0;
+  for (const line of readFileSync(a, 'utf8').replace(/\r/g, '').split('\n').filter(Boolean)) {
+    const [en, ...to] = line.split('|');
+    if (to.length !== order.length) { console.log(`${to.length} columns: ${en}`); bad++; continue; }
+    to.forEach((x, i) => {
+      if (holes(x) !== holes(en)) { console.log(`holes differ (${order[i]}): ${en} -> ${x}`); bad++; } else if (x.trim()) dicts[order[i]][en] = x.trim();
+    });
+    n++;
+  }
+  for (const l of order) save(l, dicts[l]);
+  console.log(`${a}: ${n} rows, ${bad} left out`);
 } else if (cmd === 'fill') {
   const key = process.env.TRANSLATE_API_KEY;
   if (!key) throw new Error('no TRANSLATE_API_KEY');
