@@ -29,18 +29,20 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 - **SMALL WINS, THEN THE WAY DOWN (the owner, 2026-10-31: "we can change anything about the roadmap", "small wins now and then we
   can get to the optimizations", "give players stuff to chew on"). The plan is `marketing/plan-grand-tour.html` (git-excluded, card
   zona-plan-grand-tour.jpg; copies and the true map in `progress/small-wins/`), the owner's yes given; memory note
-  small-wins-and-card-chain-2026-10-31.** Drops, each one tested by the owner and deployed on their word, one at a time:
-  1. Front page: DONE on battle-royale, NOT deployed. Seven menu scenes (src/game/menu-scenes-new.ts; a Vignette may say its `hour`),
-     the roadmap redrawn in seven phases (marketing/roadmap.html, `public/changelog/media/roadmap.jpg`; it ticks two lines that are
-     live only once this drop is: scenes, Zona). The Zona reshaped too (1d377616): corridors baked along walkable ground
-     (`npx tsx scripts/zona-ways.ts`, `... picture`), 68 m wide, soft corners, about a quarter more land. It is a tag rule, so this drop
-     deploys site AND server. Under a slow load some gun scenes are left out at random (a model not yet come when the table is made,
-     as the shovel's was): seen headless, not fixed.
-  2. Toys: DONE on battle-royale, NOT deployed (PROTOCOL 79). Smoke grenade (a grenade with a rule that hurts nobody: src/game/toys.ts),
+  small-wins-and-card-chain-2026-10-31.** **DROPS 1 AND 2 LIVE 2026-10-31 ~12:35 UTC as c067a8e8 (PROTOCOL 79, boot 9366a6265079025b, 908
+  characters and 119 stashes kept), changelog `#traps-smoke-flares`. The owner has stopped development for now; Drop 3 waits until after
+  their animation and character rigging work.** The deploy script read the site's version a moment too early and stopped before the
+  server: `node scripts/deploy.mjs --server` finished it, and the site was ahead of the server for those few minutes (nobody was on).
+  1. Front page: DONE. Seven menu scenes (src/game/menu-scenes-new.ts; a Vignette may say its `hour`),
+     the roadmap redrawn in seven phases (marketing/roadmap.html, `public/changelog/media/roadmap.jpg`; four of Phase 6 ticked;
+     the raid scene says C4 is coming, as it is held back). The Zona reshaped too: corridors baked along walkable ground
+     (`npx tsx scripts/zona-ways.ts`, `... picture`), 68 m wide, soft corners, about a quarter more land. It is a tag rule, so such a change
+     deploys site AND server. The corridors keep 165 m off the traders (test/camp.test.ts).
+  2. Toys: DONE (PROTOCOL 79). Smoke grenade (a grenade with a rule that hurts nobody: src/game/toys.ts),
      flare gun and rounds (the launcher path, `launches`; anybody may fire it, 'launch' in server/handle.ts; a real light of reach 130,
      lamps.ts lets a long-reaching glow past its 70 m), bear trap and land mine (src/sim/traps.ts, server/traps.ts, src/game/traps.ts:
      the server keeps them with the world, each to a 4 h end, taken up and set again a whole life; each game is told, and draws, only
-     those within 20 m; a death in one is its setter's and leaves a tag, the owner: "you cna get tags from traps"). Offline a trap cannot be set. Five Higgsfield models, `assets-src/incoming/higgsfield/toys`.
+     those within 20 m; a death in one is its setter's and leaves a tag, the owner: "you cna get tags from traps"). Offline a trap cannot be set. Five Higgsfield models, `assets-src/incoming/higgsfield/toys`; the flare gun is `flare_t_sized.glb`, from a reference picture, a gun pack (a pistol needs named pieces).
      Loot: all on low tiers but the mine (Tier 5, one): Tier 4 and 5 were full and pushed sniper rifles out. Tests traps, traps-server.
   3. The camp in the gas over the bunker (radio tower, barracks, decon tents, watchtower, motor pool, hatch hut), blue card, Stolovaya.
   4. The Old Mine, Bolotnaya, Level 2 and the generator; tappers Level 2 only, Deagle, Benelli, heavy armour 2 each, AK out of Tier 3.
