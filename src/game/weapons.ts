@@ -381,7 +381,7 @@ const IN_SMG: Record<string, { /** how big it is drawn in these hands, of its ow
   m9: { size: 0.88, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
   colt: { size: 1, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
   deagle: { size: 0.85, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
-  flare_gun: { size: 0.72, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
+  flare_gun: { size: 1, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
 };
 /**
  * The tops of that pack's arms, let down out of the picture (the eye's space: x right, y up, -z away; metres). Its
@@ -2157,7 +2157,8 @@ export class Weapons {
       world.add(mesh);
       p.geometry.computeBoundingBox();
       if (piece === 'base' || piece === 'slide') span.union(p.geometry.boundingBox!);
-      if (piece === 'slide' || (piece === 'base' && long)) top.union(p.geometry.boundingBox!);
+      // (a pistol with no slide, the flare gun: its body is its top, or what is set by the top has nothing to go by)
+      if (piece === 'slide' || (piece === 'base' && (long || !alone.some((q) => q.name.startsWith('slide'))))) top.union(p.geometry.boundingBox!);
     }
     // A sight whose lens is painted into the gun's own picture, opaque (the MP7's: a solid orange disc in the middle of
     // the picture when aimed through): the lens is cut out of its shape, the faces that look along the barrel inside

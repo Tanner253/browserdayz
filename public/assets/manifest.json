@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T11:25:26.424Z",
+ "generated": "2026-10-31T12:15:28.989Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14690,25 +14690,25 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 151640,
-   "srcTris": 4659,
-   "tris": 4659,
+   "bytes": 160108,
+   "srcTris": 5902,
+   "tris": 5902,
    "min": [
     -0.0287,
-    -0.0715,
-    -0.0306
+    -0.05,
+    -0.0133
    ],
    "max": [
-    0.192,
+    0.1908,
     0.0909,
-    0.0387
+    0.0215
    ],
    "lods": [
     {
      "url": "assets/models/flare_gun_lod1.glb",
-     "tris": 2490,
+     "tris": 1600,
      "far": 2,
-     "of": "151640:1793445926420"
+     "of": "160108:1793448928986"
     }
    ],
    "holds": {

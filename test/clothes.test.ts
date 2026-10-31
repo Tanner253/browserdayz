@@ -98,7 +98,7 @@ ok('what is worn has DayZ\'s eleven places, beside the two on the back and the h
 ok('no thing there was is worn anywhere else than it was', () => {
   const was: Record<string, string> = {
     mosin: 'long', benelli: 'long', mpa: 'long', ak: 'long', ar15: 'long', machete: 'long', crowbar: 'long', bat: 'long', shovel: 'long',
-    colt: 'holster', m9: 'holster', deagle: 'holster',
+    colt: 'holster', m9: 'holster', deagle: 'holster', flare_gun: 'holster',
     boonie_hat: 'head', helmet_k63: 'head', patrol_cap: 'head', fishermans_hat: 'head', gasmask: 'face',
     // (and what has been made since is worn where its like is: the steel helmet)
     helmet_m1: 'head',

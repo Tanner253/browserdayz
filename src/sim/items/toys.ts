@@ -14,7 +14,7 @@ export const TOY_ITEMS: ItemDef[] = [
   },
   {
     id: 'flare_gun', name: 'Flare Gun', model: 'flare_gun', w: 3, h: 2, weight: 0.9, category: 'weapon', slot: 'holster',
-    desc: 'A signal pistol, one round at a time. Fired up, its flare hangs over the ground for half a minute and lights it red, and everybody for kilometres sees where it is.',
+    desc: 'A red plastic signal pistol, one round at a time. Fired up, its flare hangs over the ground for half a minute and lights it red, and everybody for kilometres sees where it is.',
     weapon: { kind: 'pistol', ammo: 'ammo_flare', capacity: 1, ergo: 75, action: 'self', launches: 'ammo_flare' }, iconYaw: 0,
     loot: { pair: 'Flaregun', at: [0, 1, 3, 0, 0], restock: 900, usage: ['Military', 'Police', 'Village'], loaded: [0, 1] },
     worth: 20,
@@ -26,14 +26,14 @@ export const TOY_ITEMS: ItemDef[] = [
     worth: 3,
   },
   {
-    id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 3, h: 3, weight: 3.5, category: 'tool',
+    id: 'bear_trap', name: 'Bear Trap', model: 'bear_trap', w: 2, h: 2, weight: 3.5, category: 'tool',
     desc: 'Toothed steel on a spring. Set on the ground it waits for whoever steps on it, and breaks the leg. Held F takes up one that is set.',
     use: { verb: 'Set', time: 3, sound: 'bandage' },
     loot: { pair: 'TrapBear', at: [0, 2, 4, 0, 0], restock: 900, usage: ['Hunting', 'Farm', 'Industrial'] },
     worth: 18,
   },
   {
-    id: 'land_mine', name: 'Land Mine', model: 'land_mine', w: 3, h: 3, weight: 6, category: 'tool',
+    id: 'land_mine', name: 'Land Mine', model: 'land_mine', w: 2, h: 2, weight: 6, category: 'tool',
     desc: 'A steel disc of explosive. Set on the ground it arms itself in eight seconds, and goes off under whoever or whatever comes over it first. Held F takes one up, slowly.',
     use: { verb: 'Set', time: 4, sound: 'bandage' },
     loot: { pair: 'LandMineTrap', at: [0, 0, 0, 0, 1], restock: 1800, usage: ['Military'] },

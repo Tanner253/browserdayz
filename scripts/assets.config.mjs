@@ -1377,17 +1377,17 @@ export const WEAPON_PACKS = {
   // The Desert Eagle came as a pistol and nothing else: it is held in the other pistol's
   // hands and moved as that pistol is, like the Pistol 43. Its barrel is part of its frame
   // (the slide runs back round it), and the cartridge that came lying in it is the .50's own model.
-  // (the small wins of 2026-10-31: one piece, the body, made in Higgsfield. "the flare gun looks liek a revolver, not a flare gun lol": this is the second go, the orange lifeboat kind)
+  // (the small wins of 2026-10-31: one piece, the body, made in Higgsfield. "the flare gun looks liek a revolver, not a flare gun lol": and the fat tube after it, "I really dont like that flare gun model. Google a flare gun": this one is made from a picture of the real thing, a flat red-orange slab)
   flare_gun: {
     dir: '../incoming/higgsfield/toys',
-    file: 'flare_b_sized.glb',
+    file: 'flare_t_sized.glb',
     tex: 1024,
     fp: false,
     length: 0.22,
-    forward: [0.456, 0, 0.89],
+    forward: [0.079, 0, 0.997],
     up: [0, 1, 0],
     fit: { to: 'm9', piece: 'base' },
-    parts: { 'tripo_node_02921246-7196-47d3-909f-b312f89172d9': 'base' },
+    parts: { 'tripo_node_b75f68d4-6ac7-423e-b975-204b27f22541': 'base' },
     credit: {
       name: 'Flare gun',
       url: 'https://higgsfield.ai',

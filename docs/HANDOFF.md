@@ -39,8 +39,8 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
   2. Toys: DONE on battle-royale, NOT deployed (PROTOCOL 79). Smoke grenade (a grenade with a rule that hurts nobody: src/game/toys.ts),
      flare gun and rounds (the launcher path, `launches`; anybody may fire it, 'launch' in server/handle.ts; a real light of reach 130,
      lamps.ts lets a long-reaching glow past its 70 m), bear trap and land mine (src/sim/traps.ts, server/traps.ts, src/game/traps.ts:
-     the server keeps them, tells each game only those within 60 m, not kept over a restart; a trap's kill is nobody's, id 0, so no tag
-     in server/acts.ts). Offline a trap cannot be set: it needs a server. Five Higgsfield models, `assets-src/incoming/higgsfield/toys`.
+     the server keeps them with the world, each to a 4 h end, taken up and set again a whole life; each game is told, and draws, only
+     those within 20 m; a death in one is its setter's and leaves a tag, the owner: "you cna get tags from traps"). Offline a trap cannot be set. Five Higgsfield models, `assets-src/incoming/higgsfield/toys`.
      Loot: all on low tiers but the mine (Tier 5, one): Tier 4 and 5 were full and pushed sniper rifles out. Tests traps, traps-server.
   3. The camp in the gas over the bunker (radio tower, barracks, decon tents, watchtower, motor pool, hatch hut), blue card, Stolovaya.
   4. The Old Mine, Bolotnaya, Level 2 and the generator; tappers Level 2 only, Deagle, Benelli, heavy armour 2 each, AK out of Tier 3.

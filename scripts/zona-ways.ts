@@ -10,6 +10,7 @@
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import { generateWorld, heightAt } from '../src/world/worldgen';
+import { TRADER_SPOTS } from '../src/sim/camp-place';
 import { inside } from '../src/sim/water';
 import { MIDDLE, ROUNDS, westAt, zonaDepth } from '../src/world/zona';
 
@@ -20,6 +21,9 @@ const ground = (x: number, z: number) => heightAt(world.heights, x, z);
 
 /** the steepest ground a body climbs (src/game/player.ts CLIMB_MAX, 50 degrees), and what is hard going short of it (35) */
 const WALL = Math.tan((50 * Math.PI) / 180), HARD = Math.tan((35 * Math.PI) / 180);
+
+/** how far a corridor's line keeps from a trader, metres: its safe zone and a margin, half the corridor and the soft of its corners */
+const TRADER_OFF = 165;
 
 /** the old corridors, straight, 22 m either side: for the picture and to say what was wrong with them */
 const OLD: [number, number, number, number][] = [
@@ -114,6 +118,8 @@ function bake() {
     const ax = r.points[n - 3], az = r.points[n - 1], bx = r.points[n], bz = r.points[n + 2], l = Math.hypot(bx - ax, bz - az) || 1;
     for (let t = 0; t <= l; t += STEP / 2) near(ax + ((bx - ax) * t) / l, az + ((bz - az) * t) / l, 4, (k) => { if (going[k] < 1e5) going[k] = 0.55; });
   }
+  // and a corridor keeps off the traders: a safe zone is not to lie in the Zona, nor the Zona come to its edge (test/camp.test.ts)
+  for (const q of TRADER_SPOTS) near(q.x, q.z, TRADER_OFF, (c) => { if (going[c] < 1e5 && Math.hypot(X0 + (c % nx) * STEP - q.x, Z0 + Math.floor(c / nx) * STEP - q.z) < TRADER_OFF) going[c] = 1e6; });
   // how steep the ground is round each point, whichever way one walks over it: a way along the foot of a cliff is no cliff
   const steep = new Float32Array(nx * nz);
   for (let j = 1; j < nz - 1; j++) for (let i = 1; i < nx - 1; i++) steep[id(i, j)] = Math.hypot(hh[id(i + 1, j)] - hh[id(i - 1, j)], hh[id(i, j + 1)] - hh[id(i, j - 1)]) / (2 * STEP);

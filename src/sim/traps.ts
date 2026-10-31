@@ -1,7 +1,7 @@
 // Traps set on the ground (2026-10-31, the owner: "players want more content they can play with and interact with"): a
 // bear trap, which breaks the leg of whoever steps on it, and a land mine. DayZ's: anybody's foot sets one off, its
 // setter's too, once it has armed, and anybody may take one up who is given the time. The server keeps them and decides
-// when they go (server/traps.ts); no game is told of one further off than `sight`, so none can be listed from afar.
+// when they go (server/traps.ts); no game is told of one further off than `sight`: none can be listed from afar, and none is drawn.
 //
 // The owner, 2026-10-31: "traps should surive restart i think... but have a max timer on their life. can be reset by picking
 // up and replacing trap by owner. also you cna get tags from traps." So they are kept with the world, each with its end, and
@@ -20,8 +20,8 @@ export const TRAP_KEEP = {
   most: 6,
   /** how long one lies before it rusts away, ms: taken up and set again it has all of this again */
   lasts: 4 * 3600_000,
-  /** how far off a game is told of one, metres */
-  sight: 60,
+  /** how far off a game is told of one, metres, and so draws it (the owner, 2026-10-31: 'we odnt need to render traps till super close to them anyways so super low load') */
+  sight: 20,
   /** how far from their feet a player sets one or takes one up, metres */
   reach: 3,
   /** how far above or below it a foot may be and still be on it, metres: not from the floor over a cellar */
