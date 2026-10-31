@@ -386,6 +386,9 @@ ok('the gas and the bunker hold what they are asked, or as much as they have pla
   // (what is the bunker's and nobody else's cut least; a dressing every village has more than a shotgun)
   assert.ok(few.kept('barrett', 5) / TYPES.barrett.at[4] > few.kept('bandage', 5) / TYPES.bandage.at[4], 'a tapper cut more than a dressing');
   for (const id of ['sniper50', 'barrett', 'vssk']) assert.equal(few.kept(id, 5), 1, `${id} cut`);
+  // (the way down: each only where it is meant to lie)
+  assert.deepEqual(TYPES.card_blue.usage, ['First']);
+  for (const id of ['sniper50', 'barrett', 'vssk', 'night_vision']) assert.deepEqual(TYPES[id].usage, ['Vault']);
 });
 
 ok('the K6-3 stops a sniper\'s round to the head, barely; nothing else does', () => {

@@ -42,7 +42,7 @@ const VALLEY_FROM = -700;
 // and a clinic's shelves held hats and tins, the shop's held hatchets and Kamenka's hospital held rifles. And a
 // hospital is a kind of its own beside a clinic: "the small medical buildings should lean heavy on bandages and
 // stims and less medkits and the hospital should be medkit abundant and lots of stims".)
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Hospital' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'Lab' | 'Vault' | 'East';
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Hospital' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'First' | 'Lab' | 'Vault' | 'East';
 
 export interface LootPoint {
   x: number;
@@ -1635,7 +1635,7 @@ export class Buildings {
     const at = bunkerPlace(this.world);
     if (at) {
       // (Level 2 and Level 3 with marks of their own, for what is kept only on them)
-      const MARKS: Record<number, Usage[]> = { 1: ['Bunker'], 2: ['Bunker', 'Lab'], 3: ['Bunker', 'Lab', 'Vault'] };
+      const MARKS: Record<number, Usage[]> = { 1: ['Bunker', 'First'], 2: ['Bunker', 'Lab'], 3: ['Bunker', 'Lab', 'Vault'] };
       for (let level = 1; level <= LEVELS.last; level++) {
       const plan = bunkerPlan(level), Y = levelY(level);
       const point = (r: number, f: number, y: number, floor: boolean, surf?: LootPoint['surf']) => {
