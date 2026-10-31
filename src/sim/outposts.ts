@@ -92,7 +92,7 @@ const BUILDINGS: Record<string, TownSpot[]> = {
   ],
   Kupol: [
     // (the crew's strong room, its door to the dome and the reader by it: on the one flat of the ridge)
-    { type: 'guardpost', x: -12, z: 14, rot: S, up: 6.4 },
+    { type: 'guardpost', x: -12, z: 14, rot: S, up: 6.1 },
   ],
   'Kupol Siding': [],
   'Old Mine': [],

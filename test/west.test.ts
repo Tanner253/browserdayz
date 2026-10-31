@@ -76,7 +76,7 @@ const ok = (what: string) => { checks++; console.log(`  ok  ${what}`); };
 // Kupol's own things and buildings, which were added to the end of each list. Its ground, paint and grass are to the byte what they were)
 const WAS = {
   heights: 'e84eb63aae84e4a6', surface: '2d94c0e4a0819aa7', splat: 'cb750f3f74b54a53', grass: '2fca3323401c0679', trees: '9fbaeed794168a1f', rocks: 'd9d17dfd2558a623',
-  props: 'aba54b3f492a4992', buildings: '6e662171cd901275', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: 'bff55bd5b927bcaa',
+  props: 'aba54b3f492a4992', buildings: 'f60e4e0fc630285c', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: '098dc706427e6dcd',
 };
 for (const [k, v] of Object.entries(WAS)) assert.equal(prints[k as keyof typeof prints], v, `the east's ${k} are not what they were`);
 ok(`the east of today's map as it was, to the byte (but within ${KEEP} m of where the bunker was): its ground, paint and grass, ${world.trees.filter(east).length} trees, ${world.rocks.filter(east).length} rocks, ${world.props.filter(east).length} props, ${world.buildings.filter(east).length} buildings, the roads, the fort, Kamenka (made in ${made.toFixed(0)} ms)`);
@@ -297,7 +297,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
   assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon', 'Gorodok', 'Stolovaya', 'Bolotnaya', 'Kupol', 'Kupol Siding', 'Old Mine', 'Old Mine East']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
-    assert.ok(ids.length > 0, `${town.name} has no buildings`);
+    // (the siding and the mine's two gates are stops with no roof: src/sim/outposts.ts)
+    if (!['Kupol Siding', 'Old Mine', 'Old Mine East'].includes(town.name)) assert.ok(ids.length > 0, `${town.name} has no buildings`);
     const c = Math.cos(town.rot), s = Math.sin(town.rot);
     // (but what the town planted itself: Pokrov's court has its trees, 2026-10-19)
     const planted = townTrees(town).map(([, lx, lz]) => townPoint(town, lx, lz));
