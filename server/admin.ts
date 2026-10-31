@@ -24,6 +24,7 @@ import { stashLines } from './stash-list';
 import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, isTop, keptOffNow, keyHash, outranks, over, roleOf, roleSaid, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
 import { KEPT, asAdmin, keepBefore, place, saveAdmin, savedWords, sayRestart, setPower, sys, whoIs } from './keep';
 import { broadcast, cleanName, clients, drop, send, type Client } from './players';
+import { sayOut } from './chat';
 import { kill } from './acts';
 import { queue } from './queue';
 import { sendDrop } from './drops';
@@ -535,7 +536,7 @@ export async function command(c: Client, line: string) {
       if (!rest.length) return void sys(c, 'Say what?');
       const words = rest.join(' ').slice(0, 160);
       log(`[admin] ${c.name} to everybody: ${words}`);
-      broadcast({ t: 'announce', text: words, by: c.name });
+      sayOut({ t: 'announce', text: words, by: c.name }, c, clients.values());
       return void sys(c, `Said to all ${clients.size}: ${words}`);
     }
     case 'msg':
@@ -545,7 +546,7 @@ export async function command(c: Client, line: string) {
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (!words) return void sys(c, 'Say what to them?');
       log(`[admin] ${c.name} to ${t.name} alone: ${words}`);
-      send(t, { t: 'pm', from: c.name, role, text: words });
+      sayOut({ t: 'pm', from: c.name, role, text: words }, c, [t]);
       return void sys(c, `To ${t.name} alone: ${words}`);
     }
     case 'inv': {

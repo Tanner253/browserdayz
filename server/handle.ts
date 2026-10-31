@@ -41,6 +41,8 @@ import { cameTo, holdsTag, keepToTheirs, payingTags, wentFrom } from './custody'
 import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, reclaimBody, refusedNow, shutIt } from './searched';
 import { scores } from './queue';
 import { partyAct, partyCommand, partyMates } from './party';
+import { sayOut } from './chat';
+import { langOf } from '../src/sim/langs';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { roster } from './roster';
@@ -799,7 +801,7 @@ export function handle(c: Client, m: C2S) {
         // those with a role, to one another, wherever they are: nobody else is sent it, or told that anything was said
         if (!roleOf(c)) return;
         const out: S2C = { t: 'chat', ch: 'staff', from: c.name, text, role: roleOf(c) ?? undefined, ...(worn && worn !== 'off' ? { tint: worn } : {}), ...crown };
-        for (const o of clients.values()) if (roleOf(o)) send(o, out);
+        sayOut(out, c, [...clients.values()].filter((o) => roleOf(o)));
         return;
       }
       if (m.ch === 'party') {
@@ -807,22 +809,23 @@ export function handle(c: Client, m: C2S) {
         const mates = partyMates(c);
         if (!mates.length) return void sys(c, 'You are in no party: look at somebody and press F to ask them into one.');
         const out: S2C = { t: 'chat', ch: 'party', from: c.name, text, ...badge };
-        for (const o of mates) send(o, out);
         // (and every admin, overheard: the owner, 2026-10-27, "can admins see all chats from all people?")
-        for (const o of clients.values()) if (roleOf(o) === 'admin' && !mates.includes(o)) send(o, { ...out, over: true });
+        const overhear = [...clients.values()].filter((o) => roleOf(o) === 'admin' && !mates.includes(o));
+        sayOut(out, c, [...mates, ...overhear], (o) => overhear.includes(o));
         return;
       }
       if (m.ch === 'near') {
         // proximity: only players standing within earshot get it (the speaker included)
         const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, ...badge };
-        for (const o of clients.values()) {
-          if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
-          // (an admin out of earshot overhears it all the same)
-          else if (roleOf(o) === 'admin') send(o, { ...out, over: true });
-        }
-      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, ...badge });
+        const near = (o: Client) => Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE;
+        // (an admin out of earshot overhears it all the same)
+        sayOut(out, c, [...clients.values()].filter((o) => near(o) || roleOf(o) === 'admin'), (o) => !near(o));
+      } else sayOut({ t: 'chat', ch: 'global', from: c.name, text, ...badge }, c, clients.values());
       return;
     }
+    case 'lang':
+      c.lang = langOf(m.l);
+      return;
     case 'admin':
       return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
     // (they have just bought at the store: the site's list is asked for again, so their VIP shows within a minute)

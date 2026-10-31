@@ -101,7 +101,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (76, 2026-10-27: 'ps' tells a page only of those within its sight, and with `out` who went out of it: a page of 75
 // leaves them standing where they were last)
 // (77, 2026-10-27: a report from the death screen ('report'): a server of 76 hears none)
-export const PROTOCOL = 77;
+// (78, 2026-10-30: the language a page reads ('lang', and on 'hello'), a line's `orig` and `mid` and its late translation 'chatx')
+export const PROTOCOL = 78;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -260,7 +261,7 @@ export type C2S =
    * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
    * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
    */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string; /** the body and the voice they picked (src/sim/survivor.ts) */ bd?: number; vo?: number }
+  | { t: 'hello'; v: number; key: string; name: string; /** the language they read (src/sim/langs.ts) */ lang?: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string; /** the body and the voice they picked (src/sim/survivor.ts) */ bd?: number; vo?: number }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -330,6 +331,8 @@ export type C2S =
   /** one's beds, asked for on the death screen */
   | { t: 'mybeds' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
+  /** the language this player reads (src/sim/langs.ts): chat comes to them in it */
+  | { t: 'lang'; l: string }
   /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
   | { t: 'admin'; pw: string }
   /** this player has just bought at the store: the server asks the site again (server/perks.ts) */
@@ -620,9 +623,11 @@ export type S2C =
   | { t: 'stash~'; uid: string; buried: boolean }
   /** the stash this player asked to pick up is theirs to carry: what it was, and what is in it */
   /** said to everybody by an admin or a mod: across the screen, and in the chat */
-  | { t: 'announce'; text: string; by: string }
+  | { t: 'announce'; text: string; by: string; orig?: string; mid?: number }
   /** said to this player alone by an admin or a mod */
-  | { t: 'pm'; from: string; role: 'admin' | 'mod'; text: string }
+  | { t: 'pm'; from: string; role: 'admin' | 'mod'; text: string; orig?: string; mid?: number }
+  /** the translation of a line that went out as typed rather than wait for it (src/sim/chat-translate.ts) */
+  | { t: 'chatx'; mid: number; text: string }
   /** somebody this (admin's) game knows has vanished, or is seen by everybody again: they are drawn faintly, or as anybody is */
   | { t: 'ghost'; id: number; on: boolean }
   | { t: 'corpse-'; uid: string }
@@ -633,7 +638,7 @@ export type S2C =
   /** one's beds: [base, piece, kind, x, z, seconds until it may be woken at] */
   /** this player's beds: [base, piece, kind, x, z, seconds until it gives wakes again, wakes it has now (src/sim/build/beds.ts)] */
   | { t: 'beds'; list: [number, number, string, number, number, number, number][] }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean; /** a party's or a nearby chat an admin overhears, not being in it (server/handle.ts) */ over?: boolean }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; /** `text` is a translation: what they typed */ orig?: string; /** a translation may follow: see 'chatx' */ mid?: number; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean; /** a party's or a nearby chat an admin overhears, not being in it (server/handle.ts) */ over?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
   /** a finish put on one of this player's guns: the shop's item id */

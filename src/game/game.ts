@@ -34,6 +34,7 @@ import '../sim/barrels';
 import '../sim/emotes';
 import '../sim/save';
 import { Net, playerName, publicId, serverStatus, setPlayerName } from '../net/client';
+import { onLang } from '../i18n';
 import { crateId, type EspRow, type ZedSpot } from '../net/protocol';
 import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
@@ -1280,6 +1281,8 @@ export class Game {
       if (this.online) this.net.send({ t: 'admin', pw });
       else this.hud.chatLine('system', '', 'You are playing offline: there is no server to be an admin of.');
     };
+    // (chat follows the language chosen in Settings)
+    onLang((l) => this.online && this.net.send({ t: 'lang', l }));
     this.hud.onChat(
       (ch, text) => {
         if (this.online) this.net.send({ t: 'chat', ch, text });

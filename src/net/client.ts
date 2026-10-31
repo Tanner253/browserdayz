@@ -3,6 +3,7 @@
 
 import { PROTOCOL, type C2S, type S2C } from './protocol';
 import { deviceId, glName } from './device';
+import { lang } from '../i18n';
 import { onBait } from './bait';
 
 type Handler<T extends S2C['t']> = (m: Extract<S2C, { t: T }>) => void;
@@ -390,7 +391,7 @@ export class Net {
       this.ws = ws;
       ws.onopen = () => {
         const lp = this.lootPrint();
-        this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName(), ...(lp ? { lp } : {}), ...(this.who() ?? {}) });
+        this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, lang, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName(), ...(lp ? { lp } : {}), ...(this.who() ?? {}) });
       };
       ws.onerror = () => done(null);
       ws.onclose = () => {

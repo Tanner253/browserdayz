@@ -18,6 +18,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { ARENA, arenaEnds, arenaLoadout, hitShapes, inArena, rayRod, type LobbyInfo } from './rules';
 import { brUpgrade } from './br/match';
 import { atDoor, knownAtDoor } from './br/door';
+import { heardLang, sayOut } from './chat';
 import { CASTLE_SCALE, castleAt, type FortPlace } from '../src/sim/castle';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { shotOf } from '../src/sim/gunplay';
@@ -321,8 +322,10 @@ function shot(l: Lobby, me: Fighter, m: { o: unknown; d: unknown; w: unknown; su
 
 /** what a game in the arena says (a watcher's: only talk, and its ping) */
 function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
-  if (f.watch && m.t !== 'chat' && m.t !== 'ping') return;
+  if (f.watch && m.t !== 'chat' && m.t !== 'ping' && m.t !== 'lang') return;
   switch (m.t) {
+    case 'lang':
+      return heardLang(f.ws, m.l);
     case 's': {
       const p = m.p as Pose;
       if (!Array.isArray(p) || p.length !== 6 || !p.every(Number.isFinite)) return;
@@ -350,7 +353,7 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
       for (const o of audience(l)) if (o !== f) send(o, { t: 'gear', id: f.id, g: f.g });
       return;
     case 'chat':
-      if (typeof m.text === 'string' && m.text.trim()) for (const o of audience(l)) send(o, { t: 'chat', from: f.watch ? `${f.name} (watching)` : f.name, text: m.text.slice(0, 200) });
+      if (typeof m.text === 'string' && m.text.trim()) sayOut(f, audience(l), send, { t: 'chat', from: f.watch ? `${f.name} (watching)` : f.name, text: m.text.slice(0, 200) });
       return;
     case 'ping':
       return void (Number.isFinite(m.n) && send(f, { t: 'pong', n: m.n as number }));
@@ -394,6 +397,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
       if (gate?.on) return gate.said(m);
       if (m.t !== 'hello') return;
       if (m.v !== PROTOCOL) return void ws.send(JSON.stringify({ t: 'kick', reason: 'This page is out of date: load it again.', v: PROTOCOL }));
+      heardLang(ws, m.lang);
       const key = typeof m.key === 'string' ? m.key.slice(0, 80) : '', name = typeof m.name === 'string' ? m.name.slice(0, 24).trim() || 'Survivor' : 'Survivor';
       if (key.length < 16) return turn('No player key.');
       // (the bot check at the door, before any wager is hosted, joined or watched: the battle royale's, arena/br/door.ts)

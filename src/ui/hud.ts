@@ -11,6 +11,8 @@ import { KeysView } from './keys-view';
 import type { KeyHints } from '../game/key-hints';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
+import { LANGS, langOf } from '../sim/langs';
+import { lang, setLang, tr } from '../i18n';
 import { PadBinds } from './pad-binds';
 import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
 import { GROUPS, audio, type Group, type Mix } from '../core/audio';
@@ -520,6 +522,14 @@ export class HUD {
     chat.addEventListener('input', () => this.suggest());
     chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
     // (a click on what is said, or its scroll bar, leaves the box being typed in: the chat stays open)
+    this.el.chat.addEventListener('click', (e) => {
+      const n = (e.target as HTMLElement).closest<HTMLElement>('.chat-line[data-orig]'), body = n?.querySelector<HTMLElement>('span:last-child');
+      if (!n || !body) return;
+      const other = n.dataset.orig!;
+      n.dataset.orig = body.textContent ?? '';
+      body.textContent = other;
+      n.classList.toggle('as-typed');
+    });
     this.el.chat.addEventListener('mousedown', (e) => {
       if (this.chatOpen && e.target !== chat) e.preventDefault();
     });
@@ -812,7 +822,8 @@ export class HUD {
       this.el.says.appendChild(el);
       this.says.set(who, el);
     }
-    if (el.textContent !== text) el.textContent = text;
+    const said = tr(text);
+    if (el.textContent !== said) el.textContent = said;
     el.style.left = `${at[0] * 100}%`;
     el.style.top = `${at[1] * 100}%`;
     const k = Math.min(1, age / 0.12);
@@ -1397,6 +1408,7 @@ export class HUD {
   }
 
   private setGraphic(key: string, value: string) {
+    if (key === 'lang') return void setLang(langOf(value)).then(() => this.renderGraphics());
     const g = this.gfx;
     // (the numbers beside the status symbols are no setting of the picture's: kept by themselves, and nothing is drawn afresh for them)
     // (full screen, likewise: kept by itself, and asked for the next time the game is clicked into)
@@ -1470,6 +1482,7 @@ export class HUD {
     const pages: Record<Exclude<SetTab, 'account'>, string> = {
       // (health, blood, food and water are symbols: whoever wants the numbers as well asks for them here)
       game:
+        row('Language', 'lang', lang, LANGS.map(([c, name]) => [c, name]), 'The game, and what other players say in chat') +
         row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The numbers beside health, blood, food and water') +
         (TOUCH ? '' : row('Full screen', 'full', fullWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'Fills the screen when you click in, and keeps Ctrl + W from closing the tab (Chrome and Edge)')),
       controls:
@@ -1803,7 +1816,7 @@ export class HUD {
   /** @param role whoever said it is an admin or a mod: it is written before their name */
   /** @param tint an admin's own colour for their tag (not said: the rainbow) */
   /** @param perk from the store: [VIP] in purple before the name, a cup after it for a week after a coffee */
-  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean, perk?: { vip?: boolean; cup?: boolean; over?: boolean }) {
+  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean, perk?: { vip?: boolean; cup?: boolean; over?: boolean; orig?: string; mid?: number; lead?: string }) {
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     const n = document.createElement('div');
     n.className = 'chat-line';
@@ -1841,10 +1854,29 @@ export class HUD {
     }
     const body = document.createElement('span');
     body.textContent = text;
+    // (what a player typed is theirs, or the translator's, and never the catalog's)
+    if (ch !== 'system' || perk?.lead) body.dataset.raw = '';
     n.appendChild(body);
+    if (perk?.lead) n.dataset.lead = perk.lead;
+    if (perk?.mid !== undefined) n.dataset.mid = String(perk.mid);
+    if (perk?.orig !== undefined) this.translated(n, body, (perk.lead ?? '') + perk.orig);
     log.appendChild(n);
     while (log.children.length > 60) log.firstChild?.remove();
     log.scrollTop = log.scrollHeight;
+  }
+
+  /** A line that came in another language: a mark, and a click on it (the chat open) shows what was typed. */
+  private translated(n: HTMLElement, body: HTMLElement, typed: string) {
+    n.dataset.orig = typed;
+    n.title = 'Translated: click to see what they typed';
+    body.insertAdjacentHTML('beforebegin', '<i class="chat-tr" aria-hidden="true"></i>');
+  }
+  /** the translation of a line that went out as typed rather than wait for it */
+  chatLate(mid: number, text: string) {
+    const n = this.root.querySelector<HTMLElement>(`.chat-log [data-mid="${mid}"]`), body = n?.querySelector<HTMLElement>('span:last-child');
+    if (!n || !body || n.dataset.orig !== undefined) return;
+    this.translated(n, body, body.textContent ?? '');
+    body.textContent = (n.dataset.lead ?? '') + text;
   }
 
   /** connection line under the frame counter */

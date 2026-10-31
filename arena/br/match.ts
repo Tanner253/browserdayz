@@ -20,6 +20,7 @@ import { F_CROUCH, F_DEAD, F_PRONE, PROTOCOL, type Pose, type S2C } from '../../
 import { groundField, heightAt, type World } from '../../src/world/worldgen';
 import { AMMO, BR, FLIGHT, HEALS, MAPS, MELEE, PHASES, TEAM, capOf, stackOf, circleAt, firstCircle, inMap, kindOf, modeOfSize, nextCircle, type BrMode, type Circle, type Ground, type SlotItem } from './rules';
 import { brSpots, groundId, rollMatch, rollWait, type Spot } from './loot';
+import { heardLang, sayOut } from '../chat';
 import { atDoor, knownAtDoor } from './door';
 import { addSolids, readSolids } from './solids';
 import { THROWN, inHandDamage, judge, letGo, newThrower, pullPin, type Thrower } from '../../src/sim/grenades';
@@ -706,8 +707,10 @@ function said(l: Lobby, p: P, m: Record<string, unknown>) {
       l.doors.set(i, st);
       return all(l, { t: 'door', i, open: st[0], swing: st[1] }, p);
     }
+    case 'lang':
+      return heardLang(p.ws, m.l);
     case 'chat':
-      if (typeof m.text === 'string' && m.text.trim()) all(l, { t: 'chat', from: p.name, text: m.text.slice(0, 200) } as S2C);
+      if (typeof m.text === 'string' && m.text.trim()) sayOut(p, l.ps, send, { t: 'chat', from: p.name, text: m.text.slice(0, 200) });
       return;
     case 'ping':
       return void (Number.isFinite(m.n) && send(p, { t: 'pong', n: m.n as number }));
@@ -886,6 +889,7 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
       if (gate?.on) return gate.said(m);
       if (m.t !== 'hello') return;
       if (m.v !== PROTOCOL) return void ws.send(JSON.stringify({ t: 'kick', reason: 'This page is out of date: load it again.', v: PROTOCOL }));
+      heardLang(ws, m.lang);
       const key = typeof m.key === 'string' ? m.key.slice(0, 80) : '', name = typeof m.name === 'string' ? m.name.slice(0, 24).trim() || 'Survivor' : 'Survivor';
       if (key.length < 16) return turn('No player key.');
       // (the bot check first, for whoever has not passed it lately; passed, this same hello is taken again)

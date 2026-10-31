@@ -567,7 +567,8 @@ export const onlineMethods = {
       this.meDirty = true;
       this.resume();
     });
-    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint, m.elite, { vip: m.vip, cup: m.cup, over: m.over }));
+    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint, m.elite, { vip: m.vip, cup: m.cup, over: m.over, orig: m.orig, mid: m.mid }));
+    net.on('chatx', (m) => this.hud.chatLate(m.mid, m.text));
     // everyone carrying a tag they took, shown on the map for a few seconds
     net.on('tags', (m) => {
       const me = m.p.some(([id]) => id === net.id);
@@ -627,11 +628,11 @@ export const onlineMethods = {
     net.on('ghost', (m) => this.remotes.get(m.id)?.setGhost(m.on));
     net.on('announce', (m) => {
       this.hud.announce(m.text, m.by);
-      this.hud.chatLine('system', '', `${m.by}, to everybody: ${m.text}`);
+      this.hud.chatLine('system', '', `${m.by}, to everybody: ${m.text}`, null, undefined, undefined, { lead: `${m.by}, to everybody: `, orig: m.orig, mid: m.mid });
       this.adminUI.say(`${m.by}, to everybody: ${m.text}`);
     });
     net.on('pm', (m) => {
-      this.hud.chatLine('pm', m.from, m.text, m.role);
+      this.hud.chatLine('pm', m.from, m.text, m.role, undefined, undefined, { orig: m.orig, mid: m.mid });
       this.hud.note(`${m.role === 'admin' ? 'An admin' : 'A mod'} (${m.from}) to you: ${m.text}`, 'warn');
     });
     net.on('powers', (m) => {

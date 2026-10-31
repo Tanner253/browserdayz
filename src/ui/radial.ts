@@ -1,3 +1,5 @@
+import { tr } from '../i18n';
+
 // One radial menu for every wheel of the game (2026-10-24, the owner: "the UI/UX on our emote wheel ... is lacking, we
 // need clean smooth animations and responsive fresh feedback"; "should have visuals and icons for the building pieces
 // and also actions of the wheel"; "the bottom option for the radial wheel should always be cancel to cancel out of
@@ -250,14 +252,15 @@ export class Radial {
 
   /** the words in the hub, and the line under them */
   hub(title: string, sub: string) {
-    if (this.title.textContent !== title) {
-      this.title.textContent = title;
+    const said = tr(title);
+    if (this.title.textContent !== said) {
+      this.title.textContent = said;
       // (a new word comes up, rather than being swapped in)
       this.title.classList.remove('pop');
       void this.title.offsetWidth;
       this.title.classList.add('pop');
     }
-    if (this.sub.textContent !== sub) this.sub.textContent = sub;
+    if (this.sub.textContent !== tr(sub)) this.sub.textContent = tr(sub);
   }
 
   /** put away: with a wedge chosen (an entry, or Cancel), that one flashes as the wheel goes */

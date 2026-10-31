@@ -449,6 +449,10 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
   animation: chatfade 16s linear forwards;
 }
 .hud-chat.open .chat-line { animation: none; opacity: 1; }
+/* a line put into the reader's language: the mark, and with the chat open a click shows what was typed */
+.chat-tr { display: inline-block; width: 11px; height: 11px; margin: 0 4px 0 -2px; vertical-align: -1px; background: currentColor; opacity: 0.55; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 4h8L8 2l1-1 4 3.500-4 3.500-1-1 2-2H2zm12 8H6l2 2-1 1-4-3.500L7 8l1 1-2 2h8z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 4h8L8 2l1-1 4 3.500-4 3.500-1-1 2-2H2zm12 8H6l2 2-1 1-4-3.500L7 8l1 1-2 2h8z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.hud-chat.open .chat-line[data-orig] { cursor: pointer; }
+.chat-line.as-typed .chat-tr { opacity: 1; color: #ffd35a; }
 @keyframes chatfade { 0%, 82% { opacity: 1; } 100% { opacity: 0; } }
 .chat-line i { font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 6px; }
 .chat-line b { font-weight: 600; margin-right: 6px; }
@@ -897,13 +901,13 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .inv-item.in-slot .inv-item-img.fit { inset: 13px 4px 3px; }
 .inv-item.in-slot:hover { background: rgba(233, 228, 216, 0.07); }
 .inv-item.in-slot.sel { box-shadow: inset 0 0 0 1px var(--accent); }
-.inv-item.in-slot.active::after { content: 'in hands'; position: absolute; left: 6px; bottom: 3px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.inv-item.in-slot.active::after { content: var(--say-in-hands, 'in hands'); position: absolute; left: 6px; bottom: 3px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
 .inv-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .inv-slots .inv-slot { height: 74px; }
 /* the hands: the one place that is not a place on the body */
 .inv-slot.slot-inhands { border-color: rgba(255, 211, 90, 0.35); }
 /* (held, and carried nowhere: there was no room for it) */
-.inv-slot.slot-inhands.empty::after { content: 'Empty: drag a thing here'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; letter-spacing: 0.08em; color: var(--ink-faint); pointer-events: none; }
+.inv-slot.slot-inhands.empty::after { content: var(--say-empty-hands, 'Empty: drag a thing here'); position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; letter-spacing: 0.08em; color: var(--ink-faint); pointer-events: none; }
 /* under a gun, the places on it that take a part: each a slot of its own, dragged onto and dragged off */
 .inv-armed { min-width: 0; }
 .inv-parts { display: flex; gap: 4px; height: 38px; margin-top: 4px; }
@@ -981,7 +985,7 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .inv-ground { position: relative; }
 .inv-ground.ground-ok { border-color: var(--ink-dim); }
 .inv-ground.ground-ok::after {
-  content: 'Drop here';
+  content: var(--say-drop-here, 'Drop here');
   position: absolute;
   right: 6px;
   bottom: 5px;

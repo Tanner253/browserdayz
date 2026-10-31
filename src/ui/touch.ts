@@ -18,6 +18,7 @@
 
 import type { Input } from '../core/input';
 import { EMOTE } from '../sim/emotes';
+import { tr } from '../i18n';
 import { onWheelSlots, wheelSlots } from './wheel-slots';
 
 /** joystick travel in pixels: the ring's radius */
@@ -125,7 +126,7 @@ export class TouchControls {
     this.root.classList.toggle('bag', inventory);
     this.root.classList.toggle('use', playing && canUse);
     this.root.classList.toggle('g', playing && !!also.g);
-    if (also.g && this.act2.textContent !== also.g) this.act2.textContent = also.g;
+    if (also.g && this.act2.textContent !== tr(also.g)) this.act2.textContent = tr(also.g);
     this.root.classList.toggle('ads', playing && also.aiming);
     this.root.classList.toggle('lamp', !!also.lamp);
     this.root.classList.toggle('lit', !!also.lit);

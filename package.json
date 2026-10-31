@@ -44,6 +44,7 @@
     "test:rules": "tsx test/bunker.test.ts && tsx test/cars.test.ts && tsx test/checks.test.ts && tsx test/daynight.test.ts && tsx test/expansion.test.ts && tsx test/fires.test.ts && tsx test/gas.test.ts && tsx test/gunplay.test.ts && tsx test/infected.test.ts && tsx test/injury.test.ts && tsx test/inventory.test.ts && tsx test/loot.test.ts && tsx test/mags.test.ts && tsx test/thirst.test.ts && tsx test/trade.test.ts && tsx test/voice.test.ts && tsx test/zone.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@dgreenheck/ez-tree": "^1.1.0",
     "@dimforge/rapier3d-compat": "^0.21.0",
     "@vercel/blob": "^2.8.1",

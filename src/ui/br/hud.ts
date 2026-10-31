@@ -5,6 +5,7 @@
 // nothing (2026-10-18: the HUD's own work had been a fifth of the frame).
 import './br.css';
 import { ITEMS } from '../../sim/items';
+import { tr } from '../../i18n';
 import { socialRow } from '../hud';
 import { BR, HEALS, MAPS, RARITY, capOf, rarityOf, type Circle } from '../../../arena/br/rules';
 import type { BrS2C, Phase } from '../../../arena/br/wire';
@@ -193,8 +194,8 @@ export class BrHud {
   }
 
   private text(sel: string, s: string) {
-    const e = this.q(sel);
-    if (e.textContent !== s) e.textContent = s;
+    const e = this.q(sel), said = tr(s);
+    if (e.textContent !== said) e.textContent = said;
   }
 
   private draw(t: Tick, me: Of<'me'>) {
