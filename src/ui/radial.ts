@@ -1,4 +1,4 @@
-import { tr } from '../i18n';
+import { tr as inLang } from '../i18n';
 
 // One radial menu for every wheel of the game (2026-10-24, the owner: "the UI/UX on our emote wheel ... is lacking, we
 // need clean smooth animations and responsive fresh feedback"; "should have visuals and icons for the building pieces
@@ -114,8 +114,9 @@ export function radialSvg(entries: RadialEntry[], rings: RadialRing[], per: numb
     const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;
     const [x, y] = pt(tr, a).split(' ').map(Number);
     // (two words go on two lines, and a line too long for its wedge is set smaller: by the wedge's width where its words sit)
-    const words = e.label.split(' ');
-    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && e.label.length > 7 ? words : [e.label];
+    // (split into lines here, so put into the player's language here: the page's watch would meet it a word at a time)
+    const label = inLang(e.label), words = label.split(' ');
+    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && label.length > 7 ? words : [label];
     const room = ((Math.PI * 2 * tr) / per) * 0.82;
     // (the icon over the words, the two of them standing about the middle of the wedge)
     const glyph = !!ICONS[e.icon], size = glyph ? ICON : PIC;
@@ -252,7 +253,7 @@ export class Radial {
 
   /** the words in the hub, and the line under them */
   hub(title: string, sub: string) {
-    const said = tr(title);
+    const said = inLang(title);
     if (this.title.textContent !== said) {
       this.title.textContent = said;
       // (a new word comes up, rather than being swapped in)
@@ -260,7 +261,7 @@ export class Radial {
       void this.title.offsetWidth;
       this.title.classList.add('pop');
     }
-    if (this.sub.textContent !== tr(sub)) this.sub.textContent = tr(sub);
+    if (this.sub.textContent !== inLang(sub)) this.sub.textContent = inLang(sub);
   }
 
   /** put away: with a wedge chosen (an entry, or Cancel), that one flashes as the wheel goes */

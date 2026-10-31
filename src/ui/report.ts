@@ -19,7 +19,7 @@ export class ReportForm {
     this.button.onclick = () => this.open();
     this.form.className = 'dead-report-form';
     this.form.hidden = true;
-    this.reason.innerHTML = REPORT.reasons.map((r) => `<option>${r}</option>`).join('');
+    this.reason.innerHTML = REPORT.reasons.map((r) => `<option value="${r}">${r}</option>`).join('');
     this.text.maxLength = REPORT.text;
     this.text.placeholder = 'What happened? (optional)';
     const ok = document.createElement('button'), no = document.createElement('button');

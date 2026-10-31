@@ -1,5 +1,5 @@
 // npx tsx test/chat-translate.test.ts: CHAT IN THE READER'S LANGUAGE (src/sim/chat-translate.ts) on this tree's server,
-// booted on a port of its own (8161) as test/party.test.ts boots it, with a stand-in for the translator on 8162 (nothing
+// booted on a port of its own (8440) as test/party.test.ts boots it, with a stand-in for the translator on 8441 (nothing
 // leaves this machine; no key is real). Three readers of three languages: each has one line in their own, whoever typed it
 // has it as typed, the translator is asked once whoever many read it, a slow translator holds nothing up and its words
 // follow, a broken one costs nobody the line, and no key at all is the game as it was. The catalogs' {0}s are checked too.
@@ -14,7 +14,7 @@ import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { ChatTranslator, deliver, settled } from '../src/sim/chat-translate';
 import { langOf, type Lang } from '../src/sim/langs';
 
-const PORT = 8161, FAKE = 8162, SITE = 'http://127.0.0.1:9';
+const PORT = 8440, FAKE = 8441, SITE = 'http://127.0.0.1:9';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const until = async (f: () => unknown) => {
   for (let i = 0; i < 40 && !f(); i++) await sleep(50);
@@ -86,7 +86,8 @@ await new Promise<void>((r) => fake.listen(FAKE, '127.0.0.1', r));
   const none = new ChatTranslator('', `http://127.0.0.1:${FAKE}`);
   asked = 0;
   got.es.length = 0;
-  deliver(none, { t: 'chat', text: 'no key on this server' }, readers, io);
+  const line3 = { t: 'chat', text: 'no key on this server' };
+  deliver(none, line3, readers, io);
   assert.deepEqual(got.es.map((x) => (x as { text: string }).text), ['no key on this server'], 'with no key the game works as it did');
   assert.equal(asked, 0);
 }

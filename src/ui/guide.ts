@@ -200,7 +200,7 @@ export class Guide {
     this.el.innerHTML = `<div class="gd" role="dialog" aria-modal="true" aria-label="Building and crafting guide">
       <header><b>Build &amp; craft</b><div class="gd-tabs">${(['Building', 'Crafting'] as const).map((t) => `<button type="button" data-tab="${t}" class="${s.tab === t ? 'on' : ''}">${t}</button>`).join('')}</div><button type="button" class="gd-x" aria-label="Close">×</button></header>
       <figure>${!s.pic ? '' : s.pic.endsWith('.mp4') ? `<video src="${s.pic}" autoplay muted loop playsinline preload="auto"></video>` : `<img src="${s.pic}" alt="" decoding="async">`}</figure>
-      <div class="gd-words"><h3>${s.title}</h3><ul>${s.lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>
+      <div class="gd-words" data-raw><h3>${s.title}</h3><ul>${s.lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>
       <footer><label><input type="checkbox" ${hide ? 'checked' : ''}> Don't show this again</label><span class="gd-dots" aria-label="Step ${this.at + 1} of ${this.list.length}">${this.list.map((_, i) => `<i class="${i === this.at ? 'on' : ''}"></i>`).join('')}</span>
       <button type="button" class="gd-back" ${this.at ? '' : 'disabled'}>Back</button><button type="button" class="gd-next">${last ? 'Done' : 'Next'}</button></footer>
     </div>`;

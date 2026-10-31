@@ -39,7 +39,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `acts.ts` | 556 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
 | `admin-bodies.ts` | 75 | Bodies cleared away by an admin, with whatever is on them: one (the one looked at, by its number, or the nearest), or every one within so many metres, as /delz puts down the infected (the owner, 2026-10-23: |
-| `admin.ts` | 1050 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
+| `admin.ts` | 1051 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
 | `animals.ts` | 220 | The server: the animals (2026-10-23). |
 | `beds.ts` | 73 | Beds and sleeping bags as the server keeps them (2026-10-24, base building's fourth step). |
@@ -49,6 +49,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `boxes.ts` | 56 | A base's boxes as the server keeps them (2026-10-24, base building's fourth step). |
 | `build.ts` | 393 | The server: base building (2026-10-24, the second step; the rules are src/sim/build/). |
 | `camp.ts` | 107 | The server: the trader camp (progression v3; the rules are src/sim/camp.ts and src/sim/jobs.ts). |
+| `chat.ts` | 17 | A line of chat sent out, each reader having it in their own language (src/sim/chat-translate.ts). |
 | `checks.ts` | 480 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
 | `claims.ts` | 147 | The server: claims, upkeep and rot (2026-10-24, base building's third step; the rules are src/sim/build/upkeep.ts). |
 | `craft.ts` | 172 | The server: crafting (2026-10-24, plan-crafting; the rules are src/sim/craft/). |
@@ -61,7 +62,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `forge.ts` | 52 | The server: forges (2026-10-25, plan-crafting; the rules are src/sim/craft/forge.ts). |
 | `gate.ts` | 792 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 143 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 1147 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 1150 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1396 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 829 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `learn.ts` | 101 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
@@ -70,7 +71,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
 | `plates.ts` | 121 | A store finish put on one gun (2026-10-22), Rust's way. |
-| `players.ts` | 514 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
+| `players.ts` | 517 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `proofs.ts` | 40 | What a page was banned for running, in full (the owner, 2026-10-27: |
 | `queue.ts` | 149 | The server: the line to get in when it is full, and the leaderboard. |
 | `raid.ts` | 162 | The server: raiding (base building's fifth step; the rules are src/sim/build/raid.ts). |
@@ -236,7 +237,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 310 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 2161 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 2164 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -250,7 +251,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 442 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 797 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 1070 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 1071 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 | `reclaim.ts` | 40 | The game: a survivor's gear taken back off their own body at one press (the owner, 2026-10-25: |
 
 ## src/game/
@@ -299,22 +300,29 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
+## src/i18n/
+
+| file | lines | what it is |
+|---|---:|---|
+| `boot.ts` | 5 | Imported first by src/main.ts: the catalog is in before anything is drawn, so nobody sees English go by. |
+| `index.ts` | 150 | / <reference types="vite/client" /> The game's words in the player's language (2026-10-30, the owner: |
+
 ## src/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 381 | (first of all: three.js's inspector hook is taken away before three loads, src/net/hook-trap.ts) |
+| `main.ts` | 383 | (first of all: three.js's inspector hook is taken away before three loads, src/net/hook-trap.ts) |
 
 ## src/net/
 
 | file | lines | what it is |
 |---|---:|---|
 | `bait.ts` | 43 | window.__game was the whole game, open to the console of every player's page, until 2026-10-20: a script passed round among players reached through it to draw everybody through walls and light the night (the owner,... |
-| `client.ts` | 485 | Client side of the game connection. |
+| `client.ts` | 486 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `hook-trap.ts` | 80 | three.js hands every scene and renderer it makes to window.__THREE_DEVTOOLS__ when a page has one (its inspector's hook): a script that sets it before the game loads is given the whole world, and can draw everybody... |
 | `orders.ts` | 239 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 817 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 822 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -378,6 +386,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
+| `chat-translate.ts` | 187 | Chat in the reader's language (2026-10-30, the owner: |
 | `combat.ts` | 167 | Damage rules. The server uses these to decide how much a reported hit hurts, so a client can say "I hit player 7 in the head with a Mosin" but never "for 5000 damage". |
 | `condition.ts` | 45 | How worn a thing that is worn is: |
 | `cooking.ts` | 881 | Cooking spots (2026-10-13): whatever a fire is made in and food is made hot on. |
@@ -442,6 +451,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `jobs.ts` | 56 | Work the trader has. Three jobs a day, the same three for everybody (they come out of the date): the infected to be put down, something common to be brought in, something that has to be gone and got. Paid in scrap... |
 | `kit.ts` | 565 | A KIT of building pieces, and a LAYOUT made of them. |
 | `kits.ts` | 113 | Whole sets of gear an admin can hand out in one go (2026-10-11): |
+| `langs.ts` | 19 | The languages the game speaks (2026-10-30, the owner: |
 | `lipki.ts` | 114 | Lipki, the woodcutters' hamlet in the birch woods (2026-10-16, reworked): where its houses and what lies about them stand. |
 | `load.ts` | 70 | What a load does to whoever carries it (2026-10-13: |
 | `mokroye.ts` | 190 | Mokroye, the flooded hamlet in the swamp (2026-10-16, new): where its houses, boardwalks and what the water left stand. |
@@ -558,7 +568,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `hud.ts` | 270 | The battle royale's screen (2026-10-21), the owner: |
+| `hud.ts` | 271 | The battle royale's screen (2026-10-21), the owner: |
 | `menu.ts` | 236 | The battle royale's own front (2026-10-21), laid out as the Arena's is (src/ui/arena-menu.ts: a bar of tabs, the play panel with a side panel for friends), the owner: |
 
 ## src/ui/
@@ -574,7 +584,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `emotes-menu.ts` | 241 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
 | `guide.ts` | 209 | The building and crafting guide (the owner, 2026-10-25: |
 | `howto-more.ts` | 87 | The How to Play card's second half (the owner, 2026-10-19: |
-| `hud.ts` | 2229 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
+| `hud.ts` | 2261 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 555 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inv-card.ts` | 107 | What a thing is, and what to do with it (idea 15 of Fettah, a contributor, 2026-10-18). |
 | `inv-piles.ts` | 166 | The inventory's tidying (Fettah's inventory pull request, a contributor's, 2026-10-18): a grid sorted kind by kind, piles of one thing joined, a bag's weight, and which things feed one another. |
@@ -592,7 +602,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `pad-binds.ts` | 81 | A controller's buttons in Settings, Controls: each thing and the button it is on, clicked and put on another as the keyboard's keys are (the owner, 2026-10-26: |
 | `person.ts` | 104 | The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a program came by the dozen, and stood in the world as players). |
 | `platform.ts` | 33 | ZONA PvP, the platform both games stand under (2026-10-14). |
-| `radial.ts` | 278 | One radial menu for every wheel of the game (2026-10-24, the owner: |
+| `radial.ts` | 282 |  |
 | `report.ts` | 70 | The death screen's Report (src/sim/reports.ts has why): a button, or R, opens a reason and a message; Send gives them to the server, which keeps them with how the death went for the admins (server/reports.ts). |
 | `rewards.ts` | 424 | Dog tags and creator rewards: the illustrated explanation a player sees on entering the site, and the wallet address they give. |
 | `rotate.ts` | 34 | The screen a phone shows while it is held upright. |
@@ -613,7 +623,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `touch.ts` | 271 | On-screen controls for phones and tablets. |
+| `touch.ts` | 272 | On-screen controls for phones and tablets. |
 | `updates.ts` | 153 | The game's news in a corner of its main menu: the last few posts of its X account, each with what it says, its picture or film, and a way to it on X. |
 | `wheel-slots.ts` | 58 | The emote wheel's sixteen slots as this player has set them (Emotes, opened from the wheel: src/ui/emotes-menu.ts), kept in this browser. |
 | `who.ts` | 43 | Which survivor you are, picked on the main menu as DayZ has it (the owner, 2026-10-24: |
