@@ -2,6 +2,7 @@
 // (Methods of Game cut out of game.ts whole on 2026-10-14, so that they can be read and worked on alone: put back on
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
+import { BUNKER_LAMP } from '../game';
 import * as THREE from 'three';
 import { physics, SHOT_GROUPS } from '../../core/physics';
 import { assets } from '../../core/assets';
@@ -316,6 +317,7 @@ export const frameMethods = {
     this.trainCar.draw(physics.alpha, this.s.r.camera.position);
     this.trainCar.feel(dt, this.s.r.camera.position);
     this.lift?.draw(dt, physics.alpha, this.s.r.camera.position);
+    if (this.lift && this.lift.lamp.distanceTo(this.s.r.camera.position) < 16) this.lamps.glow(this.lift.lamp, BUNKER_LAMP, 1.3, 9);
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead && !this.powers.god);
     this.lightStep(dt, playing && !uiOpen && !typing);
@@ -648,7 +650,7 @@ export const frameMethods = {
       this.wasNight = hour.night;
     }
     atmo.update();
-    if (this.started) this.underground.update(cam.position);
+    if (this.started) this.underground.update(cam.position, dt);
     veg.update(dt, cam);
     if (!this.underground.shut) {
       this.s.terrain.update(cam);

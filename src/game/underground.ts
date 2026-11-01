@@ -26,6 +26,9 @@ export interface UndergroundHost {
   told: (floors: [number, number] | null) => void;
 }
 
+/** dust hanging in the air round the eye: how many motes, and how far off they go */
+const MOTES = 150, DUST = 9;
+
 export class Underground {
   /** nothing of the surface can be seen from where the eye is */
   shut = false;
@@ -38,7 +41,38 @@ export class Underground {
     for (const o of h.scene.children) if (o.name.startsWith('gun_rack:')) selfLit((o as THREE.Mesh).material as THREE.MeshStandardMaterial, 0.45);
   }
 
-  update(eye: THREE.Vector3) {
+  /** a mote's drift, as the eye moves through a box of them that goes with it */
+  private dust() {
+    const pos = new Float32Array(MOTES * 3);
+    for (let i = 0; i < MOTES * 3; i++) pos[i] = Math.random() * DUST * 2 - DUST;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const m = new THREE.PointsMaterial({ color: 0xc8bca0, size: 0.018, transparent: true, opacity: 0.32, depthWrite: false });
+    const dots = new THREE.Points(g, m);
+    dots.frustumCulled = false;
+    dots.visible = false;
+    this.h.scene.add(dots);
+    return dots;
+  }
+  private motes: THREE.Points | null = null;
+  private clock = 0;
+
+  /** Once a frame. @param eye where it looks from */
+  update(eye: THREE.Vector3, dt = 0) {
+    this.clock += dt;
+    const dots = (this.motes ??= this.dust());
+    dots.visible = this.shut;
+    if (this.shut) {
+      const p = dots.geometry.getAttribute('position') as THREE.BufferAttribute, a = p.array as Float32Array, span = DUST * 2;
+      for (let i = 0; i < MOTES; i++) {
+        const x = i * 3;
+        a[x] += Math.sin(this.clock * 0.3 + i) * dt * 0.06;
+        a[x + 1] -= dt * 0.03;
+        if (a[x + 1] < -DUST) a[x + 1] += span;
+      }
+      p.needsUpdate = true;
+      dots.position.set(Math.floor(eye.x / span) * span, Math.floor(eye.y / span) * span, Math.floor(eye.z / span) * span);
+    }
     const h = this.h, down = bunkerSealed(h.place(), eye.x, eye.y, eye.z);
     const mined = !down && inMine(eye.x, eye.y, eye.z) && Math.min(Math.abs(eye.x - MINE.west.x), Math.abs(eye.x - MINE.east.x)) > MOUTH;
     const at = stationAt(eye.x, eye.y, eye.z), ridden = !down && !mined && (inTunnel(eye.x, eye.y, eye.z) || (!!at && eye.y < at.y + 6));

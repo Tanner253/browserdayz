@@ -44,7 +44,7 @@ export class StationHall {
   }
 
   /** @param court the concourse behind the buffers, with a door at this far across (Level 3's): without one the hall just ends */
-  constructor(atmo: Atmosphere, scene: THREE.Scene, private t: Station, court: number | null) {
+  constructor(atmo: Atmosphere, scene: THREE.Scene, private t: Station, court: number | null, private ground?: (x: number, z: number) => number) {
     this.yaw = Math.atan2(-t.uz, t.ux);
     this.top.set(...this.at(SHAFT.top, 6.5, SHAFT.high));
     const L = HALL.long, E = HALL.edge, B = HALL.back, F = HALL.far, T = HALL.tall, W = 0.6;
@@ -126,11 +126,60 @@ export class StationHall {
     const mouth = new THREE.Mesh(this.mouth(), atmo.register(new THREE.MeshStandardMaterial({ map: c.map, normalMap: c.normalMap, roughnessMap: c.armMap, roughness: 1, metalness: 0, side: THREE.DoubleSide })));
     mouth.matrixAutoUpdate = false;
     this.group.add(mouth);
+    if (court === null && ground) {
+      const berm = this.berm();
+      // (gravel, not poured: it is the hill made up to the walls)
+      const stone = assets.pbr('rocks_ground_02'), skirt = new THREE.Mesh(berm, atmo.register(ranked(new THREE.MeshStandardMaterial({ map: stone.map, normalMap: stone.normalMap, roughnessMap: stone.armMap, roughness: 1, metalness: 0 }))));
+      skirt.matrixAutoUpdate = false;
+      skirt.receiveShadow = true;
+      this.group.add(skirt);
+      const pos = berm.getAttribute('position').array as Float32Array;
+      physics.addStatic(physics.R.ColliderDesc.trimesh(new Float32Array(pos), new Uint32Array(berm.getIndex()!.array)), 'concrete', { x: 0, y: 0, z: 0 }, 0);
+    }
     this.signs(atmo);
     this.gate(paints.steel);
     if (court === null) this.hang(paints.steel, paints.yellow);
     this.group.visible = false;
     scene.add(this.group);
+  }
+
+  /**
+   * The ground falls a metre one way and rises a metre the other round the head of the stair, and it is not ours to move: stashes lie in it. So the concrete comes down to meet it, a skirt
+   * from the top of the walls and the last step out into the hill, thinning to nothing under the grass (the owner, 2026-11-01: "the ground doesnt flush with the entrance").
+   */
+  private berm(): THREE.BufferGeometry {
+    const S = SHAFT, W = 0.4, a0 = S.open - 3, a1 = S.top + 6.5, b0 = S.b0 - 3.4, b1 = S.b1 + 3.4, wide = 3, N = Math.round((a1 - a0) / 0.75), M = Math.round((b1 - b0) / 0.75);
+    const pos: number[] = [], uv: number[] = [], idx: number[] = [], ground = this.ground!;
+    for (let i = 0; i <= N; i++) for (let j = 0; j <= M; j++) {
+      const a = a0 + ((a1 - a0) * i) / N, b = b0 + ((b1 - b0) * j) / M;
+      // (how far out of the walls and the stair's mouth: nothing over the stair itself, which is cut out below)
+      const da = a > S.top ? a - S.top : a < S.open ? S.open - a : 0, db = b < S.b0 - W ? S.b0 - W - b : b > S.b1 + W ? b - S.b1 - W : 0, far = Math.hypot(da, db);
+      const [x, , z] = this.at(a, b, 0), g = ground(x, z) - this.t.y, lip = a > S.top && db === 0 ? S.high + 0.02 : S.high + 0.92, k = THREE.MathUtils.smoothstep(1 - far / wide, 0, 1);
+      pos.push(x, this.t.y + Math.max(g + k * (lip - g), g - 0.08 * (1 - k)) - (k === 0 ? 0.1 : 0), z);
+      uv.push(a / 4, b / 4);
+    }
+    const inside = (a: number, b: number) => a < S.top + 0.05 && b > S.b0 - W + 0.1 && b < S.b1 + W - 0.1;
+    for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
+      const a = a0 + ((a1 - a0) * (i + 0.5)) / N, b = b0 + ((b1 - b0) * (j + 0.5)) / M;
+      if (inside(a, b)) continue;
+      const q = i * (M + 1) + j, r = q + 1, s = q + M + 1, u = s + 1;
+      idx.push(q, r, s, r, u, s);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    // (whichever way round this station's axes make it, its faces look up)
+    const n = g.getAttribute('normal');
+    let up = 0;
+    for (let i = 0; i < n.count; i++) up += n.getY(i);
+    if (up < 0) {
+      for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+      g.setIndex(idx);
+      g.computeVertexNormals();
+    }
+    return g;
   }
 
   private at(a: number, b: number, y: number): [number, number, number] {

@@ -207,7 +207,8 @@ export class Tunnel {
     const u = (this.stuff ??= this.paints()), s = p.from, end = p.to, piece = new THREE.Group();
     const from = Math.max(s, BORE.from), to = Math.min(end, BORE.to), shell = to > from ? new THREE.Mesh(bore(from, to), u.wall) : null;
     if (shell) shell.matrixAutoUpdate = false;
-    const floor = to > from ? new THREE.Mesh(bed(from, to), u.bed) : null;
+    // (a little past each end of the bore, under the station's wall: where it stopped short the sky showed)
+    const floor = to > from ? new THREE.Mesh(bed(from - (from === BORE.from ? 2.5 : 0), to + (to === BORE.to ? 2.5 : 0)), u.bed) : null;
     if (floor) {
       floor.matrixAutoUpdate = false;
       floor.receiveShadow = true;

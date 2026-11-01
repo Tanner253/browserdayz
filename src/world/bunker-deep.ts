@@ -329,6 +329,10 @@ export class DeepWorks {
     const at = (t: number) => low + sign * t * len;
     for (let k = 0; k < n; k++) {
       const a = low + sign * k * run, b = a + sign * run, c0 = Math.min(a, b), c1 = Math.max(a, b), top = y0 + (k + 1) * rise;
+      // (a nosing of dark steel on the edge of each: a concrete flight lit from above read as one slope, the owner, 2026-11-01: "some of the stairs look bad")
+      const nose0 = Math.min(a, a + sign * 0.06), nose1 = Math.max(a, a + sign * 0.06);
+      if (along) this.box(nose0, nose1, q.f0 + 0.02, q.f1 - 0.02, top - 0.03, top + 0.006, this.s.grey);
+      else this.box(q.r0 + 0.02, q.r1 - 0.02, nose0, nose1, top - 0.03, top + 0.006, this.s.grey);
       if (q.steel) {
         if (along) this.box(c0, c1, q.f0, q.f1, top - 0.05, top, this.tread);
         else this.box(q.r0, q.r1, c0, c1, top - 0.05, top, this.tread);

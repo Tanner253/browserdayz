@@ -296,7 +296,10 @@ export class BaseDraw {
     const s = shapeOf(d.piece.k), leaves = s.leaves ?? [];
     const first = d.parts.length - leaves.length;
     leaves.forEach((l, i) => {
-      _h.makeTranslation(l.hinge[0], l.hinge[1], l.hinge[2]).multiply(_m.makeRotationAxis(l.axis === 'y' ? _up : _x, angleAt(l, d.a)));
+      _h.makeTranslation(l.hinge[0], l.hinge[1], l.hinge[2]);
+      // (the owner, 2026-11-01: "the station door is how garage doors should open ... we can unrender the garage door top as it goes up so it dissapears": smoke and mirrors, it runs up into the head)
+      if (l.rolls) _h.multiply(_m.makeScale(1, Math.max(0.015, 1 - angleAt(l, d.a) / l.open), 1));
+      else _h.multiply(_m.makeRotationAxis(l.axis === 'y' ? _up : _x, angleAt(l, d.a)));
       d.parts[first + i].matrix.multiplyMatrices(d.frame, _h);
     });
     if (d.lock && s.lockAt) {

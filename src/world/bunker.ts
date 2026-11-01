@@ -371,6 +371,19 @@ const WAKE = 7;
 /** how near its hut the eye must be, metres, to see down its stair (or be under the ground itself) for what is buried to be drawn */
 const OPEN_FROM = 30;
 
+/** the soft dark round the foot of a thing, for a floor no sun reaches */
+function contactPaint() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!, grad = g.createRadialGradient(32, 32, 6, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.8)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
 /** a big thing of dark paint in a dim room: its own paint added to whatever light it gets, or it stands as a black shape (the owner, 2026-11-01: "this doesnt look good") */
 export function selfLit(m: THREE.MeshStandardMaterial, k: number) {
   m.emissive.set(0xffffff);
@@ -628,6 +641,26 @@ export class BunkerSite {
         group.add(many);
       });
     }).catch(() => {});
+    const shade = new THREE.MeshBasicMaterial({ map: contactPaint(), color: 0x000000, transparent: true, opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -40 });
+    const contacts = (plan: Plan, Y: number, group: THREE.Object3D) => {
+      const list: THREE.Matrix4[] = [], q = new THREE.Quaternion(), UP2 = new THREE.Vector3(0, 1, 0);
+      const lay = (r: number, f: number, y: number, rot: number, w: number, d: number) => list.push(new THREE.Matrix4().compose(new THREE.Vector3(r, Y + y + 0.03, f), q.setFromAxisAngle(UP2, rot), new THREE.Vector3(w + 0.7, 1, d + 0.7)));
+      for (const s of plan.stood) {
+        const e = assets.manifest.models[s.id.split(/[#@]/)[0]], k = s.scale ?? 1;
+        if (!e) continue;
+        const w = (e.max[0] - e.min[0]) * k, h = (e.max[1] - e.min[1]) * k, d = (e.max[2] - e.min[2]) * k;
+        // (nothing small and nothing flat)
+        if (w * d < 0.2 || h < 0.25) continue;
+        lay(s.r, s.f, s.y ?? 0, s.rot, w, d);
+      }
+      for (const m of plan.made) if (['locker', 'generator', 'tank', 'console', 'rack', 'bench', 'bunk'].includes(m.kind)) lay(m.r, m.f, m.y ?? 0, m.rot, m.w, m.d);
+      if (!list.length) return;
+      const many = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), shade, list.length);
+      list.forEach((m, i) => many.setMatrixAt(i, m));
+      many.frustumCulled = false;
+      many.renderOrder = 3;
+      group.add(many);
+    };
     const furnish = (plan: Plan, Y: number) => {
     heap.clear();
     gensets.length = 0;
@@ -793,12 +826,13 @@ export class BunkerSite {
       into.add(mesh);
     }
     if (gensets.length) standGensets(gensets.slice(), into);
+    contacts(plan, Y, into);
     };
     furnish(plan, Y);
 
     // ---- the door a keycard opens: steel, on a track, sliding aside into the wall
     {
-      const face = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 1', 'KEYCARD HOLDERS ONLY'], 31), roughness: 0.6, metalness: 0.55 }));
+      const face = selfLit(mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 1', 'KEYCARD HOLDERS ONLY'], 31), roughness: 0.6, metalness: 0.2 })), 0.3);
       const d = block(-Dr.half - 0.05, Dr.half + 0.05, L.front - 0.3, L.front - 0.08, Y, Y + Dr.tall + 0.05, [steel, steel, steel, steel, face, face], { surface: 'metal', whole: true });
       d.mesh.matrixAutoUpdate = true;
       this.door = { mesh: d.mesh, collider: d.collider!, slide: 0, at: [0, L.front - 0.19, Y + (Dr.tall + 0.05) / 2], leaf: null };
@@ -847,7 +881,7 @@ export class BunkerSite {
     }
     // ---- and the way down to the levels below, at the far end of the passage: shut, for now
     {
-      const sealed = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 2', 'GOODS LIFT', 'RED CLEARANCE ONLY'], 73), roughness: 0.6, metalness: 0.55 }));
+      const sealed = selfLit(mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 2', 'GOODS LIFT', 'RED CLEARANCE ONLY'], 73), roughness: 0.6, metalness: 0.2 })), 0.3);
       const leaf = block(-Dr.half, Dr.half, L.back - 0.32, L.back - 0.1, Y, Y + Dr.tall, [steel, steel, steel, steel, sealed, sealed], { surface: 'metal', whole: true });
       leaf.mesh.matrixAutoUpdate = true;
       // its scanner, on the passage's wall beside it: red, until a red pass is shown to it

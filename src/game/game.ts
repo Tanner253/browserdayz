@@ -589,14 +589,14 @@ export class Game {
     this.pumps = new PumpWorks(atmo, r.scene);
     this.tunnel = new Tunnel(atmo, r.scene);
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
-    if (this.bunker.place) this.lift = new GoodsLift(r.scene, this.bunker.place, () => (Date.now() + this.net.clockOff) / 1000, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
+    if (this.bunker.place) this.lift = new GoodsLift(r.scene, this.bunker.place, () => (Date.now() + this.net.clockOff) / 1000, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })), (p) => atmo.register(p) as typeof p);
     if (this.bunker.place) this.bolt = new BoltHole(r.scene, this.bunker.place, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
     if (this.bunker.place) this.escape = new BoltHole(r.scene, this.bunker.place, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })), ESCAPE, levelY(2), false);
     this.player.carry = (next) => this.trainCar.carry(next) + (this.lift?.carry(next) ?? 0);
     this.director.ride = this.trainCar.ride;
     RemotePlayer.wagon = (l, out) => void this.trainCar.world(l, out);
     this.player.moverUp = this.trainCar.deck;
-    this.halls = [new StationHall(atmo, r.scene, STATIONS[0], null), new StationHall(atmo, r.scene, STATIONS[1], 25)];
+    this.halls = [new StationHall(atmo, r.scene, STATIONS[0], null, (x, z) => heightAt(world.surface, x, z)), new StationHall(atmo, r.scene, STATIONS[1], 25)];
     this.darkBeside.push((x, y, z) => (stationAt(x, y, z) ? 0.6 : inTunnel(x, y, z) ? 0.8 : 0));
     // (the army's field posts by the western roads: src/world/posts.ts)
     void new FieldPosts(world.posts ?? [], atmo, r.scene);

@@ -69,6 +69,8 @@ export interface Leaf {
   paint?: Paint;
   /** its ironwork (straps, hinges, handles), drawn in iron of its own: made from what of its dress is shaded IRON (`ironOf`) */
   iron?: Solid[];
+  /** as it is drawn it runs up into the head of its opening and is gone, as the station's door does, and does not tip (what stops a body and a shot still turns on its hinge) */
+  rolls?: true;
 }
 
 const H = CELL / 2;
@@ -245,7 +247,7 @@ const SHAPES: Record<string, () => Shape> = {
   garage_door: () => ({
     solid: [],
     lockAt: { leaf: 0, at: [0.7, -2.2, 0.05] },
-    leaves: [{ hinge: [0, 2.6, 0], axis: 'x', open: Math.PI / 2, paint: 'galv', solid: [box(-1.18, -2.58, -0.05, 1.18, -0.02, 0.05)], dress: [...[0, 1, 2, 3, 4].map((i) => box(-1.15, -2.45 + i * 0.5, -0.09, 1.15, -2.37 + i * 0.5, -0.05)), tinted(box(-0.25, -2.48, 0.05, 0.25, -2.42, 0.09), IRON)] }],
+    leaves: [{ hinge: [0, 2.6, 0], axis: 'x', open: Math.PI / 2, rolls: true, paint: 'galv', solid: [box(-1.18, -2.58, -0.05, 1.18, -0.02, 0.05)], dress: [...[0, 1, 2, 3, 4].map((i) => box(-1.15, -2.45 + i * 0.5, -0.09, 1.15, -2.37 + i * 0.5, -0.05)), tinted(box(-0.25, -2.48, 0.05, 0.25, -2.42, 0.09), IRON)] }],
   }),
   // (a lid in the floor frame's hole, hinged at its -z side, that lifts to stand up past upright)
   hatch: () => ({ ...ladderUnder(), paint: 'steel', lockAt: { leaf: 0, at: [0.35, 0, 1.15], up: true }, leaves: [{ hinge: [0, 0, -0.7], axis: 'x', open: -1.75, paint: 'steel', solid: [box(-0.68, -0.08, 0.02, 0.68, 0, 1.38)], dress: [tinted(box(-0.08, 0, 1.12, 0.08, 0.04, 1.3), IRON), ...[-0.5, 0.5].map((x) => tinted(box(x - 0.06, -0.02, 0, x + 0.06, 0.02, 0.14), IRON)), ...rivets([-0.6, 0.6], [0.1, 1.3], 0, 'y')] }] }),
