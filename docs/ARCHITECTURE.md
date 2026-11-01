@@ -114,6 +114,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gamepad.ts` | 366 | A controller (PlayStation, Xbox, any the browser calls "standard"), read each frame, pressing the game's own controls by their names as the keyboard and the phone's buttons do (src/core/input.ts). |
 | `gltf-utils.ts` | 178 |  |
 | `input.ts` | 216 | Keyboard + mouse with pointer lock. |
+| `keep-lit.ts` | 33 | A phone or tablet in a game asks to keep its screen on (the owner, 2026-11-01: |
 | `keys.ts` | 188 | Which key does what, and how fast the mouse turns the head: both the player's to set (2026-10-12: |
 | `leave.ts` | 79 | Whether the page is being left on purpose (2026-10-14). |
 | `light-reach.ts` | 39 | A lamp's light worked out only where it reaches (2026-10-20, the owner: |
@@ -208,7 +209,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `claim-panel.ts` | 66 | The claim's own screen, as Rust's tool cupboard (the owner, 2026-10-25: |
 | `claims.ts` | 242 | A base's claim as the game has it (2026-10-24, base building's third step; the server's side server/claims.ts). |
 | `doors.ts` | 67 | A base's doors in the game (2026-10-24, base building's fourth step): |
-| `draw.ts` | 493 | The bases as they are drawn and stood on (2026-10-24). |
+| `draw.ts` | 495 | The bases as they are drawn and stood on (2026-10-24). |
 | `flags.ts` | 132 | Each claim's pole and its flag. |
 | `give.ts` | 64 | A bed or a sleeping bag of one's own given to somebody in one's party (the owner, 2026-10-27): looked at, G tapped goes through the party's members on the server, G held gives it to the one named. |
 | `icons.ts` | 102 | The wheel's pictures (2026-10-24, the owner: |
@@ -241,7 +242,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 310 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 355 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 2265 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 2267 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -363,14 +364,14 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `beds.ts` | 40 | How often a bed or a sleeping bag may be woken at, and how many a player may have (the owner, 2026-10-25: |
 | `blueprints.ts` | 176 | Blueprints (2026-10-24, base building's fourth step). |
 | `charges.ts` | 67 | THE ONE PLACE A CHARGE IS TUNED (the owner, 2026-10-25: |
-| `doors.ts` | 85 | Doors, hatches, shutters and gates as they swing (2026-10-24, base building's fourth step). |
+| `doors.ts` | 86 | Doors, hatches, shutters and gates as they swing (2026-10-24, base building's fourth step). |
 | `land.ts` | 81 | Where a base may stand (2026-10-24): out in the country, and not on a tree or a rock. |
 | `locks.ts` | 84 | Locks on a base (2026-10-24, base building's fourth step). |
 | `pieces.ts` | 222 | What a base is built of (2026-10-24, base building's second step; plan v2, approved by the owner with "think like rust how does rust do it"): |
 | `raid.ts` | 82 | Raiding (base building's fifth step; the navigator's order: |
 | `rooms.ts` | 104 | A room shut in stone (2026-10-24). |
 | `snap.ts` | 598 | Where a piece can go (2026-10-24, base building's second step): |
-| `solid.ts` | 383 | What of a base stops a body, a round and a blast, and what lies on it (2026-10-24). |
+| `solid.ts` | 385 | What of a base stops a body, a round and a blast, and what lies on it (2026-10-24). |
 | `solids.ts` | 456 | What each piece is made of, as solids in its own frame (2026-10-24): boxes, upright prisms and a few hulls, the same list drawn by the game (src/game/building/draw.ts) and made into what stops a body and a bullet. |
 | `upkeep.ts` | 126 | Upkeep and rot (2026-10-24, base building's third step). |
 

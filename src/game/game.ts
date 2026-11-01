@@ -9,6 +9,7 @@ import type { Renderer } from '../core/renderer';
 import { physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
+import { keepLit } from '../core/keep-lit';
 import { voiceOf } from '../sim/emotes';
 import { Input } from '../core/input';
 import { Gamepad } from '../core/gamepad';
@@ -1721,6 +1722,7 @@ export class Game {
     // gone into another way (back in by itself after a dropped connection, see rejoining) was silent, and so, players
     // said, until a setting was changed. In the game any press starts it, or wakes it where the browser has put it to
     // sleep: "everytime i join the game or rejoin the game, i have to changethe audio in settins to get sound back".)
+    keepLit(() => this.started);
     for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, () => this.started && audio.start(), { capture: true });
     // (and whoever is alive in a life is asked before the tab goes: Ctrl and W, the browser's own, is a helicopter
     // going down and forward. The game's own reloads are not asked about: src/core/leave.ts)
