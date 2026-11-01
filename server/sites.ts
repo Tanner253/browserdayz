@@ -201,7 +201,7 @@ export function takeFuel(c: Client, m: Extract<C2S, { t: 'sitefuel' }>) {
 /** A pass shown to a gate. */
 export function useGate(c: Client, m: Extract<C2S, { t: 'gate' }>) {
   const g = GATES[m.g], now = Date.now();
-  if (!g || !c.alive || (gates.get(m.g) ?? 0) > now || !carries(c.inv, g.card)) return;
+  if (!g || !c.alive || (gates.get(m.g) ?? 0) > now || (g.card && !carries(c.inv, g.card))) return;
   const [x, y, z] = c.pose;
   if (!atSpot(g.at, world.bunker, x, y, z, 4) && !(g.also && atSpot(g.also, world.bunker, x, y, z, 4))) return;
   const until = now + (Number(process.env.SITE_GATE_S) || g.open) * 1000;
