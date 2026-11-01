@@ -1187,7 +1187,7 @@ export class BunkerSite {
     // (the lamps are not looked at from across the map)
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
-    this.works?.update(dt, eye, on, gate, this.power, alarm);
+    this.works?.update(dt, eye, on, also, gate, this.power, alarm);
     const want = on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;
     this.fill.intensity += (want - this.fill.intensity) * Math.min(1, dt * 3);
     this.fixtures.forEach((x, k) => {

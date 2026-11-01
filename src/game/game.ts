@@ -102,6 +102,7 @@ import '../sim/injury';
 import { Base28 } from '../trailer/base28';
 import { Goggles } from './goggles';
 import { MineSite } from '../world/mine';
+import { KupolInside } from '../world/kupol';
 import { StationHall } from '../world/station';
 import { Tunnel } from '../world/tunnel';
 import { STATIONS, inTunnel, stationAt } from '../sim/train-line';
@@ -450,6 +451,8 @@ export class Game {
   sites!: Sites;
   /** the Old Mine's drifts (src/world/mine.ts) */
   oldMine!: MineSite;
+  /** inside the Kupol's dome (src/world/kupol.ts) */
+  kupol!: KupolInside;
   /** the car on the line (src/game/train.ts) */
   trainCar!: TrainCar;
   tunnel!: Tunnel;
@@ -569,6 +572,7 @@ export class Game {
     this.lamps.held = (lit) => r.warming(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid, (o) => r.ready(o).then(() => r.send(o)));
     this.oldMine = new MineSite(atmo, r.scene);
+    this.kupol = new KupolInside(atmo, r.scene);
     this.tunnel = new Tunnel(atmo, r.scene);
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
     if (this.bunker.place) this.lift = new GoodsLift(r.scene, this.bunker.place, () => (Date.now() + this.net.clockOff) / 1000, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
@@ -904,6 +908,7 @@ export class Game {
     });
     if (this.bolt) this.build.ladders.fixed.push(...this.bolt.lines);
     if (this.bunker.works) this.build.ladders.fixed.push(...this.bunker.works.ladders);
+    this.build.ladders.fixed.push(this.kupol.ladder);
     this.forges = new ForgeView({
       scene: r.scene,
       online: () => this.online,

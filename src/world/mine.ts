@@ -8,6 +8,7 @@ import { physics } from '../core/physics';
 import { noise3 } from './cave-carve';
 import type { Atmosphere } from './atmosphere';
 import { concretePaint, painted } from './bunker';
+import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { MINE, inMine, mineFloor } from '../sim/mine';
 
@@ -103,6 +104,11 @@ export class MineSite {
     for (const g of M.galleries) {
       const a0 = g.side > 0 ? z1 : z0 - g.long, a1 = g.side > 0 ? z1 + g.long : z0, end = g.side > 0 ? { s: [[g.x - g.half, g.x + g.half]] as [number, number][] } : { n: [[g.x - g.half, g.x + g.half]] as [number, number][] };
       room(g.x - g.half, g.x + g.half, a0, a1, M.tall, { ...end, w: true, e: true });
+    }
+    // (the sill before each portal, out over where the ground is opened for it)
+    for (const [a, b, y] of [[M.west.x - 2.6, M.west.x, M.west.y], [M.east.x, M.east.x + 1.4, M.y]] as const) {
+      parts.push(face(v(a, y, z0), v(b, y, z0), v(a, y, z1), v(0, 1, 0)));
+      box(a, b, y - 1, y, z0 - 0.4, z1 + 0.4);
     }
     // (the incline, from the west portal up to the drift: four long faces, and what stops a body on each)
     {
@@ -202,15 +208,30 @@ export class MineSite {
     lights.matrixAutoUpdate = false;
     this.all.add(lights);
     this.all.visible = false;
-    scene.add(this.all);
+    scene.add(this.all, this.fill);
+    this.rock = rock;
   }
+
+  /** what is in the rock's picture, the first time anybody comes to a portal */
+  private rock: THREE.MeshStandardMaterial | null = null;
+  private dressed = false;
+  private fill = new THREE.AmbientLight(0xffdcb0, 0);
 
   /** Once a frame. @param open the yellow pass has been shown */
   update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number) => void, open = false) {
     const M = MINE, at = Math.min(Math.hypot(eye.x - M.west.x, eye.z - M.z), Math.hypot(eye.x - M.east.x, eye.z - M.z)), on = inMine(eye.x, eye.y, eye.z) || at < 60;
     this.all.visible = on;
     this.gated.visible = at < 90 || on;
+    this.fill.intensity += ((inMine(eye.x, eye.y, eye.z) ? 0.24 : 0) - this.fill.intensity) * Math.min(1, dt * 3);
     if (!on) return;
+    if (!this.dressed && this.rock) {
+      this.dressed = true;
+      const t = assets.pbr('rocks_ground_02');
+      this.rock.map = t.map;
+      this.rock.normalMap = t.normalMap;
+      this.rock.roughnessMap = t.armMap;
+      this.rock.needsUpdate = true;
+    }
     // (from inside, a bar: nobody is shut in)
     for (const [k, g] of this.gates.entries()) {
       const wide = open || (inMine(eye.x, eye.y, eye.z) && g.at.distanceTo(eye) < 3.2), want = wide ? 1 : 0;

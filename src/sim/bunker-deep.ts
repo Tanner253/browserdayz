@@ -14,6 +14,8 @@ export interface DeepArea extends Area {
   /** a hole in its floor, or in its ceiling */
   hole?: Box;
   roofHole?: Box;
+  /** a wall between this and any other part stops at this height: over that, it is the other level's wall */
+  capped?: number;
 }
 /** a way through a wall: on the line between two parts, its foot over the level's floor, how high and how wide (half) when not a door's */
 export type Door = [number, number, number?, number?, number?];
@@ -43,8 +45,6 @@ export interface Tiers extends Box { to: 'f0' | 'f1'; rows: number; rise: number
 export interface Deep {
   areas: DeepArea[]; doors: Door[]; walls: { r0: number; r1: number; f0: number; f1: number; y0: number; y1: number }[]; decks: Deck[]; flights: Flight[]; rails: Rail[]; ladders: Rungs[]; glazed: Glazed[];
   masses: Mass[]; tiers: Tiers[];
-  /** where a wall this level would build is the other level's to build: two in one place would be drawn turn and turn about */
-  noWall?: Box[];
   /** glass to walk on */
   floors: Deck[]; water: Deck[]; tanks: Tank[]; parting: Parting[];
   stood: Things[]; spots: [number, number, number][]; lamps: [number, number, number, number][];
@@ -252,7 +252,7 @@ export const LEVEL3: Deep = {
     { r0: 31, r1: 42, f0: 7, f1: 9.5, name: 'East drift', roofHole: { r0: ESCAPE.r - ESCAPE.half, r1: ESCAPE.r + ESCAPE.half, f0: ESCAPE.f - ESCAPE.half, f1: ESCAPE.f + ESCAPE.half } },
     // the stair up to Level 2, behind the back wall of the balcony, and all it passes through
     { r0: -18, r1: -8.5, f0: -30.5, f1: -28, top: 6.9, hall: 'S', name: 'The stair' },
-    { r0: -8.5, r1: -6.5, f0: -30.5, f1: -28, y: 3.8, top: 6.9, hall: 'S', name: 'The stair' },
+    { r0: -8.5, r1: -6.5, f0: -30.5, f1: -28, y: 3.8, top: 6.9, hall: 'S', name: 'The stair', capped: 3.4 },
     // under the far gallery: the vault; under the west one: the sump, by a way you go in on your knees
     { r0: -6, r1: 6, f0: 6, f1: 18, y: HALL3.floor, top: -1, kind: 'armoury', name: 'The vault', bare: true, under: true },
     { r0: -17, r1: -13.5, f0: -8.5, f1: -1, y: -7.6, top: -5.4, kind: 'stores', name: 'Sump', bare: true, under: true },
@@ -317,7 +317,6 @@ export const LEVEL3: Deep = {
   water: [{ r0: -13, r1: -10, f0: -22, f1: 6, y: -7.25 }, { r0: -17, r1: -13.5, f0: -10, f1: -2, y: -7.25 }],
   tanks: [],
   parting: [],
-  noWall: [{ r0: -8.5, r1: -6.5, f0: -28.3, f1: -27.7 }],
   stood: [
     // the hall's floor: what was being got out when it ended. Three containers high against the east gallery, a ladder up the end of them, and the one on the crane
     { id: 'container_shell@0', r: 11.8, f: -10, rot: 0, y: HALL3.floor }, { id: 'container_shell@1', r: 11.8, f: -10, rot: 0, y: HALL3.floor + 2.2 }, { id: 'container_shell@0', r: 11.8, f: -10, rot: 0, y: HALL3.floor + 4.4 },
@@ -475,7 +474,8 @@ export function deepWalls(d: Deep) {
     if (!A) return [[yb, tb]];
     if (!B) return [[ya, ta]];
     if (A.hall && A.hall === B.hall) return [[Math.min(ya, yb), Math.max(ya, yb) - 0.02], [Math.min(ta, tb), Math.max(ta, tb)]];
-    return [[Math.min(ya, yb), Math.max(ta, tb)]];
+    const cap = A.capped ?? B.capped;
+    return [[Math.min(ya, yb), cap ?? Math.max(ta, tb)]];
   };
   for (const axis of ['r', 'f'] as const) {
     const [lo, hi, from, to] = axis === 'r' ? [-70, 70, -34, 24] : [-34, 24, -70, 70];
@@ -509,7 +509,6 @@ export function deepWalls(d: Deep) {
       close(to);
     }
   }
-  for (const n of d.noWall ?? []) for (let k = out.length - 1; k >= 0; k--) if (inside(n, (out[k].r0 + out[k].r1) / 2, (out[k].f0 + out[k].f1) / 2) && out[k].y1 > 3.5) out.splice(k, 1);
   // (glazed stretches: the wall below and above, and what lies between them is a pane: see `panes`)
   for (const g of d.glazed) {
     for (let k = out.length - 1; k >= 0; k--) {

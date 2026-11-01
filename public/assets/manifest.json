@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-01T05:06:35.938Z",
+ "generated": "2026-11-01T06:03:17.622Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -15004,9 +15004,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 200180,
-   "srcTris": 7081,
-   "tris": 7081,
+   "bytes": 199584,
+   "srcTris": 7015,
+   "tris": 7015,
    "min": [
     -7.3378,
     0,
@@ -15019,7 +15019,7 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/radar_dome.glb",
-   "hiBytes": 612992,
+   "hiBytes": 612396,
    "hiCard": 64
   },
   "boxcar": {
@@ -15175,6 +15175,29 @@
    "lods": [],
    "hi": "assets/models/hi/vault_door.glb",
    "hiBytes": 1491060,
+   "hiCard": 21
+  },
+  "radar_dish": {
+   "url": "assets/models/radar_dish.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1056164,
+   "srcTris": 30479,
+   "tris": 30479,
+   "min": [
+    -3.0329,
+    0,
+    -2.4498
+   ],
+   "max": [
+    3.0329,
+    8,
+    2.4498
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/radar_dish.glb",
+   "hiBytes": 1996552,
    "hiCard": 21
   }
  }

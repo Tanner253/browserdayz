@@ -55,9 +55,6 @@ const SOLID: Record<string, [Surface, number]> = {
   breaker_box: ['metal', 0.85],
   ore_cart: ['metal', 0.92],
   boxcar: ['metal', 0.96],
-  mine_portal: ['wood', 0.98],
-  // (the round of it inside its box: the corners of the box are air)
-  radar_dome: ['concrete', 0.8],
   tree_stump_01: ['wood', 0.8],
   dead_tree_trunk: ['wood', 0.8],
   Barrel_01: ['metal', 0.9],

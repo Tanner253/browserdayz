@@ -238,6 +238,11 @@ export class Sites {
     return this.phase(id) === 'spent';
   }
 
+  /** how many of a site's steps have been done */
+  turned(id: string) {
+    return this.state.get(id)?.done.length ?? 0;
+  }
+
   /** is a site's alarm going? */
   going(id: string) {
     return this.phase(id) === 'alarm';

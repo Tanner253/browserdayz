@@ -45,7 +45,7 @@ export function mineProps(): { kind: string; x: number; y: number; z: number; ro
   // (the rail lies along the level, down the middle: the model's length is its x)
   for (let x = M.x0 + 3; x < M.east.x - 3; x += 6) out.push({ kind: 'mine_rail', x, y: M.y, z: M.z, rot: 0 });
   // (the cart's length is its x too: it stands on the rail; and the rest of what was left)
-  out.push({ kind: 'ore_cart', x: M.hall.x - 4, y: M.y + 0.12, z: M.z, rot: 0 }, { kind: 'ore_cart', x: M.x0 + 34, y: M.y + 0.12, z: M.z, rot: 0 }, { kind: 'ore_cart', x: M.hall.x - 6, y: M.y, z: M.z + 5, rot: 1.1 });
+  out.push({ kind: 'ore_cart', x: M.hall.x - 4, y: M.y + 0.12, z: M.z, rot: 0 }, { kind: 'ore_cart', x: M.x0 + 12, y: M.y + 0.12, z: M.z, rot: 0 }, { kind: 'ore_cart', x: M.hall.x - 6, y: M.y, z: M.z + 5, rot: 1.1 });
   const H = M.hall;
   out.push({ kind: 'portable_generator', x: H.x + 7, y: M.y, z: M.z - 5.6, rot: 0.4 }, { kind: 'Barrel_01', x: H.x + 8.6, y: M.y, z: M.z - 5, rot: 0 }, { kind: 'barrel_03', x: H.x + 8, y: M.y, z: M.z - 6, rot: 1 }, { kind: 'wooden_military_crate', x: H.x - 8, y: M.y, z: M.z - 5.6, rot: 0.2 }, { kind: 'wooden_crate_01', x: H.x - 7.8, y: M.y + 0.46, z: M.z - 5.5, rot: 0.6 }, { kind: 'scrap_pile', x: H.x + 3, y: M.y, z: M.z + 5.4, rot: 0 });
   // (what came down: heaped against the fall's two faces, either side of the way under it)
@@ -71,7 +71,8 @@ export function mineSpots(): [number, number, number][] {
 }
 
 /** where each portal opens the ground, as the terrain's wells take such things */
+// (only where the face comes down across the way itself: a hole any bigger shows the sky over the lintel)
 export const MINE_MOUTHS = [
-  { cave: -1, x: MINE.west.x + 2.2, z: MINE.z, rot: 0, hx: 3, hz: 2.5, floor: 0 },
-  { cave: -1, x: MINE.east.x - 2.2, z: MINE.z, rot: 0, hx: 3, hz: 2.5, floor: 0 },
+  { cave: -1, x: MINE.west.x - 1, z: MINE.z, rot: 0, hx: 1.2, hz: 2.2, floor: 0 },
+  { cave: -1, x: MINE.east.x - 0.6, z: MINE.z, rot: 0, hx: 1.4, hz: 2.2, floor: 0 },
 ];
