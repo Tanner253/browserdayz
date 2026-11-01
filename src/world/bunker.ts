@@ -844,8 +844,8 @@ export class BunkerSite {
       this.wings = wings;
       const plan = bunkerWings(), Y = levelY(1), H = BOLT.hatch;
       /** a slab over an area, open at the hatch where that lies in it */
-      const slab = (a: Area, y0: number, y1: number, m: THREE.Material) => {
-        if (!(H.r > a.r0 && H.r < a.r1 && H.f > a.f0 && H.f < a.f1)) return void block(a.r0, a.r1, a.f0, a.f1, y0, y1, m);
+      const slab = (a: Area, y0: number, y1: number, m: THREE.Material, open: boolean) => {
+        if (!open) return void block(a.r0, a.r1, a.f0, a.f1, y0, y1, m);
         block(a.r0, H.r - H.half, a.f0, a.f1, y0, y1, m);
         block(H.r + H.half, a.r1, a.f0, a.f1, y0, y1, m);
         block(H.r - H.half, H.r + H.half, a.f0, H.f - H.half, y0, y1, m);
@@ -853,8 +853,9 @@ export class BunkerSite {
       };
       for (const a of WING_AREAS) {
         const low = Y + (a.y ?? 0), top = Y + (a.top ?? B.tall);
-        slab(a, low - 0.3, low, floor);
-        slab(a, top, top + 0.3, inside);
+        // (the hatch is in the cellar's floor, and comes out through the drift's roof)
+        slab(a, low - 0.3, low, floor, a.name === 'Cellar');
+        slab(a, top, top + 0.3, inside, !!a.under);
       }
       for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), Y + (w.y1 ?? B.tall), inside);
       // (the shaft from the cellar's floor to the drift's roof)

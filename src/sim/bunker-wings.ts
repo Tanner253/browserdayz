@@ -5,7 +5,7 @@
 // cellar on no map, a hatch in its floor, and a ladder down to the floor of the generator hall. All in the bunker's own measure: r right of its middle, f forward of it.
 
 /** a part of it: a room when it has a `kind`, a passage when not. Its floor and ceiling over the level's floor, when they are not the level's own */
-export interface Area { r0: number; r1: number; f0: number; f1: number; kind?: string; name?: string; y?: number; top?: number; bare?: boolean }
+export interface Area { r0: number; r1: number; f0: number; f1: number; kind?: string; name?: string; y?: number; top?: number; bare?: boolean; /** it lies under another part: it has its own walls, and is no part of the plan's */ under?: boolean }
 
 export const WING_AREAS: Area[] = [
   // the west wing: where people lived
@@ -36,7 +36,7 @@ export const WING_AREAS: Area[] = [
   { r0: -6, r1: 6, f0: 17.5, f1: 36 }, { r0: -20.5, r1: -6, f0: 24, f1: 27 }, { r0: 6, r1: 20.5, f0: 24, f1: 27 },
   // the bolt-hole: the cellar under the steps, and the drift at the ladder's foot, through to the hall's floor
   { r0: 55, r1: 61.5, f0: 2, f1: 10, kind: 'stores', name: 'Cellar' },
-  { r0: 52, r1: 57.2, f0: 4.6, f1: 7.4, y: -3.8, top: -1.2 },
+  { r0: 52, r1: 57.2, f0: 4.6, f1: 7.4, y: -3.8, top: -1.2, under: true },
 ];
 
 /** the ways through: [right, forward], on the line between two parts; `y`, how high its foot is over the level's floor, where that is not 0 */
@@ -59,12 +59,12 @@ export const BOLT = { steps: { r0: 59, r1: 61.4, f0: 10, f1: 19, high: 3.3, open
 const inside = (a: Area, r: number, f: number, slack = 0) => r > a.r0 - slack && r < a.r1 + slack && f > a.f0 - slack && f < a.f1 + slack;
 
 /** the part of the wings a spot is in, if any: its number in the list */
-export const wingAt = (r: number, f: number, slack = 0) => WING_AREAS.findIndex((a) => inside(a, r, f, slack));
+export const wingAt = (r: number, f: number, slack = 0) => WING_AREAS.findIndex((a) => !a.under && inside(a, r, f, slack));
 
 /** is a spot in the wings, the cellar steps or the shaft under the hatch? */
 export function inWings(r: number, f: number, slack = 0.6) {
   const S = BOLT.steps, H = BOLT.hatch;
-  return wingAt(r, f, slack) >= 0 || (r > S.r0 - slack && r < S.r1 + slack && f > S.f0 && f < S.open) || (Math.abs(r - H.r) < 1.2 && Math.abs(f - H.f) < 1.2);
+  return WING_AREAS.some((a) => inside(a, r, f, slack)) || (r > S.r0 - slack && r < S.r1 + slack && f > S.f0 && f < S.open) || (Math.abs(r - H.r) < 1.2 && Math.abs(f - H.f) < 1.2);
 }
 
 /** A stretch of wall, floor to ceiling, or from `y0` over the floor to `y1`. */
@@ -110,6 +110,11 @@ export function wingWalls(H: { r: number; back: number; front: number }): WingWa
       }
       close(to);
     }
+  }
+  // (what lies under another part, walled by itself)
+  for (const a of WING_AREAS.filter((q) => q.under)) {
+    const y0 = a.y ?? 0, y1 = a.top ?? TALL;
+    out.push({ r0: a.r0, r1: a.r1, f0: a.f0 - T, f1: a.f0, y0, y1 }, { r0: a.r0, r1: a.r1, f0: a.f1, f1: a.f1 + T, y0, y1 }, { r0: a.r1, r1: a.r1 + T, f0: a.f0, f1: a.f1, y0, y1 });
   }
   return out;
 }
