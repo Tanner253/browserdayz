@@ -34,6 +34,7 @@
 //   * the book could be lost and no tag would be paid twice because of it.
 
 import { createHash } from 'node:crypto';
+import { EVENT, eventOn } from './event.js';
 import { EMPTY_ACCOUNT_RENT, Keypair, LAMPORTS, SYSTEM_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM, WRAPPED_SOL, address, b58, closeTokenAccount, computeLimit, computePrice, memo, onCurve, receipt, same, seeded, signed, tokenAccount, transfer, unsigned, type Bytes, type Instruction, type Rpc, type Signed, type Status } from './solana.js';
 import { claimCurve, claimPool, state as coinState, type CoinState } from './pump.js';
 import type { Store } from './store.js';
@@ -313,7 +314,10 @@ export function config(env: Record<string, string | undefined> = process.env): C
  * @param five the tag is under the rules of the second cut-over (as its row in the book says, once it has one)
  */
 export function termsOf(cfg: Config, cashedAt: string, five = Date.parse(cashedAt) >= cfg.rules2From): Config {
-  if (five) return { ...cfg, share: 0, ceiling: cfg.floor };
+  if (five) {
+    const pay = eventOn(Date.parse(cashedAt)) ? lamports(EVENT.pay) : cfg.floor;
+    return { ...cfg, share: 0, floor: pay, ceiling: pay };
+  }
   if (!(Date.parse(cashedAt) < cfg.rulesFrom) || cfg.floorBefore <= cfg.floor) return cfg;
   return { ...cfg, floor: cfg.floorBefore, ceiling: cfg.ceiling > cfg.floorBefore ? cfg.ceiling : cfg.floorBefore };
 }
@@ -998,7 +1002,7 @@ export function rateOf(cfg: Pick<Config, 'floor' | 'holderPerM' | 'tagMax'>, hel
 /** a wallet's standing under the holder rule now: what it holds of the coin, and what a tag pays it (see api/cashins.ts, ?format=wallet) */
 export async function walletRate(w: World, who: string) {
   const held = await coinsOf(w, address(who));
-  return { held, ...rateOf(w.cfg, held) };
+  return { held, ...rateOf(termsOf(w.cfg, iso(w.now())), held) };
 }
 
 /** what of the coin a wallet holds now, in its smallest unit: its own account for the coin under either token program */

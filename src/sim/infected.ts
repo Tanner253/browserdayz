@@ -475,11 +475,33 @@ export class Director {
   private next = 1;
   /** homes owed one: which, and when */
   private due: { home: number; at: number }[] = [];
+  private times = 1;
 
   constructor(private homes: Home[], private spot: (home: Home) => { x: number; y: number; z: number } | null, private rnd: () => number = Math.random) {
     homes.forEach((h, k) => {
       for (let n = 0; n < h.n; n++) this.due.push({ home: k, at: 0 });
     });
+  }
+
+  /**
+   * Each home stood `k` times over (src/sim/event.ts). More are owed at once; when it comes down again what is owed past the count goes, and those
+   * standing past it are simply not put back as they die.
+   */
+  crowd(k: number) {
+    if (k === this.times) return;
+    const was = this.times;
+    this.times = k;
+    this.homes.forEach((h, i) => {
+      if (k > was) for (let n = 0; n < h.n * (k - was); n++) this.due.push({ home: i, at: 0 });
+      else while (this.stood(i) > h.n * k && this.due.some((d) => d.home === i)) this.due.splice(this.due.findIndex((d) => d.home === i), 1);
+    });
+  }
+
+  /** how many a home has, standing and owed */
+  private stood(k: number): number {
+    let n = this.due.filter((d) => d.home === k).length;
+    for (const b of this.bodies.values()) if (!b.diedAt && b.home === k) n++;
+    return n;
   }
 
   /**
@@ -627,7 +649,7 @@ export class Director {
       b.s[5] = 0;
       b.own = null;
       // (owed from when it went down, not from when its body is cleared away; one an admin stood lived nowhere, and nothing is owed for it)
-      if (b.home >= 0) this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
+      if (b.home >= 0 && this.stood(b.home) < this.homes[b.home].n * this.times) this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
     }
     return { hp: b.hp, dead: b.hp <= 0 };
   }
