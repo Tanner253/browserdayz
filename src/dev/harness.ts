@@ -117,15 +117,10 @@ export function installHarness(g: Game) {
       return Object.fromEntries(Object.entries(made).map(([id, url]) => [id, { url, sig: iconSig(id.replace(/^slot:/, '')) }]));
     },
     /** the moving floor on its test track, a body stood in it: src/game/train.ts */
-    async trainTest(speed = 30) {
-      const { TrainCar, plainCar, testRun } = await import('../game/train');
-      const run = testRun(speed), car = new TrainCar(g.s.r.scene, run.where);
-      plainCar(car);
-      anyG.trainCar = car;
-      g.player.carry = car.carry;
-      const p = run.where(0);
-      g.player.spawn(p.x, p.y + 0.05, p.z, p.yaw + Math.PI);
-      return { car, time: run.time, length: run.line.length };
+    /** aboard the wagon, wherever it is now, facing along it */
+    aboard(z = 3) {
+      const p = g.trainCar.world({ x: 0, y: 0.05, z });
+      g.player.spawn(p.x, p.y, p.z, g.trainCar.wagon.yaw + Math.PI);
     },
     /** give the player an item (testing) */
     give(id: string, qty?: number) {

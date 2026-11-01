@@ -356,7 +356,7 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
       if (typeof m.text === 'string' && m.text.trim()) sayOut(f, audience(l), send, { t: 'chat', from: f.watch ? `${f.name} (watching)` : f.name, text: m.text.slice(0, 200) });
       return;
     case 'ping':
-      return void (Number.isFinite(m.n) && send(f, { t: 'pong', n: m.n as number }));
+      return void (Number.isFinite(m.n) && send(f, { t: 'pong', n: m.n as number, at: Date.now() }));
   }
 }
 

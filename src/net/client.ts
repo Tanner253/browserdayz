@@ -189,6 +189,9 @@ export class Net {
   id = 0;
   /** round-trip time in ms */
   ping = 0;
+  /** how far the server's clock is ahead of ours, ms: settled on over the pings */
+  clockOff = 0;
+  private clocked = false;
   /** when each ping not yet answered was sent, and when the server was last heard at all (performance.now) */
   private pingsOut: number[] = [];
   private heardAt = 0;
@@ -449,6 +452,9 @@ export class Net {
         }
         if (m.t === 'pong') {
           this.ping = Math.round(performance.now() - m.n);
+          const off = m.at + this.ping / 2 - Date.now();
+          this.clockOff = this.clocked ? this.clockOff + (off - this.clockOff) * 0.2 : off;
+          this.clocked = true;
           this.pingsOut = this.pingsOut.filter((t) => t > m.n);
           return;
         }

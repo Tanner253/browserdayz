@@ -102,7 +102,9 @@ import '../sim/injury';
 import { Base28 } from '../trailer/base28';
 import { Goggles } from './goggles';
 import { MineSite } from '../world/mine';
-import type { TrainCar } from './train';
+import { Tunnel } from '../world/tunnel';
+import { inTunnel } from '../sim/train-line';
+import { TrainCar } from './train';
 import { Sites } from './sites';
 import { Toys } from './toys';
 import { Traps } from './traps';
@@ -446,7 +448,8 @@ export class Game {
   /** the Old Mine's drifts (src/world/mine.ts) */
   oldMine!: MineSite;
   /** the car on the line (src/game/train.ts) */
-  trainCar: TrainCar | null = null;
+  trainCar!: TrainCar;
+  tunnel!: Tunnel;
   /** night vision (src/game/goggles.ts) */
   goggles = new Goggles();
   /** the guns and tools in, to be held */
@@ -558,6 +561,10 @@ export class Game {
     this.lamps.held = (lit) => r.warming(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid, (o) => r.ready(o).then(() => r.send(o)));
     this.oldMine = new MineSite(atmo, r.scene);
+    this.tunnel = new Tunnel(atmo, r.scene);
+    this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
+    this.player.carry = this.trainCar.carry;
+    this.darkBeside.push((x, y, z) => (inTunnel(x, y, z) ? 0.92 : 0));
     // (the army's field posts by the western roads: src/world/posts.ts)
     void new FieldPosts(world.posts ?? [], atmo, r.scene);
     this.cellars = new Cellars(r.scene, world.basements ?? []);

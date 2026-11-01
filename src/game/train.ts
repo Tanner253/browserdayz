@@ -1,52 +1,41 @@
-// A floor that moves: a car on a line, that a body can walk about in while it goes (the owner, 2026-10-31: "players need to be able to move on the
-// traincar like rust"). A body is moved as it always is, its walking judged against the car as if the car stood still; then all of that is carried
-// as the car moves, past anything else, as a whole. So it walks, jumps and fights in the car at any speed, and the two are never out of step. The car
-// is set in each fixed step, and drawn between two of them exactly as the body is, so neither shakes against the other.
-// (The car is PLACED each step, never given a speed: Rapier's character controller drags a body along a floor that has one, by friction, on top of what
-// is done here, and a body stood still walked itself up the car.)
+// The train: an open wagon on the line, with a shunter coupled to it, that a body can walk about in while it goes (the owner, 2026-10-31: "players need to be able to move
+// on the traincar like rust"). A body is moved as it always is, its walking judged against the wagon as if the wagon stood still; then all of that is carried as the wagon
+// moves, past anything else, as a whole. So it walks, jumps and fights in there at any speed, and the two are never out of step. Each is set in each fixed step and drawn
+// between two of them exactly as a body is, so neither shakes against the other.
+// (A vehicle is PLACED each step, never given a speed: Rapier's character controller drags a body along a floor that has one, by friction, on top of what is done here, and
+// a body stood still walked itself up the car.)
 
 import * as THREE from 'three';
-import { WORLD_GROUPS, physics } from '../core/physics';
-import { makeLine, onLine, runTime, runTo, type Line, type OnLine } from '../sim/train';
+import { assets } from '../core/assets';
+import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
+import type { OnLine } from '../sim/train';
+import { RIM, shunterAt, trainAt, wagonAt } from '../sim/train-line';
 
-/** half the car inside, metres: across, along, and how tall */
-export const CAR = { hw: 1.45, hl: 6.3, tall: 2.5, wall: 0.12 };
-const UP = new THREE.Vector3(0, 1, 0);
+/** the inside of the wagon, metres from its middle and its deck: half across, half along; and how far the bars over its sides reach up (nothing to see: the tunnel has no walls to stop a body) */
+export const CAR = { hw: 1.42, hl: 6.35, over: 3.6, wall: 0.14 };
+/** what a wagon's deck stands over the rails, and the shunter's size inside its box */
+const DECK = 1.4, SHUNTER = { hx: 1.55, tall: 4.2, hz: 4.7 };
+/** the steps inside the wagon, up to its side, that you come in and go out by: three at a third of the side's height, on the platform's side */
+const STEPS = 3, STEP_DEEP = 0.36, STEP_WIDE = 0.9;
+/** near enough to see it: the two are loaded, and drawn, only then */
+const SEEN = 340;
+const UP = new THREE.Vector3(0, 1, 0), ACROSS = new THREE.Vector3(1, 0, 0), ONE = new THREE.Vector3(1, 1, 1), _q = new THREE.Quaternion();
 
-export class TrainCar {
+/** one vehicle on the line */
+class OnRails {
   readonly group = new THREE.Group();
-  private body;
-  private t = 0;
+  readonly body;
   private s0 = new THREE.Vector3();
   private s1 = new THREE.Vector3();
   private q0 = new THREE.Quaternion();
   private q1 = new THREE.Quaternion();
-  private m0 = new THREE.Matrix4();
-  private m1 = new THREE.Matrix4();
-  /** what the car's last step did to whatever is carried: the old pose undone and the new one done */
-  private carried = new THREE.Matrix4();
-  private inverse = new THREE.Matrix4();
-  private turned = 0;
-  private yaw = 0;
-  private v = new THREE.Vector3();
-  private ONE = new THREE.Vector3(1, 1, 1);
+  m0 = new THREE.Matrix4();
+  m1 = new THREE.Matrix4();
+  yaw = 0;
 
-  /** @param where the car's place at a moment, seconds on */
-  constructor(scene: THREE.Scene, private where: (t: number) => OnLine) {
-    const R = physics.R;
-    this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased());
-    const C = CAR, h = C.tall / 2, wall = C.wall;
-    const solid = (hx: number, hy: number, hz: number, x: number, y: number, z: number) => {
-      const c = physics.world.createCollider(R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, y, z).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS), this.body);
-      physics.tag(c, { surface: 'metal' });
-    };
-    solid(C.hw + wall, wall, C.hl + wall, 0, -wall, 0);
-    solid(C.hw + wall, wall, C.hl + wall, 0, C.tall + wall, 0);
-    solid(wall, h, C.hl + wall, -C.hw - wall, h, 0);
-    solid(wall, h, C.hl + wall, C.hw + wall, h, 0);
-    solid(C.hw, h, wall, 0, h, -C.hl - wall);
-    solid(C.hw, h, wall, 0, h, C.hl + wall);
-    this.set(where(0));
+  constructor(scene: THREE.Scene, p: OnLine) {
+    this.body = physics.world.createRigidBody(physics.R.RigidBodyDesc.kinematicPositionBased());
+    this.set(p);
     this.s0.copy(this.s1);
     this.q0.copy(this.q1);
     this.m0.copy(this.m1);
@@ -55,39 +44,117 @@ export class TrainCar {
 
   private set(p: OnLine) {
     this.s1.set(p.x, p.y, p.z);
-    this.q1.setFromAxisAngle(UP, p.yaw).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -p.pitch));
+    this.q1.setFromAxisAngle(UP, p.yaw).multiply(_q.setFromAxisAngle(ACROSS, -p.pitch));
     this.yaw = p.yaw;
-    this.m1.compose(this.s1, this.q1, this.ONE);
+    this.m1.compose(this.s1, this.q1, ONE);
   }
 
-  /** One fixed step, before anything that may stand in it moves. */
-  step(h: number) {
-    this.t += h;
+  step(p: OnLine) {
     this.s0.copy(this.s1);
     this.q0.copy(this.q1);
     this.m0.copy(this.m1);
-    const was = this.yaw;
-    this.set(this.where(this.t));
-    this.turned = this.yaw - was;
-    this.inverse.copy(this.m0).invert();
-    this.carried.copy(this.m1).multiply(this.inverse);
+    this.set(p);
   }
 
-  /** After whatever stands in it has moved: the car where this step put it. */
   placed() {
     this.body.setTranslation({ x: this.s1.x, y: this.s1.y, z: this.s1.z }, true);
     this.body.setRotation(this.q1, true);
   }
 
-  /** where a point is in the car: across, up from its floor, along */
-  local(p: { x: number; y: number; z: number }, out = new THREE.Vector3()) {
-    return out.set(p.x, p.y, p.z).applyMatrix4(this.inverse.copy(this.m1).invert());
+  draw(alpha: number) {
+    this.group.position.lerpVectors(this.s0, this.s1, alpha);
+    this.group.quaternion.slerpQuaternions(this.q0, this.q1, alpha);
   }
 
-  /** A body at `next` this step: carried with the car if it is in it. @returns how far it was turned with it, radians */
+  box(hx: number, hy: number, hz: number, x: number, y: number, z: number, groups = WORLD_GROUPS) {
+    const c = physics.world.createCollider(physics.R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, y, z).setCollisionGroups(groups).setSolverGroups(groups), this.body);
+    physics.tag(c, { surface: 'metal' });
+    return c;
+  }
+}
+
+export class TrainCar {
+  readonly wagon: OnRails;
+  readonly shunter: OnRails;
+  private t: number;
+  /** what the wagon's last step did to whatever is carried: the old pose undone and the new one done */
+  private carried = new THREE.Matrix4();
+  private inverse = new THREE.Matrix4();
+  private turned = 0;
+  private v = new THREE.Vector3();
+  private gate;
+  private loading = false;
+
+  /** @param now the shared clock, seconds */
+  constructor(scene: THREE.Scene, private now: () => number) {
+    this.t = now();
+    this.wagon = new OnRails(scene, wagonAt(this.t));
+    this.shunter = new OnRails(scene, shunterAt(this.t));
+    const C = CAR, w = this.wagon, wall = C.wall, h = RIM / 2, up = (C.over - RIM) / 2, top = RIM + up;
+    w.box(C.hw + wall, wall, C.hl + wall, 0, -wall, 0);
+    for (const s of [-1, 1]) {
+      w.box(wall / 2, h, C.hl + wall, s * (C.hw + wall / 2), h, 0);
+      w.box(C.hw, h, wall / 2, 0, h, s * (C.hl + wall / 2));
+      w.box(C.hw, up, wall / 2, 0, top, s * (C.hl + wall / 2), GLASS_GROUPS);
+    }
+    w.box(wall / 2, up, C.hl + wall, C.hw + wall / 2, top, 0, GLASS_GROUPS);
+    // (the side the platforms stand on, the -x of the line going to Level 3: open over the steps, and shut across them while the train moves)
+    const gap = STEP_WIDE, long = (C.hl - gap) / 2;
+    for (const s of [-1, 1]) w.box(wall / 2, up, long + wall, -C.hw - wall / 2, top, s * (gap + long + wall), GLASS_GROUPS);
+    this.gate = w.box(wall / 2, up, gap, -C.hw - wall / 2, top, 0, GLASS_GROUPS);
+    for (let k = 1; k <= STEPS; k++) {
+      const high = (RIM * (STEPS + 1 - k)) / (STEPS + 1), x = -C.hw + STEP_DEEP * (k - 0.5);
+      w.box(STEP_DEEP / 2, high / 2, STEP_WIDE, x, high / 2, 0);
+    }
+    this.shunter.box(SHUNTER.hx, SHUNTER.tall / 2, SHUNTER.hz, 0, SHUNTER.tall / 2 - DECK, 0);
+  }
+
+  private async load() {
+    this.loading = true;
+    const [wagon, shunter, crate] = await Promise.all([assets.model('gondola_wagon'), assets.model('diesel_shunter'), assets.model('old_military_crate')]);
+    const set = (m: THREE.Object3D, on: OnRails, turn: number) => {
+      const c = m.clone();
+      c.rotation.y = turn;
+      c.position.y = -DECK;
+      on.group.add(c);
+    };
+    // (their long way is their x, and the line's is z; the shunter's cab end faces the wagon)
+    set(wagon, this.wagon, Math.PI / 2);
+    set(shunter, this.shunter, Math.PI / 2);
+    // (the steps: crates, each as long as they are wide, stacked to the side's height)
+    const size = new THREE.Box3().setFromObject(crate).getSize(new THREE.Vector3());
+    for (let k = 1; k <= STEPS; k++) {
+      const high = (RIM * (STEPS + 1 - k)) / (STEPS + 1), c = crate.clone();
+      c.scale.set((STEP_DEEP / size.x) * c.scale.x, (high / size.y) * c.scale.y, ((STEP_WIDE * 2) / size.z) * c.scale.z);
+      c.position.set(-CAR.hw + STEP_DEEP * (k - 0.5), 0, 0);
+      this.wagon.group.add(c);
+    }
+  }
+
+  /** One fixed step, before anything that may stand in it moves. The clock is eased to, never jumped to, unless it is far out: a jump would throw whoever is aboard. */
+  step(h: number) {
+    this.t += h;
+    const off = this.now() - this.t;
+    this.t += Math.abs(off) > 3 ? off : Math.max(-0.02 * h, Math.min(0.02 * h, off));
+    const was = this.wagon.yaw, w = this.wagon;
+    w.step(wagonAt(this.t));
+    this.shunter.step(shunterAt(this.t));
+    this.turned = w.yaw - was;
+    this.inverse.copy(w.m0).invert();
+    this.carried.copy(w.m1).multiply(this.inverse);
+    this.gate.setEnabled(trainAt(this.t).stop < 0);
+  }
+
+  /** After whatever stands in it has moved: each where this step put it. */
+  placed() {
+    this.wagon.placed();
+    this.shunter.placed();
+  }
+
+  /** A body at `next` this step: carried with the wagon if it is in it. @returns how far it was turned with it, radians */
   carry = (next: { x: number; y: number; z: number }): number => {
-    const C = CAR, l = this.v.set(next.x, next.y, next.z).applyMatrix4(this.inverse.copy(this.m0).invert());
-    if (Math.abs(l.x) > C.hw + 0.3 || Math.abs(l.z) > C.hl + 0.3 || l.y < -0.5 || l.y > C.tall + 0.5) return 0;
+    const C = CAR, l = this.v.set(next.x, next.y, next.z).applyMatrix4(this.inverse.copy(this.wagon.m0).invert());
+    if (Math.abs(l.x) > C.hw + 0.3 || Math.abs(l.z) > C.hl + 0.3 || l.y < -0.5 || l.y > C.over + 0.5) return 0;
     this.v.set(next.x, next.y, next.z).applyMatrix4(this.carried);
     next.x = this.v.x;
     next.y = this.v.y;
@@ -96,38 +163,21 @@ export class TrainCar {
   };
 
   /** Drawn between its last two steps, as a body is. */
-  draw(alpha: number) {
-    this.group.position.lerpVectors(this.s0, this.s1, alpha);
-    this.group.quaternion.slerpQuaternions(this.q0, this.q1, alpha);
+  draw(alpha: number, eye: THREE.Vector3) {
+    const near = this.wagon.group.position.distanceToSquared(eye) < SEEN * SEEN;
+    this.wagon.group.visible = this.shunter.group.visible = near;
+    if (near && !this.loading) void this.load();
+    this.wagon.draw(alpha);
+    this.shunter.draw(alpha);
   }
 
-  dispose() {
-    this.group.removeFromParent();
-    physics.world.removeRigidBody(this.body);
+  /** where a point is in the wagon: across, up from its deck, along */
+  local(p: { x: number; y: number; z: number }, out = new THREE.Vector3()) {
+    return out.set(p.x, p.y, p.z).applyMatrix4(this.inverse.copy(this.wagon.m1).invert());
   }
-}
 
-/** A plain car to judge the moving floor by: grey boxes, a line down the floor every metre, and windows' worth of gaps to see the ground go by. */
-export function plainCar(car: TrainCar) {
-  const C = CAR, grey = new THREE.MeshStandardMaterial({ color: 0x6d7076, roughness: 0.8 }), red = new THREE.MeshStandardMaterial({ color: 0x8e3a2e, roughness: 0.7 });
-  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    b.position.set(x, y, z);
-    b.castShadow = b.receiveShadow = true;
-    car.group.add(b);
-  };
-  box(C.hw * 2 + 0.24, 0.12, C.hl * 2 + 0.24, 0, -0.06, 0, grey);
-  box(C.hw * 2 + 0.24, 0.12, C.hl * 2 + 0.24, 0, C.tall + 0.06, 0, red);
-  for (const s of [-1, 1]) {
-    box(0.12, 1, C.hl * 2, s * (C.hw + 0.06), 0.5, 0, red);
-    for (let z = -C.hl; z <= C.hl; z += 3.15) box(0.12, C.tall, 0.14, s * (C.hw + 0.06), C.tall / 2, z, grey);
-    box(C.hw * 2, C.tall, 0.12, 0, C.tall / 2, s * (C.hl + 0.06), red);
+  /** a point in the wagon, in the world */
+  world(l: { x: number; y: number; z: number }, out = new THREE.Vector3()) {
+    return out.set(l.x, l.y, l.z).applyMatrix4(this.wagon.m1);
   }
-  for (let z = -C.hl + 0.5; z < C.hl; z += 1) box(C.hw * 2, 0.01, 0.06, 0, 0.005, z, red);
-}
-
-/** a test track high over the desert, clear of everything: a long straight, a bend, and a run back along it */
-export function testRun(speed = 30, accel = 2.2): { line: Line; where: (t: number) => OnLine; time: number } {
-  const y = 140, line = makeLine([[-3200, y, 300], [-2900, y, 300], [-2700, y, 300], [-2600, y, 330], [-2560, y, 420], [-2560, y, 700]]);
-  return { line, where: (t) => onLine(line, runTo(line.length, speed, accel, t)), time: runTime(line.length, speed, accel) };
 }

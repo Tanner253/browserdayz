@@ -104,7 +104,7 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (78, 2026-10-30: the language a page reads ('lang', and on 'hello'), a line's `orig` and `mid` and its late translation 'chatx')
 // (79, 2026-10-31: traps ('trap', 'untrap', 'traps', 'trapok', 'trapback', 'trapgo'); a flare is launched by anybody with the gun)
 // (80, 2026-10-31: the way down's stops ('site', 'siteok'; `sites` on 'welcome'))
-export const PROTOCOL = 80;
+export const PROTOCOL = 81;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -736,7 +736,7 @@ export type S2C =
   | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number]; melee?: boolean; /** it is down, with something on it to be searched */ body?: CorpseInfo }
   /** a blow of one's was stopped by the guard of the player it was thrown at */
   | { t: 'iblk'; i: number; to: number }
-  | { t: 'pong'; n: number }
+  | { t: 'pong'; n: number; /** the server's clock, ms: what the train runs by, the same in every game */ at: number }
   /**
    * The bot check: a go at the course is dealt. All the game is told is the way the yard is turned (radians), how
    * many figures there are and how long it has: where the figures are is the server's, shown as they come into

@@ -713,7 +713,7 @@ function said(l: Lobby, p: P, m: Record<string, unknown>) {
       if (typeof m.text === 'string' && m.text.trim()) sayOut(p, l.ps, send, { t: 'chat', from: p.name, text: m.text.slice(0, 200) });
       return;
     case 'ping':
-      return void (Number.isFinite(m.n) && send(p, { t: 'pong', n: m.n as number }));
+      return void (Number.isFinite(m.n) && send(p, { t: 'pong', n: m.n as number, at: Date.now() }));
     case 'br':
       return brSaid(l, p, m);
     case 'vin': case 'vout': case 'vswap': case 'v': case 'vrest': case 'vtake': case 'vflip': case 'vhorn':

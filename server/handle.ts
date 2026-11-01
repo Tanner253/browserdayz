@@ -1140,7 +1140,7 @@ export function handle(c: Client, m: C2S) {
     case 'party':
       return partyAct(c, m);
     case 'ping':
-      send(c, { t: 'pong', n: m.n });
+      send(c, { t: 'pong', n: m.n, at: Date.now() });
       return;
     case 'report': {
       // (their last death reported from the death screen: kept with how it went, and every admin on told: server/reports.ts)
