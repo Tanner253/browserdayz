@@ -137,7 +137,7 @@ export class KupolInside {
     }
     plate(6.5, 7.75, -Hw - 0.08, Hw + 0.08, Y1, Y1 + 0.08, frame);
     for (const r of [6.5, 7.75]) plate(r, r + 0.04, -Hw - 0.34, Hw + 0.34, Y1, Y1 + 0.34, frame);
-    const door = new THREE.Mesh(mergeGeometries(frame, false), steel);
+    const door = new THREE.Mesh(mergeGeometries(frame, false), reg(new THREE.MeshStandardMaterial({ color: 0x7c827e, roughness: 0.7, metalness: 0.15 })));
     door.matrixAutoUpdate = false;
     this.outer.add(door);
     solid(Hw + 0.1, 0.2, 0.62, ...(at(7.12, 0, Y1 + 0.2).toArray() as [number, number, number]), WALK.at, 'metal');
