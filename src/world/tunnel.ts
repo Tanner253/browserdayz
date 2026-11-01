@@ -103,31 +103,51 @@ function bar(from: number, to: number, section: [number, number][], color: THREE
 
 const STEEL = new THREE.Color(0.34, 0.33, 0.32), BLACK = new THREE.Color(0.03, 0.03, 0.03), TIMBER = new THREE.Color(0.14, 0.1, 0.07);
 
-/** the sleepers between two distances */
-function sleepers(from: number, to: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-  for (let s = Math.ceil(from / SLEEPER_EVERY) * SLEEPER_EVERY; s < to; s += SLEEPER_EVERY) {
-    const p = onLine(LINE, s), g = new THREE.BoxGeometry(2.3, 0.13, 0.24);
-    g.rotateY(p.yaw);
-    g.translate(p.x, p.y - RAIL - 0.13, p.z);
-    const n = g.getAttribute('position').count, col = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) col.set([TIMBER.r, TIMBER.g, TIMBER.b], i * 3);
-    g.deleteAttribute('uv');
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    parts.push(g.toNonIndexed());
+/** the sleepers between two distances: one box many times over */
+function sleepers(from: number, to: number, timber: THREE.Material): THREE.InstancedMesh {
+  const first = Math.ceil(from / SLEEPER_EVERY), n = Math.max(1, Math.ceil(to / SLEEPER_EVERY) - first);
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(2.3, 0.13, 0.24), timber, n), m = new THREE.Matrix4(), q = new THREE.Quaternion(), at = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < n; i++) {
+    const p = onLine(LINE, (first + i) * SLEEPER_EVERY);
+    mesh.setMatrixAt(i, m.compose(at.set(p.x, p.y - RAIL - 0.13, p.z), q.setFromAxisAngle(up, p.yaw), one));
   }
-  return mergeGeometries(parts, false);
+  mesh.matrixAutoUpdate = false;
+  return mesh;
 }
 
+interface Piece { from: number; to: number; mesh: THREE.Group | null; x: number; y: number; z: number }
+interface Stuff { wall: THREE.Material; iron: THREE.Material; timber: THREE.Material; bulb: THREE.Material }
+
 export class Tunnel {
-  private pieces: { mesh: THREE.Group; x: number; y: number; z: number }[] = [];
+  private pieces: Piece[] = [];
   private all = new THREE.Group();
   private lamps: THREE.Vector3[] = [];
   private held = new THREE.Vector3();
   private ends: THREE.Mesh[] = [];
+  /** its paints, made the first time anybody comes down here: most games never do */
+  private stuff: Stuff | null = null;
 
-  constructor(atmo: Atmosphere, scene: THREE.Scene) {
-    const L = LINE.length, Nx = 256, Ny = 128;
+  constructor(private atmo: Atmosphere, scene: THREE.Scene) {
+    const L = LINE.length;
+    for (let s = 0; s < L; s += PIECE) {
+      const end = Math.min(L, s + PIECE), mid = onLine(LINE, (s + end) / 2);
+      this.pieces.push({ from: s, to: end, mesh: null, x: mid.x, y: mid.y, z: mid.z });
+    }
+    for (let k = Math.ceil(BORE.from / LAMP_EVERY); k * LAMP_EVERY < BORE.to; k++) {
+      const v: number[] = [];
+      place(k * LAMP_EVERY, (k % 2 ? 1 : -1) * (HALF - 0.12), LAMP_UP, v);
+      this.lamps.push(new THREE.Vector3(v[0], v[1], v[2]));
+    }
+    // (the bore shut with black where the drawing of it stops: the sky is behind that)
+    const shut = new THREE.MeshBasicMaterial({ color: 0, side: THREE.DoubleSide });
+    for (let k = 0; k < 2; k++) this.ends.push(new THREE.Mesh(new THREE.CircleGeometry(8, 16), shut));
+    this.all.add(...this.ends);
+    this.all.visible = false;
+    scene.add(this.all);
+  }
+
+  private paints(): Stuff {
+    const Nx = 256, Ny = 128, atmo = this.atmo;
     // (the pools of two lamps, one on each wall, on a tile that repeats every two lamps: v runs from the left foot of the wall over the crown to the right foot; and a
     // little over all of it, so that the stretch between two lamps is dim and not black)
     const glow = painted(Nx, Ny, (g) => {
@@ -147,63 +167,61 @@ export class Tunnel {
     }, 1, true);
     glow.channel = 1;
     const concrete = assets.pbr('dirty_concrete');
-    const wall = atmo.register(new THREE.MeshStandardMaterial({ map: concrete.map, normalMap: concrete.normalMap, roughnessMap: concrete.armMap, roughness: 1, metalness: 0, lightMap: glow, lightMapIntensity: 2.6 }));
-    const iron = atmo.register(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25, side: THREE.DoubleSide }));
-    const bulb = atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.84, 0.56), emissiveIntensity: 4, roughness: 0.5 }));
+    return {
+      wall: atmo.register(new THREE.MeshStandardMaterial({ map: concrete.map, normalMap: concrete.normalMap, roughnessMap: concrete.armMap, roughness: 1, metalness: 0, lightMap: glow, lightMapIntensity: 2.6 })),
+      iron: atmo.register(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25, side: THREE.DoubleSide })),
+      timber: atmo.register(new THREE.MeshStandardMaterial({ color: TIMBER, roughness: 0.9 })),
+      bulb: atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.84, 0.56), emissiveIntensity: 4, roughness: 0.5 })),
+    };
+  }
 
-    for (let s = 0; s < L; s += PIECE) {
-      const end = Math.min(L, s + PIECE), piece = new THREE.Group();
-      const from = Math.max(s, BORE.from), to = Math.min(end, BORE.to), shell = to > from ? new THREE.Mesh(bore(from, to), wall) : null;
-      if (shell) shell.matrixAutoUpdate = false;
-      const rail = (x: number): [number, number][] => [[x - 0.04, 0], [x - 0.04, 0.15], [x + 0.04, 0.15], [x + 0.04, 0]];
-      const steel = mergeGeometries([
-        bar(s, end, rail(-GAUGE), STEEL), bar(s, end, rail(GAUGE), STEEL), sleepers(s, end),
-        bar(s, end, [[HALF - 0.04, LAMP_UP - 0.5], [HALF - 0.04, LAMP_UP - 0.36], [HALF - 0.16, LAMP_UP - 0.36], [HALF - 0.16, LAMP_UP - 0.5], [HALF - 0.04, LAMP_UP - 0.5]], BLACK),
-        bar(s, end, [[-HALF + 0.04, 1.5], [-HALF + 0.04, 1.62], [-HALF + 0.14, 1.62], [-HALF + 0.14, 1.5], [-HALF + 0.04, 1.5]], BLACK),
-      ], false);
-      const iron1 = new THREE.Mesh(steel, iron);
-      iron1.matrixAutoUpdate = false;
-      const bulbs: THREE.BufferGeometry[] = [];
-      for (let k = Math.ceil(from / LAMP_EVERY); k * LAMP_EVERY < to; k++) {
-        const at = k * LAMP_EVERY, p = onLine(LINE, at), v: number[] = [];
-        const side = k % 2 ? 1 : -1;
-        place(at, side * (HALF - 0.12), LAMP_UP, v);
-        this.lamps.push(new THREE.Vector3(v[0], v[1], v[2]));
-        const b = new THREE.CapsuleGeometry(0.06, 0.34, 4, 8);
-        b.rotateX(Math.PI / 2);
-        b.rotateY(p.yaw);
-        b.translate(v[0], v[1], v[2]);
-        bulbs.push(b);
-      }
-      if (shell) piece.add(shell);
-      piece.add(iron1);
-      if (bulbs.length) {
-        const lights = new THREE.Mesh(mergeGeometries(bulbs, false), bulb);
-        lights.matrixAutoUpdate = false;
-        piece.add(lights);
-      }
-      piece.visible = false;
-      const mid = onLine(LINE, (s + end) / 2);
-      this.pieces.push({ mesh: piece, x: mid.x, y: mid.y, z: mid.z });
-      this.all.add(piece);
+  private build(p: Piece) {
+    const u = (this.stuff ??= this.paints()), s = p.from, end = p.to, piece = new THREE.Group();
+    const from = Math.max(s, BORE.from), to = Math.min(end, BORE.to), shell = to > from ? new THREE.Mesh(bore(from, to), u.wall) : null;
+    if (shell) shell.matrixAutoUpdate = false;
+    const rail = (x: number): [number, number][] => [[x - 0.04, 0], [x - 0.04, 0.15], [x + 0.04, 0.15], [x + 0.04, 0]];
+    const steel = mergeGeometries([
+      bar(s, end, rail(-GAUGE), STEEL), bar(s, end, rail(GAUGE), STEEL),
+      bar(s, end, [[HALF - 0.04, LAMP_UP - 0.5], [HALF - 0.04, LAMP_UP - 0.42], [HALF - 0.12, LAMP_UP - 0.42], [HALF - 0.12, LAMP_UP - 0.5], [HALF - 0.04, LAMP_UP - 0.5]], BLACK),
+      bar(s, end, [[-HALF + 0.04, 1.5], [-HALF + 0.04, 1.58], [-HALF + 0.12, 1.58], [-HALF + 0.12, 1.5], [-HALF + 0.04, 1.5]], BLACK),
+    ], false);
+    const iron = new THREE.Mesh(steel, u.iron);
+    iron.matrixAutoUpdate = false;
+    const bulbs: THREE.BufferGeometry[] = [];
+    for (let k = Math.ceil(from / LAMP_EVERY); k * LAMP_EVERY < to; k++) {
+      const at = k * LAMP_EVERY, q = onLine(LINE, at), v: number[] = [];
+      place(at, (k % 2 ? 1 : -1) * (HALF - 0.12), LAMP_UP, v);
+      const b = new THREE.CapsuleGeometry(0.06, 0.34, 4, 8);
+      b.rotateX(Math.PI / 2);
+      b.rotateY(q.yaw);
+      b.translate(v[0], v[1], v[2]);
+      bulbs.push(b);
     }
-    // (the bore shut with black where the drawing of it stops: the sky is behind that)
-    const shut = new THREE.MeshBasicMaterial({ color: 0, side: THREE.DoubleSide });
-    for (let k = 0; k < 2; k++) this.ends.push(new THREE.Mesh(new THREE.CircleGeometry(8, 16), shut));
-    this.all.add(...this.ends);
-    this.all.visible = false;
-    scene.add(this.all);
+    if (shell) piece.add(shell);
+    piece.add(iron, sleepers(s, end, u.timber));
+    if (bulbs.length) {
+      const lights = new THREE.Mesh(mergeGeometries(bulbs, false), u.bulb);
+      lights.matrixAutoUpdate = false;
+      piece.add(lights);
+    }
+    p.mesh = piece;
+    this.all.add(piece);
   }
 
   /** @param under the eye is under the ground @param lit a lamp is lit here */
   update(eye: THREE.Vector3, under: boolean, lit: (pos: THREE.Vector3, burn: number) => void) {
     this.all.visible = under;
     if (!under) return;
-    let first = -1, last = -1;
+    let first = -1, last = -1, made = false;
     this.pieces.forEach((p, i) => {
-      const near = Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z) < DRAWN;
-      p.mesh.visible = near;
-      if (near) {
+      const far = Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z), near = far < DRAWN;
+      // (one a frame, and ahead of being seen: a train brings a new one every three seconds or so)
+      if (!p.mesh && !made && far < DRAWN + PIECE) {
+        this.build(p);
+        made = true;
+      }
+      if (p.mesh) p.mesh.visible = near;
+      if (near && p.mesh) {
         if (first < 0) first = i;
         last = i;
       }

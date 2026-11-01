@@ -117,6 +117,8 @@ export class Player {
   yaw = 0;
   /** a floor that moves, if there is one: told where the body is going this step, moves that with it if it is on it, and says how far it was turned */
   carry: ((next: { x: number; y: number; z: number }) => number) | null = null;
+  /** which way is up off the floor that moves, for a body at this spot in it (null: it is not): that floor tilts with the line it runs on */
+  moverUp: ((at: { x: number; y: number; z: number }) => { x: number; y: number; z: number } | null) | null = null;
   pitch = 0;
   crouched = false;
   grounded = false;
@@ -729,7 +731,11 @@ export class Player {
     // slipping: its own two limits are what made a wall of fifty degrees and a chute of fifty-eight, and what the
     // legs can do there is decided above. Everywhere else they are what they have always been.
     this.slopes(on ? Math.min(85, Math.max(CLIMB_MAX, degOf(on.rise) + 8)) : CLIMB_MAX, on ? 86 : SLIP_MIN, !on);
-    const laid = this.grounded && this.vel.y < 0 ? (on ? this.alongSteep(desired, h, on) : this.alongGround(desired, h)) : 0;
+    // (On a deck that tilts a step is laid along it, touching nothing, and the deck carries it. Anything else asks the controller about slopes, and on a floor that is moving
+    // a step uphill came to nothing at all: a body could not walk up the wagon on a grade.)
+    const tilt = this.grounded && this.vel.y < 0 ? this.moverUp?.(this.body.translation()) : null;
+    if (tilt) desired.y = -(tilt.x * pace.x + tilt.z * pace.z) / tilt.y;
+    const laid = !tilt && this.grounded && this.vel.y < 0 ? (on ? this.alongSteep(desired, h, on) : this.alongGround(desired, h)) : 0;
     this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);
     let mv = this.kcc.computedMovement();
     // Something stood in the way (a trunk, a wall, a crate). A step laid along a slope slides

@@ -162,6 +162,14 @@ export class TrainCar {
     return this.turned;
   };
 
+  /** which way is up off the deck, for a body at this spot in the wagon; null anywhere else */
+  deck = (at: { x: number; y: number; z: number }) => {
+    const C = CAR, l = this.v.set(at.x, at.y, at.z).applyMatrix4(this.inverse.copy(this.wagon.m0).invert());
+    if (Math.abs(l.x) > C.hw || Math.abs(l.z) > C.hl || l.y < -0.5 || l.y > 2.2) return null;
+    const e = this.wagon.m0.elements;
+    return { x: e[4], y: e[5], z: e[6] };
+  };
+
   /** where it is in its round now: standing, and how long for */
   state() {
     return trainAt(this.t);
