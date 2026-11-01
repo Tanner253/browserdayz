@@ -371,6 +371,14 @@ const WAKE = 7;
 /** how near its hut the eye must be, metres, to see down its stair (or be under the ground itself) for what is buried to be drawn */
 const OPEN_FROM = 30;
 
+/** a big thing of dark paint in a dim room: its own paint added to whatever light it gets, or it stands as a black shape (the owner, 2026-11-01: "this doesnt look good") */
+export function selfLit(m: THREE.MeshStandardMaterial, k: number) {
+  m.emissive.set(0xffffff);
+  m.emissiveMap = m.map;
+  m.emissiveIntensity = k;
+  return m;
+}
+
 /** the generator set's model, metres: its length, height and depth */
 const GENSET = { long: 3.6, high: 2.05, deep: 1.24 };
 
@@ -410,6 +418,8 @@ export class BunkerSite {
   private sealed: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; open: boolean; lamp: THREE.MeshStandardMaterial } | null = null;
   /** Level 2's plant is running */
   power = false;
+  /** the paint of what stands in Level 2's dark until the plant runs */
+  private plantPaints: THREE.MeshStandardMaterial[] = [];
   /** the light on the card reader beside the door */
   private readerLamp: THREE.MeshStandardMaterial | null = null;
   private clock = 0;
@@ -605,7 +615,12 @@ export class BunkerSite {
       root.traverse((o) => {
         const src = o as THREE.Mesh;
         if (!src.isMesh) return;
-        const paint = atmo.register(Object.assign((src.material as THREE.MeshStandardMaterial).clone(), { metalness: 0.25 })) as THREE.MeshStandardMaterial;
+        const paint = atmo.register(selfLit(Object.assign((src.material as THREE.MeshStandardMaterial).clone(), { metalness: 0.25 }), 0.32)) as THREE.MeshStandardMaterial;
+        // (Level 2's stands in the dark until it is run)
+        if ([...this.deep.values()].includes(group as THREE.Group)) {
+          this.plantPaints.push(paint);
+          if (!this.power) paint.emissiveIntensity = 0.015;
+        }
         const many = new THREE.InstancedMesh(src.geometry, paint, list.length), at = new THREE.Matrix4();
         list.forEach((m, i) => many.setMatrixAt(i, at.multiplyMatrices(m, src.matrixWorld)));
         many.receiveShadow = true;
@@ -645,10 +660,9 @@ export class BunkerSite {
           break;
         }
         case 'generator': {
-          // (the real thing, the owner's word, 2026-11-01, at the length its place gives it; and its exhaust, up to the ceiling)
+          // (the real thing, the owner's word, 2026-11-01, at the length its place gives it)
           const k = w / GENSET.long, top = GENSET.high * k;
           gensets.push(new THREE.Matrix4().multiplyMatrices(base, new THREE.Matrix4().makeScale(k, k, k)));
-          part(new THREE.CylinderGeometry(0.09, 0.09, B.tall - top + 0.25, 10), dark, -w * 0.38, top - 0.22 + (B.tall - top + 0.25) / 2, 0);
           solid('metal', w, top, GENSET.deep * k);
           break;
         }
@@ -1007,6 +1021,8 @@ export class BunkerSite {
           for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
             const wide = level > 1;
+            // (the vault lies under vault control on the plan, and that room's pools and walls fell on it in hard lines: it takes its light from a stretch of the great hall)
+            if (level === 3 && Math.abs(v.x) < 6.6 && v.z > 5.4 && v.z < 18.6 && v.y < levelY(3) - 1) v.set(v.x * 0.2, v.y, -8 + (v.z - 12) * 0.2);
             uv1[i * 2] = ((wide ? (v.x + WING_SPAN / 2) / WING_SPAN : (v.x - R0) / span) + level - 1) / (LEVELS.last + 1);
             uv1[i * 2 + 1] = wide ? (v.z - WING_F0) / WING_SPAN : (v.z - F0) / span;
           }
@@ -1125,6 +1141,7 @@ export class BunkerSite {
   setPower(on: boolean) {
     if (on === this.power) return;
     this.power = on;
+    for (const p of this.plantPaints) p.emissiveIntensity = on ? 0.32 : 0.015;
     this.poweredAt = this.clock;
     this.waking = on ? 16 : 0;
     this.repaint();

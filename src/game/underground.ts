@@ -2,10 +2,11 @@
 // can be seen, and it was all still gone through and drawn behind the rock: the sun's three shadow maps, the terrain, the grass, the trees. Here it is let go of while the eye is shut
 // in, on the one frame that changes, and down the bunker so is whatever stands on a floor the eye is not on: its furniture and the infected on it.
 
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { BUNKER_FAR, bunkerSealed, type Place } from '../sim/bunker';
 import { MINE, inMine } from '../sim/mine';
 import type { Atmosphere } from '../world/atmosphere';
+import { selfLit } from '../world/bunker';
 import type { Terrain } from '../world/terrain';
 import type { Vegetation } from '../world/vegetation';
 
@@ -31,7 +32,10 @@ export class Underground {
   readonly far = BUNKER_FAR;
   private seen = '';
 
-  constructor(private h: UndergroundHost) {}
+  constructor(private h: UndergroundHost) {
+    // (a gun rack is dark steel: down the bunker it stood as a black block, and what was on it with it)
+    for (const o of h.scene.children) if (o.name.startsWith('gun_rack:')) selfLit((o as THREE.Mesh).material as THREE.MeshStandardMaterial, 0.45);
+  }
 
   update(eye: THREE.Vector3) {
     const h = this.h, down = bunkerSealed(h.place(), eye.x, eye.y, eye.z);

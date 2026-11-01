@@ -91,7 +91,7 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   ore_cart: { label: 'Minecart', w: 8, h: 6, count: [2, 3], usage: ['Industrial'], tier: 1, list: [['pickaxe', 4], ['scrap', 5], ['metal_frags', 5]], piles: { metal_frags: [25, 80], scrap: [3, 10] } },
   // The vault, the end of the way down (the owner, 2026-11-01: "i expected tons of 50 bmg and tappers and stuff"; 2026-10-31: "the only place you can find tappers and the best loot in the
   // game"). Its racks and crates stand as any do (VAULT_KIND, by where they are) and hold this instead, and the forty minutes a heavy sniper takes to come back (see guns.ts).
-  vault_rack: { label: 'Weapon Rack', w: 10, h: 20, count: [4, 6], usage: ['Bunker'], tier: 5, full: true, again: 2400, list: [['barrett', 2], ['sniper50', 2], ['vssk', 2], ['ammo_50bmg', 7], ['ammo_127x55', 3], ['mag_barrett', 2], ['mag_sniper50', 2], ['scope_50', 1], ['scope_barrett', 1]] },
+  vault_rack: { label: 'Weapon Rack', w: 10, h: 20, count: [5, 7], usage: ['Bunker'], tier: 5, full: true, again: 2400, list: [['barrett', 4], ['sniper50', 4], ['vssk', 4], ['ammo_50bmg', 6], ['ammo_127x55', 3], ['mag_barrett', 2], ['mag_sniper50', 2], ['scope_50', 1], ['scope_barrett', 1]] },
   vault_case: { label: 'Vault Case', w: 8, h: 4, count: [4, 7], usage: ['Bunker'], tier: 5, full: true, again: 2400, list: [['ammo_50bmg', 10], ['ammo_127x55', 4], ['mag_barrett', 2], ['mag_sniper50', 2], ['night_vision', 0.6], ['life_vest', 0.8]] },
 };
 /** what one of these holds when it stands in the vault */

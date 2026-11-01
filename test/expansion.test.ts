@@ -342,8 +342,8 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
   // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp; and, since
   // 2026-10-13, the fifteen the outlying places of the old valley were owed and had never had: see INFECTED.max)
-  // (the twenty-one asleep on the levels under the first are over and above INFECTED.max: see `deep` above)
-  assert.equal(INFECTED.max - here!.n - below.reduce((a, h) => a + h.n, 0) + 21 - over[0].n, 33 + 15 + 15);
+  // (the forty-five asleep on the levels under the first and in Level 1's wings are over and above INFECTED.max: see `deep` above)
+  assert.equal(INFECTED.max - here!.n - below.reduce((a, h) => a + h.n, 0) + 45 - over[0].n, 33 + 15 + 15);
   // (and the fort's own since: about its ruined village and in the dark under its terrace)
   assert.ok(forts >= 8 && homes.filter(atFort).reduce((a, h) => a + h.n, 0) === forts, 'the fort has not its own');
   // (the bunker's, in and over it, are its own wherever it stands: since plan v2, 2026-10-16, in the pines of the west)
@@ -757,9 +757,9 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   // (the fort's own, and its hamlet's before the gate, which are a place of their own to the map: 'hamlet')
   // (the basements' come after the fort's since 2026-10-14, the newest lot last: `cellar`; and Kalat's after all, plan v5: `ruins_`)
   // (and the watchtowers' and hunting towers' with the west's towns, 2026-10-19)
-  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.usage.includes('Lab') || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(q.building)), "the fort's places for things are not the last there are");
+  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.usage.includes('Lab') || q.building === 'mine' || q.building.startsWith('bunker') || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(q.building)), "the fort's places for things are not the last there are");
   const cellarsAt = data.lootPoints.findIndex((q) => q.building === 'cellar');
-  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.usage.includes('Lab') || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(q.building)), "something after the basements' places that is not theirs");
+  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.usage.includes('Lab') || q.building === 'mine' || q.building.startsWith('bunker') || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(q.building)), "something after the basements' places that is not theirs");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
   assert.ok(heli && inRounds(heli.x, heli.z, 15), 'no helicopter by the fort');

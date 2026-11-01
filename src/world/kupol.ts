@@ -240,7 +240,7 @@ export class KupolInside {
       };
       dress(this.wall, 'concrete_block_wall');
       dress(this.plain, 'white_rough_plaster');
-      if (this.floorMat) dress(this.floorMat, 'anti_slip_concrete');
+      if (this.floorMat) dress(this.floorMat, 'concrete_floor_worn_001');
     }
     const inside = far < D.inner && eye.y > D.door && eye.y < D.deck + 11;
     this.fill.intensity += ((inside ? 0.34 : 0) - this.fill.intensity) * Math.min(1, dt * 3);

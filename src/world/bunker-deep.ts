@@ -29,7 +29,7 @@ type Tex = [string, number, [number, number, number]?];
 const LINO: Tex = ['old_linoleum_flooring_01', 3, [0.8, 0.8, 0.82]], WHITE: Tex = ['long_white_tiles', 1.6], SQUARE: Tex = ['square_tiled_wall', 1.4], TILE: Tex = ['worn_tile_floor', 2.2, [1.4, 1.4, 1.36]], DIRTY: Tex = ['dirty_tiles', 2];
 const TERRAZZO: Tex = ['terrazzo_tiles', 2.4], CREAM: Tex = ['painted_plaster_wall', 3, [0.86, 0.86, 0.76]], GREEN: Tex = ['painted_concrete_02', 3, [0.72, 1, 0.78]], BOARD: Tex = ['wood_textured_concrete', 3.2], RIB: Tex = ['ribbed_concrete_wall', 3];
 const PANEL: Tex = ['dark_paneled_wood', 2.4, [2, 1.8, 1.6]], ROUGH: Tex = ['white_rough_plaster', 2.6], PLATE: Tex = ['metal_plate_02', 2.4], RUST: Tex = ['rusty_painted_metal', 3];
-const OAK: Tex = ['wood_floor_worn', 2.6], BROKEN: Tex = ['damaged_concrete_floor', 3], BLOCK: Tex = ['concrete_block_wall', 2.6], GRIP: Tex = ['anti_slip_concrete', 1.1], WORN: Tex = ['concrete_floor_worn_001', 3, [1.3, 1.3, 1.28]], GRIME: Tex = ['dirty_concrete', 3];
+const OAK: Tex = ['wood_floor_worn', 2.6], BROKEN: Tex = ['damaged_concrete_floor', 3], BLOCK: Tex = ['concrete_block_wall', 2.6], GRIP: Tex = ['concrete_floor_worn_001', 2.4, [1.2, 1.2, 1.16]], WORN: Tex = ['concrete_floor_worn_001', 3, [1.3, 1.3, 1.28]], GRIME: Tex = ['dirty_concrete', 3];
 /** what is overhead: on the second level plaster, on the third the boards the concrete was poured against */
 const PLASTERED: Tex = ['white_rough_plaster', 3.4, [0.72, 0.72, 0.68]], SHUTTERED: Tex = ['wood_textured_concrete', 3.2, [0.8, 0.8, 0.78]];
 
