@@ -18,11 +18,12 @@ export class BoltHole {
   private up = 0;
   private was = false;
   private at = new THREE.Vector3();
-  /** the ladder under it, as src/game/building/ladders.ts takes one */
-  readonly line: { x: number; z: number; nx: number; nz: number; y0: number; y1: number };
+  /** the two ladders, as src/game/building/ladders.ts takes them: the one under the hatch, and the one from the cellar to the barracks */
+  readonly lines: { x: number; z: number; nx: number; nz: number; y0: number; y1: number }[];
 
-  constructor(scene: THREE.Scene, private P: Place, steel: THREE.Material) {
-    const H = BOLT.hatch, Y = levelY(1), [x, y, z] = bunkerAt(P, H.r, H.f - H.half, Y), [cx, cy, cz] = bunkerAt(P, H.r, H.f, Y - 0.04), turn = P.rot / 2;
+  /** @param H the hatch; @param Y the floor it lies in; @param ladders the ladders of it to give the game */
+  constructor(scene: THREE.Scene, private P: Place, steel: THREE.Material, private H: { r: number; f: number; half: number } = BOLT.hatch, private Y = levelY(1), ladders = true) {
+    const [x, y, z] = bunkerAt(P, H.r, H.f - H.half, Y), [cx, cy, cz] = bunkerAt(P, H.r, H.f, Y - 0.04), turn = P.rot / 2;
     this.hinge.position.set(x, y, z);
     this.hinge.rotation.y = P.rot;
     const plate = new THREE.Mesh(new THREE.BoxGeometry(H.half * 2, 0.08, H.half * 2), steel);
@@ -40,13 +41,13 @@ export class BoltHole {
     physics.tag(this.body, { surface: 'metal' });
     this.group.visible = false;
     scene.add(this.group);
-    const [rx, , rz] = bunkerAt(P, H.r, H.f + H.half - 0.14, 0), n = Math.sin(P.rot), c = Math.cos(P.rot);
-    this.line = { x: rx, z: rz, nx: -n, nz: -c, y0: P.y + Y - HALL_DEEP, y1: P.y + Y + 0.05 };
+    const [rx, , rz] = bunkerAt(P, H.r, H.f + H.half - 0.14, 0), W = BOLT.trap, [tx, , tz] = bunkerAt(P, W.r, W.f + W.half - 0.14, 0), n = Math.sin(P.rot), c = Math.cos(P.rot);
+    this.lines = !ladders ? [] : [{ x: rx, z: rz, nx: -n, nz: -c, y0: P.y + Y - HALL_DEEP, y1: P.y + Y + 0.05 }, { x: tx, z: tz, nx: -n, nz: -c, y0: P.y + Y, y1: P.y + Y + W.high + 0.05 }];
   }
 
   /** Once a frame. @param open the blast door stands open, or the wheel has been turned from below */
   update(dt: number, open: boolean, eye: THREE.Vector3) {
-    const far = this.group.position.distanceTo(eye), [hx, hy, hz] = bunkerAt(this.P, BOLT.hatch.r, BOLT.hatch.f, levelY(1)), d = Math.hypot(hx - eye.x, hy - eye.y, hz - eye.z);
+    const far = this.group.position.distanceTo(eye), [hx, hy, hz] = bunkerAt(this.P, this.H.r, this.H.f, this.Y), d = Math.hypot(hx - eye.x, hy - eye.y, hz - eye.z);
     void far;
     this.group.visible = d < 40;
     if (open !== this.was) {
@@ -63,7 +64,7 @@ export class BoltHole {
   /** what is said to whoever stands over it in the cellar */
   note(p: { x: number; y: number; z: number }, open: boolean) {
     const [r, f, h] = bunkerLocal(this.P, p.x, p.y, p.z);
-    if (open || Math.hypot(r - BOLT.hatch.r, f - BOLT.hatch.f) > 1.6 || Math.abs(h - levelY(1)) > 1.5) return null;
+    if (open || Math.hypot(r - this.H.r, f - this.H.f) > 1.6 || Math.abs(h - this.Y) > 1.5) return null;
     return '<small>Bolted from below. The lamp goes green when the blast door opens</small>';
   }
 }

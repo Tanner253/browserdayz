@@ -66,7 +66,8 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     // across each: every floor stands just over the highest of the ground under it, on a foundation down to the lowest. The owner, 2026-11-01: "the town on top of the
     // bunker some of the buildings are floating". `assets-src/_wf/me/gorodok-say.ts` measures them.)
     { type: 'barracks', x: 38, z: 14, rot: Q, up: -0.32, under: 1.55 },
-    { type: 'barracks', x: 53, z: 14, rot: Q, up: -0.54, under: 1.5 },
+    // (a trapdoor in the floor of its arms room, the way down to the bunker's bolt-hole: src/sim/bunker-wings.ts BOLT, in this building's own frame)
+    { type: 'barracks', x: 53, z: 14, rot: Q, up: -0.54, under: 1.5, trap: { x: 5, z: 0.6, half: 0.6 } },
     { type: 'garage', x: 42, z: 40, rot: S, up: -0.72, under: 1.66 },
     { type: 'garage', x: 54, z: 40, rot: S, up: -1.48, under: 3.24 },
     { type: 'hut', x: 18, z: 48, rot: N, up: -0.08, under: 0.94 },

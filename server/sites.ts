@@ -73,7 +73,7 @@ export function doorLocked(i: number) {
 }
 
 /** the floor of the level a site is on */
-const floorOf = (s: Site) => (s.level ? (world.bunker?.y ?? 0) + levelY(s.level) : undefined);
+const floorOf = (s: Site) => (s.level ? (world.bunker?.y ?? 0) + levelY(s.level) + (s.down ?? 0) : undefined);
 
 /** a crate of a site's, set down as a supply drop's is */
 function crate(s: Site, r: Run, at: [number, number], fill: (c: Container) => void, label: string, y?: number) {
@@ -94,7 +94,7 @@ function wave(s: Site, r: Run, now: number) {
   if (s.level) {
     const spots = levelSpots(s.level), y = (world.bunker?.y ?? 0) + levelY(s.level);
     for (let k = 0; k < n; k++) {
-      const [x, z] = sitePoint(s, spots[Math.floor(Math.random() * spots.length)]), b = horde.place(x, y, z, now);
+      const at = spots[Math.floor(Math.random() * spots.length)], [x, z] = sitePoint(s, [at[0], at[1]]), b = horde.place(x, y + at[2], z, now);
       r.stood.add(b.i);
       broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
     }

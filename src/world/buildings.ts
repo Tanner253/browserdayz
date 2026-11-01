@@ -1649,7 +1649,8 @@ export class Buildings {
       };
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
-        this.world.props.push({ kind: st.id, x, y, z, rot: st.rot + at.rot, scale: st.scale ?? 1, far: 46 });
+        // (a container down here stands where it is told, not on the ground over it)
+        this.world.props.push({ kind: st.id, x, y, z, rot: st.rot + at.rot, scale: st.scale ?? 1, far: 46, ...(st.id.startsWith(CONTAINER.id) ? { lean: [0, 0, y] as [number, number, number] } : {}) });
         const e = assets.manifest.models[st.id];
         if (!st.on || !e || CRATE_KINDS.has(st.id)) continue;
         // where things are kept on it: on its top, or on each of its boards; two side by side where it is long enough
@@ -2363,9 +2364,18 @@ export class Buildings {
         this.doorSpecs.push({ m: hinge, w: dr.w, h: dr.h, id: `${plot.id}_door${k}`, open: rng.chance(0.4), swing: rng.chance(0.5) ? 1 : -1 });
       });
     } else {
-      addBox('concrete', -hw - proud, hw + proud, -(plot.under ?? 1.4), -0.1, -hd - proud, hd + proud, B);
+      /** a slab of it, round the well through it where it has one */
+      const round = (key: MatKey, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) => {
+        const t = plot.trap;
+        if (!t) return addBox(key, x0, x1, y0, y1, z0, z1, B);
+        addBox(key, x0, t.x - t.half, y0, y1, z0, z1, B);
+        addBox(key, t.x + t.half, x1, y0, y1, z0, z1, B);
+        addBox(key, t.x - t.half, t.x + t.half, y0, y1, z0, t.z - t.half, B);
+        addBox(key, t.x - t.half, t.x + t.half, y0, y1, t.z + t.half, z1, B);
+      };
+      round('concrete', -hw - proud, hw + proud, -(plot.under ?? 1.4), -0.1, -hd - proud, hd + proud);
       // (where it has no wall of its own, its floor runs on to the middle of the wall that is there)
-      addBox(bp.floor, joined.has('left') ? -hw - T * 0.5 : -hw + T * 0.5, joined.has('right') ? hw + T * 0.5 : hw - T * 0.5, -0.12, 0, joined.has('back') ? -hd - T * 0.5 : -hd + T * 0.5, joined.has('front') ? hd + T * 0.5 : hd - T * 0.5, B);
+      round(bp.floor, joined.has('left') ? -hw - T * 0.5 : -hw + T * 0.5, joined.has('right') ? hw + T * 0.5 : hw - T * 0.5, -0.12, 0, joined.has('back') ? -hd - T * 0.5 : -hd + T * 0.5, joined.has('front') ? hd + T * 0.5 : hd - T * 0.5);
     }
     // (The ceiling under a pitched roof: it stops a body. It was a picture of a ceiling and nothing else, and a jump in
     // a room went up through it into the roof: "ceilings in our buildings need collision so when you jump your camera

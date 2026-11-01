@@ -233,6 +233,16 @@ export class Sites {
     return null;
   }
 
+  /** has a site's time run out, its room open? */
+  spent(id: string) {
+    return this.phase(id) === 'spent';
+  }
+
+  /** is a site's alarm going? */
+  going(id: string) {
+    return this.phase(id) === 'alarm';
+  }
+
   /** is this gate open now? */
   gateOpen(id: string) {
     return !!this.gates.get(id)?.open;

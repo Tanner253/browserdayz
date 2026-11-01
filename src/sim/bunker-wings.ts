@@ -1,8 +1,9 @@
 // Level 1's wings (the owner, 2026-11-01: "i expected lvl 1 bunker to be much larger and have a much better layout"; the plan, marketing/plan-level1.html): where people lived to
 // the west, where the work was to the east, command out front, and a passage round the old block so that no room is a dead end. The old block stands as it was, every room and
 // thing in it where it was: all this is laid round it, and its places for things come after all the others. It lies under the ground as it is, nothing of which is moved.
-// And the bolt-hole (the owner: "a 2nd entrance is under a locked hatch and ladder to lvl 1 from a nearby buildings basement"): cellar steps beside the camp's far barracks, a
-// cellar on no map, a hatch in its floor, and a ladder down to the floor of the generator hall. All in the bunker's own measure: r right of its middle, f forward of it.
+// And the bolt-hole (the owner: "a 2nd entrance is under a locked hatch and ladder to lvl 1 from a nearby buildings basement"): a trapdoor in the floor of the arms room of the
+// camp's far barracks, a ladder down to a cellar on no map, a steel hatch in its floor, and a ladder on down to the floor of the generator hall. Nothing of it shows outside.
+// All in the bunker's own measure: r right of its middle, f forward of it.
 
 /** a part of it: a room when it has a `kind`, a passage when not. Its floor and ceiling over the level's floor, when they are not the level's own */
 export interface Area { r0: number; r1: number; f0: number; f1: number; kind?: string; name?: string; y?: number; top?: number; bare?: boolean; /** it lies under another part: it has its own walls, and is no part of the plan's */ under?: boolean }
@@ -35,7 +36,7 @@ export const WING_AREAS: Area[] = [
   { r0: 23, r1: 52, f0: 2, f1: 5 }, { r0: 23, r1: 52, f0: -14, f1: -11 }, { r0: 23, r1: 52, f0: 22, f1: 25 },
   { r0: -6, r1: 6, f0: 17.5, f1: 36 }, { r0: -20.5, r1: -6, f0: 24, f1: 27 }, { r0: 6, r1: 20.5, f0: 24, f1: 27 },
   // the bolt-hole: the cellar under the steps, and the drift at the ladder's foot, through to the hall's floor
-  { r0: 55, r1: 61.5, f0: 2, f1: 10, kind: 'stores', name: 'Cellar' },
+  { r0: 52.6, r1: 61, f0: 2, f1: 10, kind: 'stores', name: 'Cellar' },
   { r0: 52, r1: 57.2, f0: 4.6, f1: 7.4, y: -3.8, top: -1.2, under: true },
 ];
 
@@ -44,17 +45,19 @@ export const WING_DOORS: [number, number, number?][] = [
   [-44, -14], [-29.5, -14], [-36, -21], [-44, -11], [-44, 2], [-29.5, 2], [-23, -4.5], [-44, 5], [-30, 5], [-23, 14], [-44, 22], [-30, 22], [-45, 25], [-30, 25], [-38, 30.5],
   [30, -14], [44.5, -14], [37, -21], [30, -11], [23, -4.5], [44.5, -11], [44.5, 2], [30, 5], [44.5, 5], [23, 14], [30, 22], [44.5, 22], [30, 25], [45, 25], [38, 30.5],
   [-20.5, 17], [20.5, 17], [-20.5, 31.5], [20.5, 31.5], [-6, 20], [6, 20], [-6, 31.5], [6, 31.5], [-13, 24], [13, 24], [-13, 27], [13, 27],
-  [60.2, 10], [52, 6, -3.8],
+  [52, 6, -3.8],
 ];
 
 /** how deep the generator hall's floor lies, and the walkway round it at the level's own floor: how wide */
 export const HALL_DEEP = 3.8, WALKWAY = 2.4;
 
 /**
- * The bolt-hole's fixed points. `steps`: the cellar steps, a flight beside the barracks rising from the cellar's back to the ground; `open`, where their roof ends and the ground is
- * cut for them. `hatch`: the steel plate in the cellar's floor, the ladder under it, the wheel beside it.
+ * The bolt-hole's fixed points. `trap`: the trapdoor in the barracks' arms room, at its floor's height over the level's, and the well under it down to the cellar. `hatch`: the
+ * steel plate in the cellar's floor, the ladder under it, the wheel beside it.
  */
-export const BOLT = { steps: { r0: 59, r1: 61.4, f0: 10, f1: 19, high: 3.3, open: 13 }, hatch: { r: 56, f: 6, half: 0.62 } };
+/** where the ladder up from Level 3 comes through the generator hall's floor */
+export const ESCAPE_HOLE = { r0: 39.88, r1: 41.12, f0: 7.63, f1: 8.87 };
+export const BOLT = { trap: { r: 53.6, f: 9, half: 0.6, high: 5.14 }, hatch: { r: 56, f: 6, half: 0.62 } };
 
 const inside = (a: Area, r: number, f: number, slack = 0) => r > a.r0 - slack && r < a.r1 + slack && f > a.f0 - slack && f < a.f1 + slack;
 
@@ -63,8 +66,8 @@ export const wingAt = (r: number, f: number, slack = 0) => WING_AREAS.findIndex(
 
 /** is a spot in the wings, the cellar steps or the shaft under the hatch? */
 export function inWings(r: number, f: number, slack = 0.6) {
-  const S = BOLT.steps, H = BOLT.hatch;
-  return WING_AREAS.some((a) => inside(a, r, f, slack)) || (r > S.r0 - slack && r < S.r1 + slack && f > S.f0 && f < S.open) || (Math.abs(r - H.r) < 1.2 && Math.abs(f - H.f) < 1.2);
+  const H = BOLT.hatch, W = BOLT.trap;
+  return WING_AREAS.some((a) => inside(a, r, f, slack)) || (Math.abs(r - H.r) < 1.2 && Math.abs(f - H.f) < 1.2) || (Math.abs(r - W.r) < 1.2 && Math.abs(f - W.f) < 1.2);
 }
 
 /** A stretch of wall, floor to ceiling, or from `y0` over the floor to `y1`. */
@@ -119,8 +122,8 @@ export function wingWalls(H: { r: number; back: number; front: number }): WingWa
   return out;
 }
 
-/** where the cellar steps open the ground, as the terrain's wells take such things. @param at the bunker's place */
+/** where the well under the trapdoor goes through the ground, under the barracks' floor, as the terrain's wells take such things. @param at the bunker's place */
 export function boltMouth(at: { x: number; z: number; rot: number }) {
-  const S = BOLT.steps, r = (S.r0 + S.r1) / 2, f = (S.open + S.f1) / 2, c = Math.cos(at.rot), n = Math.sin(at.rot);
-  return { cave: -1, x: at.x + r * c + f * n, z: at.z - r * n + f * c, rot: at.rot, hx: (S.r1 - S.r0) / 2 + 0.3, hz: (S.f1 - S.open) / 2 + 0.2, floor: 0 };
+  const W = BOLT.trap, c = Math.cos(at.rot), n = Math.sin(at.rot);
+  return { cave: -1, x: at.x + W.r * c + W.f * n, z: at.z - W.r * n + W.f * c, rot: at.rot, hx: W.half + 0.2, hz: W.half + 0.2, floor: 0 };
 }

@@ -444,6 +444,8 @@ export interface BuildingPlot {
   seed: number;
   /** how many of its loot points are kept stocked with something to fight with */
   arms?: number;
+  /** a well through its floor and foundation, in its own frame (the trapdoor down to the bunker's bolt-hole) */
+  trap?: { x: number; z: number; half: number };
   /** how far its foundation goes down under its floor, where it stands on ground that falls away (and a door the ground has dropped from has stairs) */
   under?: number;
 }

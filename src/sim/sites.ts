@@ -9,6 +9,7 @@ import { inMine, MINE } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, STOLOVAYA } from './outposts';
 import { DOOR, SHAFT, STATIONS, stationAt } from './train-line';
 import { BOLT } from './bunker-wings';
+import { ESCAPE, HALL3, STAIR_DOOR } from './bunker-deep';
 import { townPoint, type Town } from './towns';
 
 export type SitePhase = 'idle' | 'alarm' | 'spent';
@@ -25,6 +26,8 @@ export interface Site {
   /** where its crates are set down, in the town's frame: out in the world there is the one, in the strong room, with the next card in it; a level's has a locker as well, for the end of its time */
   crate: [number, number];
   locker?: [number, number];
+  /** on a level, how far over its floor its crates lie */
+  down?: number;
   /** how long there is, seconds (0: the door just opens), and how long the place is spent after it */
   hold: number;
   again: number;
@@ -74,8 +77,8 @@ const safe = () => clearIn(2, bunkerPlan(2).rooms.find((r) => r.kind === 'armour
 SITES.level2 = {
   town: GORODOK, name: 'Level 2', card: 'jerrycan', gives: 'card_black', level: 2, quiet: true,
   room: [plant().r, plant().f], reader: [plant().r, plant().f + plant().d / 2 + 0.7], crate: safe()[0], locker: safe()[1],
-  hold: 180, again: 1800, heard: 40,
-  wave: { every: 45, n: 5, most: 16, from: [0, 0] },
+  hold: 75, again: 1800, heard: 40,
+  wave: { every: 30, n: 5, most: 16, from: [0, 0] },
   // (the owner, 2026-10-31: "gas can be found on the same level floor where required for generator always and rewspawn 5 in intervals after collected")
   fuel: { at: [-1.2, -26.5], item: 'jerrycan', back: 300 },
   what: { use: 'Pour the jerrycan into the plant', doing: 'Filling the plant', none: 'The plant is dry. There is a jerrycan on this floor' },
@@ -83,14 +86,14 @@ SITES.level2 = {
 
 SITES.vault = {
   town: GORODOK, name: 'the vault', card: '', gives: 'night_vision', level: 3,
-  room: bunkerVault().room, reader: [bunkerVault().breaker[0], bunkerVault().breaker[1] + 1], crate: bunkerVault().clear[0], locker: bunkerVault().clear[1],
-  hold: 240, again: 3600, heard: 70,
-  wave: { every: 24, n: 9, most: 32, from: [0, 0] },
+  room: bunkerVault().room, reader: [bunkerVault().breaker[0], bunkerVault().breaker[1] - 1], crate: bunkerVault().clear[0], locker: bunkerVault().clear[1], down: HALL3.floor,
+  hold: 90, again: 3600, heard: 70,
+  wave: { every: 22, n: 9, most: 32, from: [0, 0] },
   what: { use: 'Throw the vault breaker', doing: 'Throwing the breaker', none: '' },
 };
 
 /** where each pass comes from, as a locked thing says it: nothing that stops you leaves you guessing */
-export const PASS_FROM: Record<string, string> = { card_blue: 'found on Level 1 of Bunker 17', card_yellow: 'from the strong room at Stolovaya', card_red: 'from the strong room at Bolotnaya', card_black: 'from the locker on Level 2', card_purple: 'from the strong room at the Kupol' };
+export const PASS_FROM: Record<string, string> = { card_blue: 'found on Level 1 of Bunker 17', card_yellow: 'from the strong room at Stolovaya', card_red: 'from the strong room at Bolotnaya', card_black: 'from the strong room on Level 2', card_purple: 'from the strong room at the Kupol' };
 
 /**
  * The way down in order, as the map tells it (the owner, 2026-10-31: "is it intuitive to the user what steps are required next"): each stop, what it asks and where it is.
@@ -102,7 +105,7 @@ export const WAY: { pass: string; name: string; say: string; x: number; z: numbe
   { pass: 'card_yellow', name: 'Bolotnaya', say: `Bolotnaya: scan the yellow pass and turn ${SITES.bolotnaya.steps!.at.length} valves in ${SITES.bolotnaya.hold / 60} minutes to open the room with the Level 2 keycard`, x: BOLOTNAYA.x, z: BOLOTNAYA.z },
   { pass: 'card_red', name: 'Bunker 17', say: 'Bunker 17: the Level 2 keycard opens the goods lift at the end of Level 1. On Level 2, pour a jerrycan into the plant', x: GORODOK.x, z: GORODOK.z },
   { pass: 'card_black', name: 'The Kupol', say: `The Kupol: scan the black pass and throw ${SITES.kupol.steps!.at.length} breakers in ${SITES.kupol.hold / 60} minutes to open the room with the Level 3 keycard`, x: KUPOL.x, z: KUPOL.z },
-  { pass: 'card_purple', name: 'Kupol station', say: 'The stair west of the Kupol: scan the Level 3 keycard at its foot and take the train', x: STATIONS[0].x + STATIONS[0].ux * SHAFT.top, z: STATIONS[0].z + STATIONS[0].vz * 6.5 },
+  { pass: 'card_purple', name: 'Kupol station', say: 'Level 3: scan the Level 3 keycard at the stair door on Level 2, or at the foot of the stair west of the Kupol and take the train', x: STATIONS[0].x + STATIONS[0].ux * SHAFT.top, z: STATIONS[0].z + STATIONS[0].vz * 6.5 },
 ];
 
 /** which of those somebody is at, by the furthest pass they carry */
@@ -112,7 +115,7 @@ export function wayStep(has: (id: string) => boolean) {
 }
 
 /** where a thing is said to be: on a level of the bunker, at [right, forward]; or on the ground of a town, at a place in its frame */
-export type Spot = { level: number; at: [number, number] } | { town: Town; at: [number, number] } | { place: [number, number, number] };
+export type Spot = { level: number; at: [number, number]; /** only from under this height over the pad */ under?: number } | { town: Town; at: [number, number] } | { place: [number, number, number] };
 const CABIN: [number, number] = [0, (CAB.back + CAB.front) / 2];
 
 /** A way shut until a pass is shown to it. How long it stays open, seconds; `keep`: the pass is shown and not cancelled. */
@@ -125,6 +128,10 @@ export const GATES: Record<string, Gate> = {
   // (the bolt-hole's hatch from under it: its wheel always turns, and on one circuit with the blast door it needs nothing from above. src/game/bolt.ts)
   bolt: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [BOLT.hatch.r, BOLT.hatch.f] }, open: 14, keep: true },
   train: { name: 'the station door', card: 'card_purple', at: { place: DOOR.reader }, open: 300 },
+  // (the other way into Level 3: the owner, "one from train tunnel underneath direct to bunker 3 and then one through bunker lvl 2". The same card, so the Kupol still has to be done)
+  stair: { name: 'the stair to Level 3', card: 'card_purple', at: { level: 2, at: STAIR_DOOR.reader }, open: 300 },
+  // (out of Level 3 by the top of its ladder: on one wheel like the bolt-hole's. Its height says Level 2, by `levelAt`)
+  escape: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [ESCAPE.r, ESCAPE.f], under: levelY(2) - 0.4 }, open: 14, keep: true },
 };
 
 /** A way from one place to another that a body is carried by, seconds on the way; shut with its `gate` */
@@ -137,9 +144,8 @@ export const RIDES: Record<string, Ride> = {
   // (out is by a bar on the inside: nobody is shut in)
   mine_out: { label: 'Out by the west gate', doing: 'Through the gate', secs: 2, from: { place: [MINE.x0 + 1.5, MINE.y, MINE.z] }, to: { town: MINE_W, at: [4, 0] } },
   mine_out_e: { label: 'Out by the east gate', doing: 'Through the gate', secs: 2, from: { place: [MINE.x1 - 1.5, MINE.y, MINE.z] }, to: { town: MINE_E, at: [4, 0] } },
-  // (off the platform by a bar on the inside: nobody is shut in. The train is the only way into Level 3, and the ladder the other way out of it)
+  // (off the platform by a bar on the inside: nobody is shut in)
   train_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, from: { place: DOOR.inside }, to: { place: DOOR.outside } },
-  ladder: { label: 'Climb the ladder', doing: 'Up the ladder', secs: 6, from: { level: 3, at: [0, BUNKER.hall.front - 1.4] }, to: { town: GORODOK, at: [18, 45] } },
 };
 
 /** where a spot is: x, z, and the height, or null where it is the ground's to say */
@@ -160,7 +166,7 @@ export function atSpot(s: Spot, P: Place | null, x: number, y: number, z: number
   if ('place' in s) return inMine(x, y, z) || stationAt(x, y, z) !== null;
   // (a level is only asked of the bunker: Bolotnaya's ground lies lower than its second)
   if (!('level' in s)) return !inMine(x, y, z);
-  return !!P && y < P.y - 1 && levelAt(y + 1 - P.y) === s.level;
+  return !!P && y < P.y - 1 && levelAt(y + 1 - P.y) === s.level && (s.under === undefined || y < P.y + s.under);
 }
 
 /** a site as a spot: its reader, or any other of its places */

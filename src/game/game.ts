@@ -126,7 +126,7 @@ import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
 import { FieldPosts } from '../world/posts';
 import { Cellars } from './cellars';
-import { bunkerCrates } from '../sim/bunker';
+import { ESCAPE, bunkerCrates, levelY } from '../sim/bunker';
 import { CastleSite } from '../world/castle';
 import { CASTLE_SCALE, inCastle } from '../sim/castle';
 import { WreckFire } from './wreck-fire';
@@ -455,6 +455,8 @@ export class Game {
   tunnel!: Tunnel;
   lift: GoodsLift | null = null;
   bolt: BoltHole | null = null;
+  /** the hatch of Level 3's way out, in the generator hall's floor */
+  escape: BoltHole | null = null;
   halls!: StationHall[];
   /** night vision (src/game/goggles.ts) */
   goggles = new Goggles();
@@ -571,6 +573,7 @@ export class Game {
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
     if (this.bunker.place) this.lift = new GoodsLift(r.scene, this.bunker.place, () => (Date.now() + this.net.clockOff) / 1000, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
     if (this.bunker.place) this.bolt = new BoltHole(r.scene, this.bunker.place, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
+    if (this.bunker.place) this.escape = new BoltHole(r.scene, this.bunker.place, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })), ESCAPE, levelY(2), false);
     this.player.carry = (next) => this.trainCar.carry(next) + (this.lift?.carry(next) ?? 0);
     this.director.ride = this.trainCar.ride;
     RemotePlayer.wagon = (l, out) => void this.trainCar.world(l, out);
@@ -899,7 +902,8 @@ export class Game {
       },
       impact: (surface, at, normal) => this.effects.impact(surface, at, normal, false),
     });
-    if (this.bolt) this.build.ladders.fixed.push(this.bolt.line);
+    if (this.bolt) this.build.ladders.fixed.push(...this.bolt.lines);
+    if (this.bunker.works) this.build.ladders.fixed.push(...this.bunker.works.ladders);
     this.forges = new ForgeView({
       scene: r.scene,
       online: () => this.online,

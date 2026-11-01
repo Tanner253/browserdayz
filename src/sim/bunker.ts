@@ -15,6 +15,7 @@
 // forward of its middle, forward being the way out (toward the middle of the map), and `y`
 // metres above the pad (the first level's floor is at -depth).
 
+import { DEEP, ESCAPE, HALL3, LEVEL3, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, deepLinks, deepPartAt, deepParts, deepWalls, inDeep, middle, type Deep, type DeepArea } from './bunker-deep';
 import { BOLT, HALL_DEEP, WING_AREAS, WING_DOORS, inWings, wingAt, wingWalls } from './bunker-wings';
 
 export { inWings };
@@ -102,7 +103,7 @@ export function liftAt(t: number) {
 export function bunkerDark(p: Place | null, x: number, y: number, z: number): number {
   if (!p) return 0;
   const B = BUNKER, [r, f, h] = bunkerLocal(p, x, y, z);
-  if ((Math.abs(r) > B.pit.r || f < B.pit.back || f > B.hut.front) && !inWings(r, f)) return 0;
+  if ((Math.abs(r) > B.pit.r || f < B.pit.back || f > B.hut.front) && !inWings(r, f) && !inDeep(r, f, h, levelY(2), levelY(3))) return 0;
   // (by how far down: nothing at the pad, all of it two metres and a half under)
   return Math.min(1, Math.max(0, (-h - 0.2) / 2.5));
 }
@@ -121,7 +122,7 @@ export function bunkerOutside(p: Place): [number, number, number] {
 export function inBunker(p: Place | null, x: number, y: number, z: number, slack = 0): boolean {
   if (!p) return false;
   const B = BUNKER, [r, f, h] = bunkerLocal(p, x, y, z);
-  return h < -1 && ((Math.abs(r) < B.hall.r + 0.6 && f > B.hall.back - 0.6 && f < B.hall.front + slack) || inWings(r, f));
+  return h < -1 && ((Math.abs(r) < B.hall.r + 0.6 && f > B.hall.back - 0.6 && f < B.hall.front + slack) || inWings(r, f) || inDeep(r, f, h, levelY(2), levelY(3)));
 }
 
 /**
@@ -156,11 +157,13 @@ export interface Room {
   doors: [number, number][];
   /** nothing is laid in it by rule: what it holds is its own (the generator hall, see `hallOfWings`) */
   bare?: boolean;
+  /** its floor over the level's */
+  y?: number;
 }
 /** a stretch of wall, floor to ceiling (or, a lintel: from `y0` above the floor up to it) */
 export interface Wall { r0: number; r1: number; f0: number; f1: number; y0?: number; y1?: number }
 /** something off a shelf of real things (a model the game has), stood in a room. `on`: heights above its own foot at which things are kept on it. */
-export interface Stood { id: string; r: number; f: number; rot: number; scale?: number; y?: number; on?: number[] }
+export interface Stood { id: string; r: number; f: number; rot: number; scale?: number; y?: number; on?: number[]; /** it stops a body: a box of the model's own size */ solid?: boolean }
 /** something made for the bunker: [what, where its middle is on the floor, which way it faces, its size across, deep and tall] */
 export interface Made { kind: 'locker' | 'generator' | 'tank' | 'console' | 'rack' | 'bench' | 'pillar' | 'bunk' | 'pipe' | 'duct' | 'sign' | 'grate' | 'cell' | 'mattress' | 'stripe' | 'stain' | 'scrawl'; r: number; f: number; rot: number; w: number; d: number; h: number; y?: number; text?: string; solid?: boolean; /** which of its kind it is: a pool of blood or what was dragged through one, white paint or red */ v?: number }
 export interface Spot { r: number; f: number; y: number; floor: boolean }
@@ -177,19 +180,34 @@ export interface Plan {
   sealed: [number, number];
   /** where the passage across lies along the main one */
   cross: number;
+  /** the plan's parts, rooms and passages both, where it was built by hand */
+  areas?: DeepArea[];
 }
 
 let made: Plan | null = null;
 const deeper: Plan[] = [];
 /** A level as it is laid out. (Worked out once: it is the same every time.) */
 export function bunkerPlan(level = 1): Plan {
-  if (level > 1) return (deeper[level] ??= inPatches(apart(layOut(BUNKER.seed, level), level), level));
+  if (level > 1) return (deeper[level] ??= inPatches(apart(layOut(BUNKER.seed, level, deepShape(DEEP[level], level)), level), level));
   return (made ??= letOut(layOut(BUNKER.seed)));
 }
 
 /** the wings of Level 1, a plan of their own laid round it: see src/sim/bunker-wings.ts */
 let winged: Plan | null = null;
-export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, true), 4), 4, 85));
+export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, wingShape()), 4), 4, 85));
+
+/** a plan built by hand, as the rules take one: its parts, its ways through, its walls, and what it holds that no rule lays */
+interface Shape { areas: DeepArea[]; doors: [number, number, number?, number?, number?][]; walls: Wall[]; extra(stood: Stood[], made: Made[], spots: Spot[], lamps: Plan['lamps'], Y: number): void }
+const wingShape = (): Shape => ({ areas: WING_AREAS, doors: WING_DOORS, walls: wingWalls(BUNKER.hall), extra: hallOfWings });
+const deepShape = (d: Deep, level: number): Shape => ({
+  areas: d.areas, doors: d.doors, walls: deepWalls(d),
+  extra(stood, made, spots, lamps, Y) {
+    for (const t of d.stood) stood.push({ id: t.id, r: t.r, f: t.f, rot: t.rot, y: t.y, on: t.on, scale: t.scale, solid: t.solid });
+    for (const [r, f, y] of d.spots) spots.push({ r, f, y: Y + y, floor: true });
+    for (const [r, f, y, how] of d.lamps) lamps.push([r, f, Y + y, how]);
+    if (level === 2) made.push({ kind: 'generator', r: PLANT.r, f: PLANT.f, rot: 0, w: 3.6, d: 2, h: 2.1, y: PLANT.plinth });
+  },
+});
 
 /** the two outer walls of the first level cut where the passage across it comes to them, and on to the ring round it */
 function letOut(plan: Plan) {
@@ -211,8 +229,10 @@ function inPatches(plan: Plan, level: number, lit = 50) {
     const k = Math.imul(Math.round(a * 2) + 97, 2654435761) ^ Math.imul(Math.round(b * 2) + level * 131, 40503);
     return ((k ^ (k >>> 13)) >>> 0) % 100;
   };
-  plan.lamps = plan.lamps.map(([r, f, y]) => {
+  plan.lamps = plan.lamps.map(([r, f, y, how]) => {
     const q = plan.rooms.find((x) => r > x.r0 && r < x.r1 && f > x.f0 && f < x.f1);
+    // (what is set by hand in a level built by hand burns as it was set)
+    if (level <= LEVELS.last && (how ?? 0) >= 0 && DEEP[level]?.lamps.some(([a, b]) => a === r && b === f)) return [r, f, y, how];
     if (q?.bare || (level > LEVELS.last && q?.kind === 'mess')) return [r, f, y, 1];
     if (q) return [r, f, y, roll(q.r0, q.f0) < lit ? 1 : roll(r, f) < 25 ? 0.35 : 0];
     return [r, f, y, roll(Math.floor(r / 12), Math.floor(f / 12)) < lit + 5 ? 1 : 0];
@@ -232,8 +252,9 @@ function hallOfWings(stood: Stood[], made: Made[], spots: Spot[], lamps: Plan['l
   for (const [r, f] of [[33, 11], [38.5, 11], [44, 11], [33, 16.5], [38.5, 16.5], [44, 16.5]]) made.push({ kind: 'generator', r, f, rot: Math.PI / 2, w: 3.4, d: 2, h: 2.1, y: dy });
   for (const [r, f] of [[29, 8.5], [29, 13.5], [29, 18.5]]) made.push({ kind: 'tank', r, f, rot: 0, w: 1.3, d: 1.3, h: 2.6, y: dy });
   for (const [r, f] of [[51.2, 10.5], [51.2, 19]]) stood.push({ id: 'painted_wooden_cabinet', r, f, rot: -Math.PI / 2, y: dy });
-  // (the ladder out of the bolt-hole, flat to the far wall of its shaft)
+  // (the ladders of the bolt-hole, flat to the far walls of their wells: the one out of the hall's drift, and the two end to end from the cellar to the barracks' floor)
   stood.push({ id: 'bunker_ladder', r: BOLT.hatch.r, f: BOLT.hatch.f + BOLT.hatch.half - 0.1, rot: Math.PI, y: dy });
+  for (const y of [0, 2.6]) stood.push({ id: 'bunker_ladder', r: BOLT.trap.r, f: BOLT.trap.f + BOLT.trap.half - 0.1, rot: Math.PI, y });
   for (const [r, f] of [[35, 14], [40, 14], [46, 14.5], [29.5, 10]]) spots.push({ r, f, y: low, floor: true });
   for (const r of [27, 34, 41, 48]) for (const f of [7.5, 13.5, 19.5]) lamps.push([r, f, Y + BUNKER.tall - 0.25, 1]);
   void q;
@@ -261,24 +282,15 @@ function apart(plan: Plan, level: number) {
   return plan;
 }
 
-/** the deepest of Level 3's armouries: the vault */
-const vaultRoom = (rooms: Room[]) => rooms.filter((q) => q.kind === 'armoury').sort((a, b) => a.f0 - b.f0)[0];
+/** the vault, and what throws it: the room behind the round door, its breaker in vault control */
 export const bunkerVault = () => {
-  const plan = bunkerPlan(3), q = vaultRoom(plan.rooms), b = plan.stood.find((s) => s.id === 'breaker_box')!;
-  return { room: [(q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2] as [number, number], breaker: [b.r, b.f] as [number, number], clear: clearIn(3, q) };
+  const q = LEVEL3.areas.find((a) => a.name === 'The vault')!;
+  return { room: middle(q), breaker: [0, 15.5] as [number, number], clear: [[0, 10], [0, 15.4]] as [[number, number], [number, number]], floor: HALL3.floor };
 };
+export { ESCAPE, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt };
 
-/** what the rooms of the levels under the first are, by lot; the biggest is always the plant and the deepest in the armoury */
-const DEEP_ROOMS: Record<number, RoomKind[]> = {
-  2: ['medical', 'archive', 'control', 'cells', 'medical', 'stores', 'workshop', 'quarters', 'archive', 'washroom', 'cells', 'stores', 'medical', 'stores'],
-  3: ['armoury', 'cells', 'control', 'stores', 'armoury', 'archive', 'medical', 'stores', 'quarters', 'cells', 'washroom', 'stores', 'armoury', 'stores'],
-};
-const DEEP_WRITING: Record<number, string[]> = {
-  2: ['NO POWER NO LIGHT', 'FEED THE PLANT|CAN IN THE STORE', 'DO NOT WAKE THEM', 'BATCH 18 FAILED', 'THE CURE WAS NEVER HERE', 'COUNT YOUR ROUNDS'],
-  3: ['VAULT 17', 'NO LIFT DOWN HERE', 'LADDER BY THE FRONT WALL', 'THEY KEPT THE BEST', 'TRAIN WONT WAIT', 'ALL OF US VOLUNTEERED'],
-};
-
-function layOut(seed: number, level = 1, wings = false): Plan {
+function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
+  const wings = !!shape;
   const B = BUNKER, H = B.hall, T = 0.3, GAP = 0.95, Y = levelY(level);
   let s = seed >>> 0;
   const rnd = () => {
@@ -302,11 +314,11 @@ function layOut(seed: number, level = 1, wings = false): Plan {
     return l;
   };
   const cross = wings ? 0 : round(between(-12, -8));
-  if (wings) {
-    WING_AREAS.forEach((a) => {
-      if (a.kind) rooms.push({ kind: a.kind as RoomKind, name: a.name!, r0: a.r0, r1: a.r1, f0: a.f0, f1: a.f1, doors: WING_DOORS.filter(([r, f]) => r >= a.r0 && r <= a.r1 && f >= a.f0 && f <= a.f1).map(([r, f]) => [r, f]), bare: a.bare });
+  if (shape) {
+    shape.areas.forEach((a) => {
+      if (a.kind) rooms.push({ kind: a.kind as RoomKind, name: a.name!, r0: a.r0, r1: a.r1, f0: a.f0, f1: a.f1, doors: a.name === 'Cellar' ? [[BOLT.trap.r, BOLT.trap.f], [BOLT.hatch.r, BOLT.hatch.f]] : shape.doors.filter(([r, f]) => r >= a.r0 && r <= a.r1 && f >= a.f0 && f <= a.f1).map(([r, f]) => [r, f]), bare: a.bare, y: a.y });
     });
-    for (const w of wingWalls(H)) walls.push(w);
+    for (const w of shape.walls) walls.push(w);
   }
   // ---- the two passages: the main one from the door to the sealed door, and one across it
   const spineL = wings ? [] : [line('f', -B.passage, H.back, cross - B.across), line('f', -B.passage, cross + B.across, H.front)];
@@ -433,14 +445,6 @@ function layOut(seed: number, level = 1, wings = false): Plan {
       if (a.doors.length >= 3 || b.doors.length >= 3 || joined(a, b)) continue;
       if (join(a, b)) more++;
     }
-  }
-  // The same concrete floor over floor, so that every way through is where it is on the level above and the infected's ways
-  // are the same ways: what the rooms ARE is another matter, and from here on each level draws its own lots.
-  if (level > 1) {
-    s = (seed + level * 7919) >>> 0;
-    const biggest = [...rooms].sort((a, b) => area(b) - area(a))[0], far = [...rooms].filter((q) => q !== biggest && area(q) > 30).sort((a, b) => depth(b) - depth(a))[0];
-    const list = [...DEEP_ROOMS[level]];
-    for (const q of rooms) q.kind = q === biggest ? 'plant' : q === far ? 'armoury' : list.length ? list.splice(Math.floor(rnd() * Math.min(4, list.length)), 1)[0] : 'stores';
   }
   const count = new Map<RoomKind, number>();
   for (const q of rooms) {
@@ -808,6 +812,7 @@ function layOut(seed: number, level = 1, wings = false): Plan {
     for (const [dr, df] of q.doors) {
       // (in the wings, on whichever side of it the room is not: over the way in, from the passage)
       if (wings) {
+        if (q.name === 'Cellar') continue;
         const across = Math.abs(dr - q.r0) < 0.01 || Math.abs(dr - q.r1) < 0.01, out = across ? Math.sign(dr - cr) : Math.sign(df - cf);
         build('sign', across ? dr + out * (T / 2 + 0.02) : dr, across ? df : df + out * (T / 2 + 0.02), across ? (out > 0 ? Math.PI / 2 : -Math.PI / 2) : out > 0 ? 0 : Math.PI, 1.5, 0.02, 0.3, { y: 2.3, text: q.name.toUpperCase(), solid: false });
         continue;
@@ -843,17 +848,17 @@ function layOut(seed: number, level = 1, wings = false): Plan {
     if (w * d > 60) lamps.push([cr + (w > d ? w * 0.28 : 0), cf + (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0.3, 0, 0])], [cr - (w > d ? w * 0.28 : 0), cf - (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0, 0, 0])]);
   }
 
-  if (wings) {
-    hallOfWings(stood, builtList, spots, lamps, Y);
+  if (shape) {
+    shape.extra(stood, builtList, spots, lamps, Y);
     // (a big room is not lit by a lamp in its middle: a lamp every so far across its ceiling)
     for (const q of rooms) {
       if (q.bare || (q.r1 - q.r0) * (q.f1 - q.f0) < 110) continue;
       for (let r = q.r0 + 4; r < q.r1 - 2; r += 8) for (let f = q.f0 + 4; f < q.f1 - 2; f += 8) lamps.push([r, f, Y + B.tall - 0.25, 0]);
     }
     // (the passages: a lamp every so far, and now and then something left against a wall, or something to find)
-    const clear = (r: number, f: number) => !WING_DOORS.some(([a, b]) => Math.hypot(a - r, b - f) < 2.2);
-    for (const a of WING_AREAS) {
-      if (a.kind || a.y) continue;
+    const clear = (r: number, f: number) => !shape.doors.some(([a, b]) => Math.hypot(a - r, b - f) < 2.2);
+    for (const a of shape.areas) {
+      if (a.kind || a.y || a.hall || (a.top ?? B.tall) < 2) continue;
       const long = a.r1 - a.r0 > a.f1 - a.f0, len = long ? a.r1 - a.r0 : a.f1 - a.f0, cr = (a.r0 + a.r1) / 2, cf = (a.f0 + a.f1) / 2;
       for (let v = 3.5; v < len - 1; v += 7) lamps.push([long ? a.r0 + v : cr, long ? cf : a.f0 + v, Y + B.tall - 0.25, pick([0.4, 0, 0.3])]);
       for (let v = 5; v < len - 3; v += between(8, 13)) {
@@ -863,7 +868,7 @@ function layOut(seed: number, level = 1, wings = false): Plan {
       for (let v = 8; v < len - 2; v += 13) spots.push({ r: long ? a.r0 + v : cr, f: long ? cf : a.f0 + v, y: Y, floor: true });
     }
     for (const add of later) add();
-    return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, 0], cross };
+    return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, 0], cross, areas: shape.areas };
   }
 
   // ---- the passages: lamps down them, pipes and a duct along the ceiling, and what has been left standing about
@@ -894,7 +899,7 @@ function layOut(seed: number, level = 1, wings = false): Plan {
       return;
     }
   };
-  const say = DEEP_WRITING[level] ?? ['THE CURE IS BELOW', 'DO NOT OPEN|LEVEL 2', 'MASKS ON', 'THEY HEAR THE DOOR', 'BATCH 17 HOLDS', 'COUNT YOUR ROUNDS'];
+  const say = ['THE CURE IS BELOW', 'DO NOT OPEN|LEVEL 2', 'MASKS ON', 'THEY HEAR THE DOOR', 'BATCH 17 HOLDS', 'COUNT YOUR ROUNDS'];
   daub(-1, H.back + 2.6, say[0], 0);
   daub(1, H.back + 3.2, say[1], 1, 2.2);
   daub(1, H.front - 3.4, say[2], 0, 2.0);
@@ -921,14 +926,6 @@ function layOut(seed: number, level = 1, wings = false): Plan {
     side = -side;
   }
 
-  // (the vault's breaker, on the back wall of the deepest armoury: its panel is the model's +x, turned to look down the room at whoever comes in)
-  if (level === 3) {
-    const q = vaultRoom(rooms), cr = (q.r0 + q.r1) / 2;
-    const r = [cr, cr + 1.6, cr - 1.6, cr + 3, cr - 3].find((x) => !stood.some((s) => Math.hypot(s.r - x, s.f - (q.f0 + 0.5)) < 1.2) && !builtList.some((m) => m.solid !== false && Math.hypot(m.r - x, m.f - (q.f0 + 0.5)) < 1.2)) ?? cr;
-    stood.push({ id: 'breaker_box', r, f: q.f0 + 0.42, rot: -Math.PI / 2 });
-  }
-  // (the only way out of Level 3: a ladder up the front wall, flat to it, its width across the passage as the model's is across its x)
-  if (level === 3) stood.push({ id: 'bunker_ladder', r: 0, f: H.front - 0.45, rot: 0 });
   for (const add of later) add();
   return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, H.back], cross };
 }
@@ -947,13 +944,13 @@ export function bunkerCrates(p: Place): { kind: string; x: number; y: number; z:
   const out: { kind: string; x: number; y: number; z: number; rot: number }[] = [];
   for (let level = 1; level <= LEVELS.last; level++) {
     const plan = bunkerPlan(level);
-    const add = (kind: string | undefined, r: number, f: number, rot: number) => {
+    const add = (kind: string | undefined, r: number, f: number, rot: number, up = 0) => {
       if (!kind) return;
-      const [x, y, z] = bunkerAt(p, r, f, levelY(level));
+      const [x, y, z] = bunkerAt(p, r, f, levelY(level) + up);
       out.push({ kind, x, y, z, rot: p.rot + rot });
     };
-    for (const m of plan.made) add(SEARCHED[m.kind], m.r, m.f, m.rot);
-    for (const s of plan.stood) add(SEARCHED[s.id], s.r, s.f, s.rot);
+    for (const m of plan.made) add(SEARCHED[m.kind], m.r, m.f, m.rot, m.y);
+    for (const s of plan.stood) add(SEARCHED[s.id], s.r, s.f, s.rot, s.y);
   }
   // (the wings' after all of those: nothing already here is renumbered)
   const w = bunkerWings();
@@ -982,13 +979,10 @@ export function clearIn(level: number, q: Room): [[number, number], [number, num
   return [one, two];
 }
 
-/** where the infected of a site's waves are stood on a level: clear spots down the passages, [right, forward] */
-export function levelSpots(level: number): [number, number][] {
-  const H = BUNKER.hall, plan = bunkerPlan(level), out: [number, number][] = [];
-  const clear = (r: number, f: number) => !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.4) && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1 + Math.max(m.w, m.d) / 2);
-  for (let f = H.front - 4; f > H.back + 3; f -= 5) if (clear(0, f)) out.push([0, f]);
-  for (const r of [-15, -10, 10, 15]) if (clear(r, plan.cross)) out.push([r, plan.cross]);
-  return out;
+/** where the infected of a site's waves are stood on a level: clear spots down its halls and passages, [right, forward, height over the level] */
+export function levelSpots(level: number): [number, number, number][] {
+  if (level === 2) return [[0, -18, 0], [-20, -8, 0], [-34, -8, 0], [14.5, -8, 0], [-6, 13.5, 0], [6, 13.5, 0], [-8, -3, 0], [8, -3, 0]];
+  return [[-7, -18, HALL3.floor], [7, -13, HALL3.floor], [-6, 2, HALL3.floor], [6, 3, HALL3.floor], [-15, -16, 0], [15, -16, 0], [-14, 8, 0], [14, 8, 0]];
 }
 
 // ------------------------------------------------------------------ finding the way about it
@@ -1032,7 +1026,14 @@ export function bunkerWays(): Ways {
   const MAIN = n, LEFT = n + 1, RIGHT = n + 2, STAIR = n + 3, WORLD = n + 4, COURT = n + 5;
   const head = B.stair.foot + B.stair.run;
   const W0 = COURT + 1;
+  const D2 = W0 + WING_AREAS.length, P2 = deepParts(2), P3 = deepParts(3), D3 = D2 + P2.length, Y2 = levelY(2), Y3 = levelY(3);
   const part = (r: number, f: number, h: number): number => {
+    // (the deep levels first: a wing lies over them, and goes by the plan alone)
+    const deep = deepLevelAt(r, f, h, Y2, Y3);
+    if (deep) {
+      const parts = deep === 2 ? P2 : P3, k = deepPartAt(parts, r, f, h - 1 - (deep === 2 ? Y2 : Y3));
+      if (k >= 0) return (deep === 2 ? D2 : D3) + k;
+    }
     if (h <= -2) {
       const k = wingAt(r, f);
       if (k >= 0) return W0 + k;
@@ -1083,8 +1084,11 @@ export function bunkerWays(): Ways {
     });
   });
   ways.push({ a: LEFT, b: W0 + wingAt(-H.r - 1.2, plan.cross), r: -H.r - 0.25, f: plan.cross, nr: -1, nf: 0 }, { a: RIGHT, b: W0 + wingAt(H.r + 1.2, plan.cross), r: H.r + 0.25, f: plan.cross, nr: 1, nf: 0 });
+  // (the deep levels, and how each is got to from the other: the stair. The lift and the ladder are not for anything without a card or hands)
+  for (const w of deepLinks(2, P2)) ways.push({ ...w, a: D2 + w.a, b: D2 + w.b });
+  for (const w of deepLinks(3, P3)) ways.push({ ...w, a: D3 + w.a, b: D3 + w.b });
   // the first step from each part to each other, by the fewest doorways
-  const parts = W0 + WING_AREAS.length;
+  const parts = D3 + P3.length;
   const first: ({ way: Way; dir: 1 | -1 } | null)[][] = [];
   for (let from = 0; from < parts; from++) {
     const step: ({ way: Way; dir: 1 | -1 } | null)[] = new Array(parts).fill(null);
