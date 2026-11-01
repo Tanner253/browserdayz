@@ -444,6 +444,8 @@ export interface BuildingPlot {
   seed: number;
   /** how many of its loot points are kept stocked with something to fight with */
   arms?: number;
+  /** how far its foundation goes down under its floor, where it stands on ground that falls away (and a door the ground has dropped from has stairs) */
+  under?: number;
 }
 
 /** what stands at an outlying place */

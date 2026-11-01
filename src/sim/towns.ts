@@ -36,7 +36,7 @@ export interface Town {
   asIs?: boolean;
 }
 /** a building of a town, in the town's frame: `rot` turns its front (+z of its own) toward (sin, cos) */
-export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }
+export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** how far its foundation goes down under its floor, where the ground falls away under it */ under?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }
 
 
 /**

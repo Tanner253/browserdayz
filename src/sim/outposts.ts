@@ -65,15 +65,17 @@ const N = 0, S = PI;
 
 const BUILDINGS: Record<string, TownSpot[]> = {
   Gorodok: [
-    // (the men's quarters along the east of the yard, the motor pool beyond them, the decon tents by the way in, the gate)
-    { type: 'barracks', x: 38, z: 14, rot: Q },
-    { type: 'barracks', x: 53, z: 14, rot: Q },
-    { type: 'garage', x: 42, z: 40, rot: S },
-    { type: 'garage', x: 54, z: 40, rot: S },
-    { type: 'hut', x: 18, z: 48, rot: N },
-    { type: 'tent', x: -14, z: 36, rot: S },
-    { type: 'tent', x: -23, z: 36, rot: S },
-    { type: 'guardpost', x: 10, z: 60, rot: N },
+    // (the men's quarters along the east of the yard, the motor pool beyond them, the decon tents by the way in, the gate. The ground here is as it lies, and falls away
+    // across each: every floor stands just over the highest of the ground under it, on a foundation down to the lowest. The owner, 2026-11-01: "the town on top of the
+    // bunker some of the buildings are floating". `assets-src/_wf/me/gorodok-say.ts` measures them.)
+    { type: 'barracks', x: 38, z: 14, rot: Q, up: -0.32, under: 1.55 },
+    { type: 'barracks', x: 53, z: 14, rot: Q, up: -0.54, under: 1.5 },
+    { type: 'garage', x: 42, z: 40, rot: S, up: -0.72, under: 1.66 },
+    { type: 'garage', x: 54, z: 40, rot: S, up: -1.48, under: 3.24 },
+    { type: 'hut', x: 18, z: 48, rot: N, up: -0.08, under: 0.94 },
+    { type: 'tent', x: -14, z: 36, rot: S, up: -0.25, under: 1.4 },
+    { type: 'tent', x: -23, z: 36, rot: S, up: 0.16, under: 1.8 },
+    { type: 'guardpost', x: 10, z: 60, rot: N, up: 0.03, under: 0.8 },
   ],
   Stolovaya: [
     // (the observers' quarters, the instrument shop, the crew tent; and the guard post, its door to the reader, the strong room)

@@ -2355,14 +2355,14 @@ export class Buildings {
     const proud = bp.shell ? 0.06 : 0.08;
     if (bp.whole) {
       // (all of it is the model's: under it only a pad, for ground that falls away from its foot, as low as the model's own ground)
-      addBox('concrete', -hw - 0.04, hw + 0.04, -1.4, -bp.whole.lift - 0.03, -hd - 0.04, hd + 0.04, B);
+      addBox('concrete', -hw - 0.04, hw + 0.04, -(plot.under ?? 1.4), -bp.whole.lift - 0.03, -hd - 0.04, hd + 0.04, B);
       this.shells.push({ model: bp.whole.model, m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, -bp.whole.lift, 0)), solid: bp.whole.surface });
       bp.whole.doors.forEach((dr, k) => {
         const hinge = B.clone().multiply(new THREE.Matrix4().makeTranslation(dr.x, dr.y, dr.z)).multiply(new THREE.Matrix4().makeRotationY(dr.rot));
         this.doorSpecs.push({ m: hinge, w: dr.w, h: dr.h, id: `${plot.id}_door${k}`, open: rng.chance(0.4), swing: rng.chance(0.5) ? 1 : -1 });
       });
     } else {
-      addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
+      addBox('concrete', -hw - proud, hw + proud, -(plot.under ?? 1.4), -0.1, -hd - proud, hd + proud, B);
       // (where it has no wall of its own, its floor runs on to the middle of the wall that is there)
       addBox(bp.floor, joined.has('left') ? -hw - T * 0.5 : -hw + T * 0.5, joined.has('right') ? hw + T * 0.5 : hw - T * 0.5, -0.12, 0, joined.has('back') ? -hd - T * 0.5 : -hd + T * 0.5, joined.has('front') ? hd + T * 0.5 : hd - T * 0.5, B);
     }
@@ -2846,7 +2846,10 @@ export class Buildings {
         at.set(x, 0, z).applyMatrix4(o.F);
         foot = Math.min(foot, heightAt(this.world.heights, at.x, at.z) - at.y - 0.03);
       }
-      addBox('concrete', o.a - 0.22, o.b + 0.22, foot < -STEP_DOWN ? -0.14 : foot, -0.012, T / 2, T / 2 + 0.72, o.F, false);
+      const stairs = plot.under !== undefined && foot < -STEP_DOWN;
+      addBox('concrete', o.a - 0.22, o.b + 0.22, foot < -STEP_DOWN && !stairs ? -0.14 : foot, -0.012, T / 2, T / 2 + 0.72, o.F, stairs);
+      // (and from a door the ground has fallen away from, real stairs down to it)
+      if (stairs) for (let k = 0, top = -0.25; top > foot; k++, top -= 0.24) addBox('concrete', o.a - 0.22, o.b + 0.22, foot, top, T / 2 + 0.72 + k * 0.3, T / 2 + 1.02 + k * 0.3, o.F);
       if (!o.front || !(lived || plot.type === 'clinic' || plot.type === 'store')) continue;
       // and over the front one a little roof on two brackets
       const mid = (o.a + o.b) / 2, half = (o.b - o.a) / 2 + 0.42;

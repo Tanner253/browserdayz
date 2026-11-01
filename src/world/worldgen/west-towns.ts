@@ -109,7 +109,7 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
   const later = isLater(t) ? { later: true } : {};
   townBuildings(t).forEach((s, n) => {
     const [x, z] = townPoint(t, s.x, s.z);
-    out.buildings.push({ id: `${t.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: t.rot + s.rot, floorY: padY + (s.up ?? moundAt(t, s.x, s.z) + 0.3), seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
+    out.buildings.push({ id: `${t.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: t.rot + s.rot, floorY: padY + (s.up ?? moundAt(t, s.x, s.z) + 0.3), seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}), ...(s.under ? { under: s.under } : {}) });
     const [fw, fd] = BUILDING_FOOTPRINT[s.type], c = Math.cos(t.rot + s.rot), sn = Math.sin(t.rot + s.rot), reach = Math.hypot(fw, fd) / 2 + 2;
     for (let j = Math.floor((z - reach - net.z0) / CELL); j <= Math.ceil((z + reach - net.z0) / CELL); j++) for (let i = Math.floor((x - reach - net.x0) / CELL); i <= Math.ceil((x + reach - net.x0) / CELL); i++) {
       const dx = net.x0 + i * CELL - x, dz = net.z0 + j * CELL - z;
