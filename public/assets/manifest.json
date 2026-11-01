@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T22:31:10.456Z",
+ "generated": "2026-10-31T23:57:38.191Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14999,6 +14999,52 @@
     0.1
    ],
    "lods": []
+  },
+  "gondola_wagon": {
+   "url": "assets/models/gondola_wagon.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 470056,
+   "srcTris": 8695,
+   "tris": 8695,
+   "min": [
+    -6.7501,
+    0,
+    -1.6441
+   ],
+   "max": [
+    6.7501,
+    2.8183,
+    1.6441
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/gondola_wagon.glb",
+   "hiBytes": 945032,
+   "hiCard": 64
+  },
+  "diesel_shunter": {
+   "url": "assets/models/diesel_shunter.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 461868,
+   "srcTris": 6928,
+   "tris": 6928,
+   "min": [
+    -4.7526,
+    0,
+    -1.5781
+   ],
+   "max": [
+    4.7526,
+    4.339,
+    1.5781
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/diesel_shunter.glb",
+   "hiBytes": 1072632,
+   "hiCard": 64
   }
  }
 }

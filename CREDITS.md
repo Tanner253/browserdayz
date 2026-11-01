@@ -361,6 +361,10 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Made at its true size; textures capped at 1024; geometry compressed.
 - "Night vision" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.
   Changes made: Made at its true size; textures capped at 1024; geometry compressed.
+- "Open gondola wagon" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.
+  Changes made: Made at its true size; squared to its axes; textures capped at 2048; geometry compressed.
+- "Diesel shunter" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.
+  Changes made: Made at its true size; squared to its axes; textures capped at 2048; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -1094,6 +1094,16 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
     credit: { name: 'Freight boxcar', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Freight boxcar" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
+  gondola_wagon: {
+    dir: '../incoming/higgsfield/toys', file: 'gondola_wagon_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; squared to its axes; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Open gondola wagon', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Open gondola wagon" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  diesel_shunter: {
+    dir: '../incoming/higgsfield/toys', file: 'diesel_shunter_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; squared to its axes; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Diesel shunter', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Diesel shunter" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
   rail_track: {
     dir: '../incoming/higgsfield/toys', file: 'rail_track_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
