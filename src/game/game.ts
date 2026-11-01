@@ -699,7 +699,7 @@ export class Game {
         o.rotation.y = 0.5;
         this.s.r.scene.add(o);
         return o;
-      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.halls[0].doorOpen = open), line: () => this.trainCar.line(this.player.pos), has: (id) => this.inv.count(id) > 0,
+      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.halls[0].doorOpen = open), scene: r.scene, line: () => this.trainCar.line(this.player.pos), has: (id) => this.inv.count(id) > 0,
       doorAt: (i) => {
         const p = this.s.buildings.doors[i]?.pivot.position;
         return p ? [p.x, p.z] : null;

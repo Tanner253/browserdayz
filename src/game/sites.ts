@@ -30,6 +30,7 @@ export interface SiteHost {
   power(on: boolean): void;
   sealed(open: boolean): void;
   stationDoor(open: boolean): void;
+  scene: THREE.Scene;
   /** the train now: where it stands (-1 on the way), for how long, where it is bound, the shared clock, and whether this body is aboard */
   line(): { stop: number; left: number; bound: number; t: number; aboard: boolean };
   /** what lies at a site, stood where it lies */
@@ -44,7 +45,10 @@ const TOLD = 1500;
 
 const _at = new THREE.Vector3();
 
+const _card = new THREE.Vector3(), _way = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+
 export class Sites {
+  private swept = 0;
   private state = new Map<string, { phase: SitePhase; until: number; fuel: boolean; done: number[] }>();
   private gates = new Map<string, { open: boolean; until: number }>();
   private doors = new Map<number, string>();
@@ -90,6 +94,58 @@ export class Sites {
     if (m.phase === 'spent' && d < 120) this.h.note(`The locker at ${s.name} has opened`, 'good');
   }
 
+  /** A pass shown to a reader: its lamp comes on red and a beam sweeps the card held up to it, a beep, and when the server has it the lamp goes green (the owner, 2026-10-31). */
+  private scanFx: { at: THREE.Vector3; t: number; secs: number; green: number } | null = null;
+  private beam: THREE.Mesh | null = null;
+  private lamp: THREE.Mesh | null = null;
+
+  private scanning(spot: Parameters<typeof atSpot>[0], secs: number) {
+    const [x, y, z] = spotAt(spot, this.h.bunker()), me = this.h.feet();
+    this.beam ??= new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 1, 6), new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.lamp ??= new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff2a1a }));
+    this.h.scene.add(this.beam, this.lamp);
+    this.scanFx = { at: new THREE.Vector3(x, (y ?? me.y) + 1.22, z), t: 0, secs, green: 0 };
+    this.lamp.position.copy(this.scanFx.at);
+    (this.lamp.material as THREE.MeshBasicMaterial).color.set(0xff2a1a);
+    this.beam.visible = true;
+  }
+
+  /** once a frame, with the prompt */
+  private sweep(dt: number) {
+    const f = this.scanFx, beam = this.beam, lamp = this.lamp;
+    if (!f || !beam || !lamp) return;
+    f.t += dt;
+    const me = this.h.feet();
+    if (f.green) {
+      f.green -= dt;
+      if (f.green <= 0) {
+        this.h.scene.remove(beam, lamp);
+        this.scanFx = null;
+      }
+      return;
+    }
+    if (f.t > f.secs + 0.4 || Math.hypot(me.x - f.at.x, me.z - f.at.z) > 3) {
+      this.h.scene.remove(beam, lamp);
+      this.scanFx = null;
+      return;
+    }
+    const card = _card.set(me.x, me.y + 1.15 + Math.sin(f.t * 7) * 0.16, me.z).lerp(f.at, 0.2), len = card.distanceTo(f.at);
+    beam.position.copy(card).add(f.at).multiplyScalar(0.5);
+    beam.scale.set(1, len, 1);
+    beam.quaternion.setFromUnitVectors(_up, _way.copy(f.at).sub(card).normalize());
+  }
+
+  /** the pass went through */
+  private passed() {
+    const f = this.scanFx;
+    audio.click(2300, 0.45, 0.07, 0);
+    audio.click(3100, 0.45, 0.09, 0.1);
+    if (!f || !this.lamp || !this.beam) return;
+    f.green = 2.6;
+    this.beam.visible = false;
+    (this.lamp.material as THREE.MeshBasicMaterial).color.set(0x35ff6a);
+  }
+
   /** what the server says of a gate */
   onGate(m: Extract<S2C, { t: 'gate' }>) {
     this.gates.set(m.g, { open: m.open, until: performance.now() + m.left * 1000 });
@@ -105,6 +161,9 @@ export class Sites {
   /** the prompt at a reader, a gate or a ride, if one is near; and it is done if F has just gone down */
   prompt(free: boolean): string | null {
     const go = free && this.h.pressed('KeyF');
+    const stamp = performance.now(), dt = Math.min(0.1, (stamp - this.swept) / 1000);
+    this.swept = stamp;
+    this.sweep(dt);
     for (const [id, s] of Object.entries(SITES)) {
       if (s.steps && this.phase(id) === 'alarm') {
         const k = s.steps.at.findIndex((at, n) => !this.state.get(id)?.done.includes(n) && this.at(siteSpot(s, at), 1.9));
@@ -122,7 +181,13 @@ export class Sites {
       if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : 'The alarm is going'} · ${this.left(this.state.get(id)?.until)}</small>`;
       if (phase === 'spent') return `<small>Spent · back on line in ${this.left(this.state.get(id)?.until)}</small>`;
       if (s.card && !this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}, ${PASS_FROM[s.card]}`}</small>`;
-      if (go) this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? (s.card ? 6 : 3) : 2, s.card, () => this.h.send({ t: 'site', s: id }));
+      if (go) {
+        if (!s.what) this.scanning(siteSpot(s, s.reader), 2);
+        this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? (s.card ? 6 : 3) : 2, s.card, () => {
+          if (!s.what) this.passed();
+          this.h.send({ t: 'site', s: id });
+        });
+      }
       return `<kbd>F</kbd>${s.what?.use ?? `Scan the ${name}`}`;
     }
     for (const [id, g] of Object.entries(GATES)) {
@@ -130,7 +195,13 @@ export class Sites {
       const state = this.gates.get(id), name = ITEMS[g.card].name.toLowerCase();
       if (state?.open) return `<small>Open · ${this.left(state.until)}</small>`;
       if (!this.h.has(g.card)) return `<small>Locked. It scans a ${name}, ${PASS_FROM[g.card]}</small>`;
-      if (go) this.h.work(`Scanning the ${name}`, 2, g.card, () => this.h.send({ t: 'gate', g: id }));
+      if (go) {
+        this.scanning(this.at(g.at, 1.8) ? g.at : g.also!, 2);
+        this.h.work(`Scanning the ${name}`, 2, g.card, () => {
+          this.passed();
+          this.h.send({ t: 'gate', g: id });
+        });
+      }
       return `<kbd>F</kbd>Scan the ${name}`;
     }
     for (const [id, w] of Object.entries(RIDES)) {
