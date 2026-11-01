@@ -216,51 +216,6 @@ function stainPaint(v: number) {
   return stains.get(v)!;
 }
 
-/** words put on a wall with a brush by somebody in a hurry: `|` breaks the line; v 0 is whitewash, 1 red */
-const scrawls = new Map<string, THREE.CanvasTexture>();
-function scrawlPaint(text: string, v: number) {
-  const key = `${v}:${text}`;
-  if (!scrawls.has(key)) {
-    scrawls.set(key, painted(1024, 256, (g, rnd) => {
-      const rows = text.split('|');
-      const size = rows.length > 1 ? 104 : 136;
-      g.font = `900 ${size}px Impact, "Arial Black", "Arial Narrow", Arial, sans-serif`;
-      g.textBaseline = 'middle';
-      g.textAlign = 'center';
-      const ink = v === 1 ? '148, 24, 16' : '212, 206, 188';
-      rows.forEach((row, li) => {
-        const all = g.measureText(row).width, k = Math.min(1, 950 / all);
-        let x = 512 - (all * k) / 2;
-        const y = 132 + (li - (rows.length - 1) / 2) * size * 1.04;
-        for (const ch of row) {
-          const cw = g.measureText(ch).width * k;
-          g.save();
-          g.translate(x + cw / 2, y + (rnd() - 0.5) * size * 0.1);
-          g.rotate((rnd() - 0.5) * 0.13);
-          g.scale(k, 1 + (rnd() - 0.5) * 0.14);
-          g.fillStyle = `rgba(${ink}, ${(0.7 + rnd() * 0.22).toFixed(2)})`;
-          g.fillText(ch, 0, 0);
-          g.restore();
-          // (paint that ran)
-          if (ch !== ' ' && rnd() < 0.3) {
-            g.fillStyle = `rgba(${ink}, 0.55)`;
-            g.fillRect(x + cw * (0.25 + rnd() * 0.5), y + size * 0.28, 3 + rnd() * 3, 12 + rnd() * 46);
-          }
-          x += cw;
-        }
-      });
-      // (and what the years have taken off it)
-      g.globalCompositeOperation = 'destination-out';
-      for (let i = 0; i < 1100; i++) {
-        g.fillStyle = `rgba(0, 0, 0, ${(0.25 + rnd() * 0.6).toFixed(2)})`;
-        g.fillRect(rnd() * 1024, rnd() * 256, 2 + rnd() * 11, 1 + rnd() * 3);
-      }
-      g.globalCompositeOperation = 'source-over';
-    }, 77 + text.length * 13 + v, false));
-  }
-  return scrawls.get(key)!;
-}
-
 /** warning paint on a floor: yellow and black on the slant, scuffed by years of boots */
 let hazardTex: THREE.CanvasTexture | null = null;
 function hazardPaint() {
@@ -783,10 +738,6 @@ export class BunkerSite {
         }
         case 'stain': {
           part(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), onIt(`stain${m.v ?? 0}`, stainPaint(m.v ?? 0), 0.45), 0, 0.009, 0);
-          break;
-        }
-        case 'scrawl': {
-          part(new THREE.PlaneGeometry(w, h), onIt(`scrawl${m.v ?? 0}:${m.text ?? ''}`, scrawlPaint(m.text ?? '', m.v ?? 0), 0.9), 0, h / 2, 0.006);
           break;
         }
         case 'grate': {

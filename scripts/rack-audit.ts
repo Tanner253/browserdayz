@@ -184,7 +184,7 @@ for (const p of world.props) {
     const y0 = w.y0 ?? 0;
     return { obb: yawObb((w.r0 + w.r1) / 2, (y0 + Hh) / 2, (w.f0 + w.f1) / 2, 0, [-(w.r1 - w.r0) / 2, -(Hh - y0) / 2, -(w.f1 - w.f0) / 2], [(w.r1 - w.r0) / 2, (Hh - y0) / 2, (w.f1 - w.f0) / 2]), what: 'the bunker\'s wall' };
   });
-  const made = plan.made.filter((m) => m.solid !== false && !['sign', 'stain', 'stripe', 'scrawl', 'duct', 'pipe'].includes(m.kind) && !(m.y && m.y > 1.8))
+  const made = plan.made.filter((m) => m.solid !== false && !['sign', 'stain', 'stripe', 'mark', 'duct', 'pipe'].includes(m.kind) && !(m.y && m.y > 1.8))
     .map((m) => ({ obb: yawObb(m.r, m.y ?? 0, m.f, m.rot, [-m.w / 2, 0, -m.d / 2], [m.w / 2, m.h, m.d / 2], 1, [-0.01, -0.01, -0.01]), what: `a made ${m.kind}` }));
   const stood = plan.stood.flatMap((st) => {
     const sz = size(st.id);

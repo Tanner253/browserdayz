@@ -176,7 +176,7 @@ export interface Wall { r0: number; r1: number; f0: number; f1: number; y0?: num
 /** something off a shelf of real things (a model the game has), stood in a room. `on`: heights above its own foot at which things are kept on it. */
 export interface Stood { id: string; r: number; f: number; rot: number; scale?: number; y?: number; on?: number[]; /** it stops a body: a box of the model's own size */ solid?: boolean }
 /** something made for the bunker: [what, where its middle is on the floor, which way it faces, its size across, deep and tall] */
-export interface Made { kind: 'locker' | 'generator' | 'tank' | 'console' | 'rack' | 'bench' | 'pillar' | 'bunk' | 'pipe' | 'duct' | 'sign' | 'grate' | 'cell' | 'mattress' | 'stripe' | 'stain' | 'scrawl'; r: number; f: number; rot: number; w: number; d: number; h: number; y?: number; text?: string; solid?: boolean; /** which of its kind it is: a pool of blood or what was dragged through one, white paint or red */ v?: number }
+export interface Made { kind: 'locker' | 'generator' | 'tank' | 'console' | 'rack' | 'bench' | 'pillar' | 'bunk' | 'pipe' | 'duct' | 'sign' | 'grate' | 'cell' | 'mattress' | 'stripe' | 'stain' | 'mark'; r: number; f: number; rot: number; w: number; d: number; h: number; y?: number; text?: string; solid?: boolean; /** which of its kind it is: a pool of blood or what was dragged through one */ v?: number; /** a mark on a wall: turned over, and turned on the wall */ flip?: boolean; tilt?: number }
 export interface Spot { r: number; f: number; y: number; floor: boolean }
 export interface Plan {
   rooms: Room[];
@@ -222,7 +222,7 @@ const deepShape = (d: Deep, level: number): Shape => ({
       made.push({ kind: 'generator', r: PLANT.r, f: PLANT.f, rot: 0, w: 3.6, d: 2, h: 2.1, y: PLANT.plinth });
       made.push({ kind: 'sign', r: STAIR_DOOR.r, f: STAIR_DOOR.f + 0.16, rot: 0, w: 1.7, d: 0.02, h: 0.32, y: 2.3, text: 'LEVEL 3 STAIR', solid: false });
     }
-    for (const [r, f, rot, y, w, text, v] of d.written) made.push({ kind: 'scrawl', r, f, rot, w, d: 0.02, h: w / 4, y, text, v, solid: false });
+    for (const [r, f, rot, y, h, text, flip, tilt] of d.marks) made.push({ kind: 'mark', r, f, rot, w: 0, d: 0.02, h, y, text, flip, tilt, solid: false });
     d.stains.forEach(([r, f, y, size], k) => made.push({ kind: 'stain', r, f, rot: k * 1.7, w: size, d: size, h: 0, y, v: 2 * (k % 3), solid: false }));
   },
 });
@@ -915,26 +915,28 @@ function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
   for (const f of [H.back + 0.72, H.front - 1.05]) builtList.push({ kind: 'stripe', r: 0, f, rot: 0, w: 2.7, d: 1.0, h: 0.004, text: 'hazard', solid: false });
   for (let k = 0, f = H.back + 2.4; k < 3; k++, f += 3.2) builtList.push({ kind: 'stain', r: between(-0.3, 0.3), f, rot: between(-0.1, 0.1), w: 0.95, d: 3.5, h: 0, v: 1 + 2 * k, solid: false });
   builtList.push({ kind: 'stain', r: 0.25, f: H.back + 0.95, rot: 1.1, w: 1.9, d: 1.9, h: 0, v: 0, solid: false });
-  // What whoever was last down here wrote on the walls, in what paint they had: on a stretch of the main passage's
-  // wall with no way through it. (v 0: whitewash; 1: red.) Nothing is stood or hung where something is written.
-  const written: [number, number][] = [];
-  const daub = (side: number, want: number, text: string, v: number, wide = 2.6) => {
+  // What whoever was last down here left on the walls, spray paint and their hands: on a stretch of the main passage's
+  // wall with no way through it. Nothing is stood or hung there.
+  const written: [number, number][] = [], beside: [string, number][] = [['hand', 0.42], ['drag', 1], ['hands', 0.7], ['spatter', 0.9]];
+  const daub = (side: number, want: number, text: string, h: number, wide = 2.6) => {
     for (const off of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3, 3.5, -3.5]) {
       const f = want + off;
       if (f < H.back + wide / 2 + 0.3 || f > H.front - wide / 2 - 0.7 || Math.abs(f - cross) < B.across + wide / 2 + 0.3) continue;
       if (rooms.some((q) => q.doors.some(([dr, df]) => Math.abs(dr - side * B.passage) < 0.1 && Math.abs(df - f) < wide / 2 + 1.1)) || written.some(([s2, f2]) => s2 === side && Math.abs(f2 - f) < wide + 0.5)) continue;
-      builtList.push({ kind: 'scrawl', r: side * (B.passage - T / 2 - 0.004), f, rot: side > 0 ? -Math.PI / 2 : Math.PI / 2, w: wide, d: 0.02, h: wide / 4, y: 1.18, text, v, solid: false });
+      const [by, tall] = beside[written.length % beside.length], mark = (at: number, y: number, what: string, high: number) => builtList.push({ kind: 'mark', r: side * (B.passage - T / 2 - 0.004), f: at, rot: side > 0 ? -Math.PI / 2 : Math.PI / 2, w: 0, d: 0.02, h: high, y, text: what, solid: false });
+      mark(f - 0.2, 1.1, text, h);
+      mark(f + 0.75, 1.45 - tall, by, tall);
       written.push([side, f]);
       return;
     }
   };
-  const say = ['THE CURE IS BELOW', 'DO NOT OPEN|LEVEL 2', 'MASKS ON', 'THEY HEAR THE DOOR', 'BATCH 17 HOLDS', 'COUNT YOUR ROUNDS'];
-  daub(-1, H.back + 2.6, say[0], 0);
-  daub(1, H.back + 3.2, say[1], 1, 2.2);
-  daub(1, H.front - 3.4, say[2], 0, 2.0);
-  daub(-1, cross + 5.5, say[3], 1);
-  daub(1, cross - 5.5, say[4], 0, 2.4);
-  daub(-1, cross - 6.5, say[5], 0);
+  // (the arrow is the way down, to the far door)
+  daub(-1, H.back + 2.6, 'arrow', 0.6);
+  daub(1, H.back + 3.2, 'cross', 0.9, 2.2);
+  daub(1, H.front - 3.4, 'trefoil', 0.85, 2.0);
+  daub(-1, cross + 5.5, 'eye', 0.6);
+  daub(1, cross - 5.5, 'skull', 0.9, 2.4);
+  daub(-1, cross - 6.5, 'tally', 0.6);
   const kept = (side: number, f: number) => written.some(([s2, f2]) => s2 === side && Math.abs(f2 - f) < 2.1);
   for (let f = H.front - 5; f > H.back + 3; f -= between(5, 9)) {
     const side = rnd() < 0.5 ? -1 : 1, r = side * (B.passage - 0.5);
