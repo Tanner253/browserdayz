@@ -33,6 +33,8 @@ const card = (head: string, keys: string, kbd?: string) => `<span class="bc">${k
 
 export class LadderView {
   private lines: Line[] = [];
+  /** ladders that are part of the place and of nobody's base: the bolt-hole's */
+  fixed: Line[] = [];
   private t = 0;
   /** till the next creak of the rungs, s */
   private creakT = 0;
@@ -41,7 +43,7 @@ export class LadderView {
 
   /** the ladders near: every piece with a ladder's line, joined where one stands on another */
   private gather(at: THREE.Vector3) {
-    const all: Line[] = [];
+    const all: Line[] = this.fixed.filter((l) => Math.hypot(l.x - at.x, l.z - at.z) < 30);
     for (const b of this.store().near(at.x, at.z, 30)) {
       for (const p of b.pieces.values()) {
         const c = shapeOf(p.k).climb;

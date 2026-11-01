@@ -15,7 +15,7 @@ import { PILLBOX, POST_ROOM, postAt, postFoot, postYaw } from '../sim/posts';
 import type { Tier } from '../sim/tiers';
 import { watchtowerTier } from '../sim/watchtowers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
-import { bunkerAt, bunkerPlan, LEVELS, levelY } from '../sim/bunker';
+import { bunkerAt, bunkerPlan, bunkerWings, LEVELS, levelY } from '../sim/bunker';
 import { mineProps } from '../sim/mine';
 import { wreckUnder } from '../sim/bridge';
 import { LATER_TOWNS, TOWNS } from '../sim/towns';
@@ -1637,14 +1637,15 @@ export class Buildings {
       // (Level 2 and Level 3 are places apart, stocked over and above the first and sorted as such a place is, so each is of every kind the bunker keeps:
       // src/sim/apart.ts. Level 1's own mark is for what lies nowhere deeper: the blue pass, which is the way to the rest)
       const EVERY: Usage[] = ['Bunker', 'Lab', 'Military', 'Police', 'Medic', 'Hospital', 'Industrial', 'Hunting', 'Town', 'Village', 'Shop', 'Farm'];
-      const MARKS: Record<number, Usage[]> = { 1: ['Bunker', 'First'], 2: EVERY, 3: [...EVERY, 'Vault'] };
-      for (let level = 1; level <= LEVELS.last; level++) {
-      const plan = bunkerPlan(level), Y = levelY(level);
+      const MARKS: Record<number, Usage[]> = { 1: ['Bunker', 'First'], 2: EVERY, 3: [...EVERY, 'Vault'], 4: ['Bunker', 'First'] };
+      // (the fourth pass is Level 1's wings: after everything else, so that nothing already here is renumbered)
+      for (let level = 1; level <= LEVELS.last + 1; level++) {
+      const wing = level > LEVELS.last, plan = wing ? bunkerWings() : bunkerPlan(level), Y = levelY(wing ? 1 : level);
       const point = (r: number, f: number, y: number, floor: boolean, surf?: LootPoint['surf']) => {
         const [x, wy, z] = bunkerAt(at, r, f, y);
         // (on the floor a thing lies a finger over it, as everywhere; on a table or a shelf it lies ON it: that
         // finger, and a mess table whose top was taken to be a metre up, had things hanging in the air over them)
-        (level === 1 ? this.lootPoints : this.deepLoot).push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: MARKS[level], building: level === 1 ? 'bunker' : `bunker${level}`, floor, tier: 5, ...(surf ? { surf } : {}) });
+        (level === 1 ? this.lootPoints : this.deepLoot).push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: MARKS[level], building: level === 1 || wing ? 'bunker' : `bunker${level}`, floor, tier: 5, ...(surf ? { surf } : {}) });
       };
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));

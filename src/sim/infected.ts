@@ -18,7 +18,7 @@ import { MINE, mineSpots } from './mine';
 import { BUILDING_FOOTPRINT, bunkerPlace, onWorld, heightAt, type World } from '../world/worldgen';
 
 /** how far from the middle one may be said to be: the edge of the ground, and a little */
-import { BUNKER, bunkerAt, bunkerPlan, bunkerWays, levelY } from './bunker';
+import { BUNKER, bunkerAt, bunkerPlan, bunkerWays, bunkerWings, levelY } from './bunker';
 import { castleHomes } from './castle';
 import { caveLoot } from './pass';
 import { waterAt } from './water';
@@ -275,6 +275,18 @@ const WORKS_REACH = 62;
  * 2026-10-19: "i want the zombies to be all throughout the bunker not just sitting by the front door or in the center
  * halls"). The levels under the first are sealed: there is nowhere below to stand one.
  */
+export function wingSpots(world: World): Spot[] {
+  const P = bunkerPlace(world), plan = bunkerWings(), W = bunkerWays(), Y = levelY(1), out: Spot[] = [];
+  if (!P) return out;
+  const clear = (r: number, f: number) => !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.4) && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1 + Math.max(m.w, m.d) / 2);
+  for (const q of plan.rooms) {
+    if (q.bare || q.name === 'Cellar') continue;
+    const cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2, w = (q.r1 - q.r0) / 4, d = (q.f1 - q.f0) / 4;
+    for (const [r, f] of [[cr, cf], [cr + w, cf + d], [cr - w, cf - d]]) if (clear(r, f)) out.push([...bunkerAt(P, r, f, Y), W.part(r, f, Y + 1)]);
+  }
+  return out;
+}
+
 export function bunkerSpots(world: World, rooms = false, level = 1): Spot[] {
   const P = bunkerPlace(world);
   if (!P) return [];
@@ -416,6 +428,8 @@ export function infectedHomes(world: World): Home[] {
   // (and the levels under the first: asleep in their rooms, and more of them the deeper it goes)
   if (world.towns) homes.push({ x: MINE.hall.x, z: MINE.z, r: 120, n: mineSpots().length, inside: mineSpots(), still: true });
   if (bunker) for (const [level, n] of [[2, 9], [3, 12]]) homes.push({ x: bunker.x, z: bunker.z, r: 30, n, inside: bunkerSpots(world, true, level), bunker: true, still: true });
+  // (and Level 1's wings: in their own rooms, and put back only with the door shut, as the rest of the bunker's are)
+  if (bunker && wingSpots(world).length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: 16, inside: wingSpots(world), bunker: true, still: true });
   return homes.filter((h) => h.n > 0);
 }
 

@@ -11,7 +11,12 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Atmosphere } from './atmosphere';
 import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BUNKER, bunkerAt, bunkerPlan, inBunker, lampBurns, levelY, type Place, CAB, LEVELS, levelAt, type Plan } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, bunkerWings, inBunker, inWings, lampBurns, levelY, type Place, CAB, LEVELS, levelAt, type Plan } from '../sim/bunker';
+import { BOLT, HALL_DEEP, WALKWAY, WING_AREAS, wingAt, type Area } from '../sim/bunker-wings';
+
+/** how much of the world the wings' sheet of painted light covers, metres, and where it starts */
+const WING_SPAN = 128, WING_F0 = -40;
+type Block = (r0: number, r1: number, f0: number, f1: number, y0: number, y1: number, m: THREE.Material | THREE.Material[], o?: { solid?: boolean; shadow?: boolean; surface?: 'concrete' | 'metal'; whole?: boolean }) => { mesh: THREE.Mesh; collider: RAPIER.Collider | null };
 
 export function painted(w: number, h: number, draw: (g: CanvasRenderingContext2D, rnd: () => number) => void, seed: number, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -377,6 +382,7 @@ export class BunkerSite {
   private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number; level: number; battery: boolean }[] = [];
   /** the levels under the first, each drawn only with the eye on it */
   private deep = new Map<number, THREE.Group>();
+  private wings: THREE.Group | null = null;
   /** the painted light laid again, when Level 2's plant starts or stops */
   private repaint: () => void = () => {};
   /** the door at the passage's far end: it slides aside for the red pass (see the site's gate, src/sim/sites.ts) */
@@ -830,6 +836,38 @@ export class BunkerSite {
       furnish(plan, Y);
       hang(plan, level);
     }
+    // ---- and round the first level its wings: a plan of their own on the same floor (src/sim/bunker-wings.ts)
+    {
+      const wings = Object.assign(new THREE.Group(), { name: 'bunker wings', visible: false });
+      group.add(wings);
+      into = wings;
+      this.wings = wings;
+      const plan = bunkerWings(), Y = levelY(1), H = BOLT.hatch;
+      /** a slab over an area, open at the hatch where that lies in it */
+      const slab = (a: Area, y0: number, y1: number, m: THREE.Material) => {
+        if (!(H.r > a.r0 && H.r < a.r1 && H.f > a.f0 && H.f < a.f1)) return void block(a.r0, a.r1, a.f0, a.f1, y0, y1, m);
+        block(a.r0, H.r - H.half, a.f0, a.f1, y0, y1, m);
+        block(H.r + H.half, a.r1, a.f0, a.f1, y0, y1, m);
+        block(H.r - H.half, H.r + H.half, a.f0, H.f - H.half, y0, y1, m);
+        block(H.r - H.half, H.r + H.half, H.f + H.half, a.f1, y0, y1, m);
+      };
+      for (const a of WING_AREAS) {
+        const low = Y + (a.y ?? 0), top = Y + (a.top ?? B.tall);
+        slab(a, low - 0.3, low, floor);
+        slab(a, top, top + 0.3, inside);
+      }
+      for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), Y + (w.y1 ?? B.tall), inside);
+      // (the shaft from the cellar's floor to the drift's roof)
+      const shaftTop = Y, shaftFoot = Y - 1.2;
+      for (const s of [-1, 1]) {
+        block(H.r + s * H.half - 0.1, H.r + s * H.half + 0.1, H.f - H.half, H.f + H.half, shaftFoot, shaftTop, inside);
+        block(H.r - H.half, H.r + H.half, H.f + s * H.half - 0.1, H.f + s * H.half + 0.1, shaftFoot, shaftTop, inside);
+      }
+      this.hallOfWings(block, Y, steel);
+      this.cellarSteps(block, Y, floor, inside, steel, group);
+      furnish(plan, Y);
+      hang(plan, 1);
+    }
     into = group;
     // The fittings themselves are a model (a caged lamp out of the bunker pack), hung from the
     // ceiling upside down as it was made to stand; the boxes above are what is there until it has
@@ -865,16 +903,16 @@ export class BunkerSite {
     // be a bright point lighting nothing. Each lights the room or the passage it hangs in, and not the next through the wall.
     {
       const N = 512, R0 = -L.r - 3, span = 2 * L.r + 6, F0 = L.back - 1.5;
-      const px = (r: number) => ((r - R0) / span) * N, py = (f: number) => (1 - (f - F0) / span) * N;
       // (three levels side by side on one sheet, each room lit or not as its level has it. Level 2's is painted again when its plant starts: until then only the lamps of
       // its passages that burn at all do, on their batteries, red and low.)
       const sheet = (g: CanvasRenderingContext2D) => {
         g.globalCompositeOperation = 'source-over';
         g.fillStyle = '#000';
-        g.fillRect(0, 0, N * LEVELS.last, N);
+        g.fillRect(0, 0, N * (LEVELS.last + 1), N);
         g.globalCompositeOperation = 'lighter';
-        for (let level = 1; level <= LEVELS.last; level++) {
-          const plan = bunkerPlan(level), battery = level === 2 && !this.power;
+        for (let level = 1; level <= LEVELS.last + 1; level++) {
+          const wing = level > LEVELS.last, plan = wing ? bunkerWings() : bunkerPlan(level), battery = level === 2 && !this.power, S0 = wing ? WING_SPAN : span, R = wing ? -WING_SPAN / 2 : R0, F = wing ? WING_F0 : F0;
+          const px = (r: number) => ((r - R) / S0) * N, py = (f: number) => (1 - (f - F) / S0) * N;
           g.save();
           g.translate((level - 1) * N, 0);
           g.beginPath();
@@ -884,12 +922,13 @@ export class BunkerSite {
             if (how < 1) continue;
             if (battery && plan.rooms.some((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1)) continue;
             const q = plan.rooms.find((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1);
-            const [r0, r1, f0, f1] = q ? [q.r0, q.r1, q.f0, q.f1] : f > L.front ? [-S.half, S.half, L.front - 0.3, head] : Math.abs(r) > B.passage ? [-L.r, L.r, plan.cross - B.across, plan.cross + B.across] : [-B.passage, B.passage, L.back, L.front];
+            const passage = wing ? WING_AREAS[wingAt(r, f)] : null;
+            const [r0, r1, f0, f1] = q ? [q.r0, q.r1, q.f0, q.f1] : passage ? [passage.r0, passage.r1, passage.f0, passage.f1] : f > L.front ? [-S.half, S.half, L.front - 0.3, head] : Math.abs(r) > B.passage ? [-L.r, L.r, plan.cross - B.across, plan.cross + B.across] : [-B.passage, B.passage, L.back, L.front];
             g.save();
             g.beginPath();
             g.rect(px(r0), py(f1), px(r1) - px(r0), py(f0) - py(f1));
             g.clip();
-            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), (LAMP_POOL / span) * N);
+            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), (LAMP_POOL / S0) * N);
             for (const [at, c] of (battery ? [[0, 'rgb(150, 28, 18)'], [0.3, 'rgb(84, 14, 8)'], [0.65, 'rgb(30, 5, 3)'], [1, 'rgb(0, 0, 0)']] : [[0, 'rgb(255, 222, 164)'], [0.22, 'rgb(170, 140, 96)'], [0.55, 'rgb(74, 60, 40)'], [1, 'rgb(0, 0, 0)']]) as [number, string][]) grad.addColorStop(at, c);
             g.fillStyle = grad;
             g.fillRect(0, 0, N, N);
@@ -898,7 +937,7 @@ export class BunkerSite {
           g.restore();
         }
       };
-      const glow = painted(N * LEVELS.last, N, (g) => sheet(g), 1, false);
+      const glow = painted(N * (LEVELS.last + 1), N, (g) => sheet(g), 1, false);
       this.repaint = () => {
         sheet((glow.image as HTMLCanvasElement).getContext('2d')!);
         glow.needsUpdate = true;
@@ -913,12 +952,13 @@ export class BunkerSite {
         // (what stands above the ground is lit by the sky, not by these: it is all laid on a corner of the plan where nothing burns)
         let high = -Infinity;
         for (let i = 0; i < pos.count; i++) high = Math.max(high, v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix).y);
-        const level = [...this.deep].find(([, d]) => d === o.parent)?.[0] ?? (o.parent === group ? 1 : 0);
+        const level = o.parent === this.wings ? LEVELS.last + 1 : [...this.deep].find(([, d]) => d === o.parent)?.[0] ?? (o.parent === group ? 1 : 0);
         if (high <= under + 0.01 && level) {
           for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
-            uv1[i * 2] = ((v.x - R0) / span + level - 1) / LEVELS.last;
-            uv1[i * 2 + 1] = (v.z - F0) / span;
+            const wing = level > LEVELS.last;
+            uv1[i * 2] = ((wing ? (v.x + WING_SPAN / 2) / WING_SPAN : (v.x - R0) / span) + level - 1) / (LEVELS.last + 1);
+            uv1[i * 2 + 1] = wing ? (v.z - WING_F0) / WING_SPAN : (v.z - F0) / span;
           }
         }
         geo.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2));
@@ -968,6 +1008,64 @@ export class BunkerSite {
     const on = levelAt(eye.y - P.y);
     if (this.under) this.under.visible = on === 1 && ((near < OPEN_FROM && eye.y < P.y + 4) || inBunker(P, eye.x, eye.y, eye.z, 3) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1));
     for (const [level, g] of this.deep) g.visible = level === on;
+    if (this.wings) this.wings.visible = on === 1 && !!this.under?.visible || inWings(...bunkerLocal(P, eye.x, eye.y, eye.z).slice(0, 2) as [number, number], 12);
+  }
+
+  /**
+   * The generator hall's walkway, round all four sides at the level's own floor, the doors of the wings opening on to it; its rail; and two steel stairs down to the machines.
+   * The rail stops a body and nothing else of the hall's air does.
+   */
+  private hallOfWings(block: Block, Y: number, steel: THREE.Material) {
+    const a = WING_AREAS.find((q) => q.bare)!, W = WALKWAY, P = this.place!, deck = (r0: number, r1: number, f0: number, f1: number) => block(r0, r1, f0, f1, Y - 0.12, Y, steel, { surface: 'metal' });
+    deck(a.r0, a.r1, a.f0, a.f0 + W);
+    deck(a.r0, a.r1, a.f1 - W, a.f1);
+    deck(a.r0, a.r0 + W, a.f0 + W, a.f1 - W);
+    deck(a.r1 - W, a.r1, a.f0 + W, a.f1 - W);
+    const r0 = a.r0 + W, r1 = a.r1 - W, f0 = a.f0 + W, f1 = a.f1 - W, S = 1.5, RUN = 7;
+    /** a rail along a line of the deck's inner edge */
+    const rail = (ra: number, fa: number, rb: number, fb: number) => {
+      block(Math.min(ra, rb) - 0.03, Math.max(ra, rb) + 0.03, Math.min(fa, fb) - 0.03, Math.max(fa, fb) + 0.03, Y + 1, Y + 1.06, steel, { solid: false });
+      block(Math.min(ra, rb) - 0.02, Math.max(ra, rb) + 0.02, Math.min(fa, fb) - 0.02, Math.max(fa, fb) + 0.02, Y + 0.5, Y + 0.54, steel, { solid: false });
+      const len = Math.hypot(rb - ra, fb - fa);
+      for (let k = 0; k <= Math.ceil(len / 2.4); k++) {
+        const t = k / Math.ceil(len / 2.4), r = ra + (rb - ra) * t, f = fa + (fb - fa) * t;
+        block(r - 0.03, r + 0.03, f - 0.03, f + 0.03, Y, Y + 1, steel, { solid: false });
+      }
+      const [x, y, z] = bunkerAt(P, (ra + rb) / 2, (fa + fb) / 2, Y + 0.55);
+      physics.addStatic(physics.R.ColliderDesc.cuboid(Math.abs(rb - ra) / 2 + 0.05, 0.55, Math.abs(fb - fa) / 2 + 0.05), 'metal', { x, y, z }, P.rot);
+    };
+    rail(r0 + S, f0, r1, f0);
+    rail(r0, f1, r1 - S, f1);
+    rail(r0, f0 + S, r0, f1);
+    rail(r1, f0, r1, f1 - S);
+    /** a steel stair from the deck's edge, `dir` the way it goes down along f */
+    const flight = (r: number, fa: number, dir: number) => {
+      const low = Y - HALL_DEEP, n = 12, rise = HALL_DEEP / n, run = RUN / n;
+      for (let k = 0; k < n; k++) {
+        const f = fa + dir * k * run, y = Y - k * rise;
+        block(r - S / 2, r + S / 2, Math.min(f, f + dir * run), Math.max(f, f + dir * run), y - rise - 0.05, y - rise, steel, { solid: false });
+      }
+      const c = (rr: number, ff: number, yy: number) => bunkerAt(P, rr, ff, yy);
+      const pts = [c(r - S / 2, fa, Y), c(r + S / 2, fa, Y), c(r - S / 2, fa + dir * RUN, low), c(r + S / 2, fa + dir * RUN, low), c(r - S / 2, fa, Y - 0.3), c(r + S / 2, fa, Y - 0.3), c(r - S / 2, fa + dir * RUN, low - 0.3), c(r + S / 2, fa + dir * RUN, low - 0.3)];
+      physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array(pts.flat()))!, 'metal', { x: 0, y: 0, z: 0 }, 0);
+      void low;
+    };
+    flight(r0 + S / 2, f0, 1);
+    flight(r1 - S / 2, f1, -1);
+  }
+
+  /** the cellar steps of the bolt-hole, from the cellar's back to the ground beside the far barracks: roofed as far as the ground comes, then an open cut with a kerb round it */
+  private cellarSteps(block: Block, Y: number, floor: THREE.Material, inside: THREE.Material, steel: THREE.Material, top: THREE.Group) {
+    const S = BOLT.steps, P = this.place!, n = 20, rise = S.high / n, run = (S.f1 - S.f0) / n, TH = 0.3, at = (f: number) => Y + ((f - S.f0) / (S.f1 - S.f0)) * S.high;
+    for (let k = 0; k < n; k++) block(S.r0, S.r1, S.f0 + k * run, S.f0 + (k + 1) * run, Y + k * rise - 0.3, Y + (k + 1) * rise, floor, { solid: false });
+    const c = (r: number, f: number, y: number) => bunkerAt(P, r, f, y);
+    physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array([c(S.r0, S.f0, Y), c(S.r1, S.f0, Y), c(S.r0, S.f1 + 0.6, at(S.f1 + 0.6)), c(S.r1, S.f1 + 0.6, at(S.f1 + 0.6)), c(S.r0, S.f0, Y - 0.6), c(S.r1, S.f0, Y - 0.6), c(S.r0, S.f1 + 0.6, at(S.f1 + 0.6) - 0.6), c(S.r1, S.f1 + 0.6, at(S.f1 + 0.6) - 0.6)].flat()))!, 'concrete', { x: 0, y: 0, z: 0 }, 0);
+    // (its walls, up past the ground at the kerb; the roof over the part still under it; the kerb stands out of the ground, and so is drawn from above as well)
+    const kerb = Y + S.high + 0.45, into = (m: THREE.Mesh) => void top.add(m);
+    for (const r of [S.r0 - TH, S.r1]) into(block(r, r + TH, S.f0, S.f1 + 0.3, Y, kerb, inside).mesh);
+    into(block(S.r0, S.r1, S.f0 + 0, S.open, Y + 2.5 + ((S.open - S.f0) / (S.f1 - S.f0)) * S.high, kerb, inside).mesh);
+    into(block(S.r0 - TH, S.r1 + TH, S.open - 0.3, S.open, Y + 2.2 + ((S.open - S.f0) / (S.f1 - S.f0)) * S.high, kerb + 0.5, inside).mesh);
+    into(block(S.r0 - 0.03, S.r1 + 0.03, S.f1 + 0.2, S.f1 + 0.3, kerb - 0.4, kerb - 0.3, steel, { solid: false }).mesh);
   }
 
   /** Level 2's plant, running or stopped. */

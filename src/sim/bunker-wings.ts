@@ -54,7 +54,7 @@ export const HALL_DEEP = 3.8, WALKWAY = 2.4;
  * The bolt-hole's fixed points. `steps`: the cellar steps, a flight beside the barracks rising from the cellar's back to the ground; `open`, where their roof ends and the ground is
  * cut for them. `hatch`: the steel plate in the cellar's floor, the ladder under it, the wheel beside it.
  */
-export const BOLT = { steps: { r0: 58.5, r1: 61, f0: 10, f1: 19, high: 5.2, open: 14.2 }, hatch: { r: 56, f: 6, half: 0.62 }, ladderOut: 1 };
+export const BOLT = { steps: { r0: 58.5, r1: 61, f0: 10, f1: 19, high: 4.9, open: 14.2 }, hatch: { r: 56, f: 6, half: 0.62 } };
 
 const inside = (a: Area, r: number, f: number, slack = 0) => r > a.r0 - slack && r < a.r1 + slack && f > a.f0 - slack && f < a.f1 + slack;
 
@@ -112,4 +112,10 @@ export function wingWalls(H: { r: number; back: number; front: number }): WingWa
     }
   }
   return out;
+}
+
+/** where the cellar steps open the ground, as the terrain's wells take such things. @param at the bunker's place */
+export function boltMouth(at: { x: number; z: number; rot: number }) {
+  const S = BOLT.steps, r = (S.r0 + S.r1) / 2, f = (S.open + S.f1) / 2, c = Math.cos(at.rot), n = Math.sin(at.rot);
+  return { cave: -1, x: at.x + r * c + f * n, z: at.z - r * n + f * c, rot: at.rot, hx: (S.r1 - S.r0) / 2 + 0.3, hz: (S.f1 - S.open) / 2 + 0.2, floor: 0 };
 }

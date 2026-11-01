@@ -8,6 +8,7 @@ import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, level
 import { inMine, MINE } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, STOLOVAYA } from './outposts';
 import { DOOR, SHAFT, STATIONS, stationAt } from './train-line';
+import { BOLT } from './bunker-wings';
 import { townPoint, type Town } from './towns';
 
 export type SitePhase = 'idle' | 'alarm' | 'spent';
@@ -115,12 +116,14 @@ export type Spot = { level: number; at: [number, number] } | { town: Town; at: [
 const CABIN: [number, number] = [0, (CAB.back + CAB.front) / 2];
 
 /** A way shut until a pass is shown to it. How long it stays open, seconds; `keep`: the pass is shown and not cancelled. */
-export interface Gate { name: string; card: string; at: Spot; also?: Spot; open: number; keep?: boolean }
+export interface Gate { name: string; card: string; at: Spot; also?: Spot; open: number; keep?: boolean; /** what is done at it, where it wants no card */ use?: string }
 export const GATES: Record<string, Gate> = {
   lift: { name: 'the goods lift', card: 'card_red', at: { level: 1, at: [BUNKER.door.half + 0.32, BUNKER.hall.back + 0.5] }, open: 1800 },
   // (it stays with whoever shows it: the yellow pass goes on to Bolotnaya, and the Pass is the long way round)
   mine: { name: 'the Old Mine', card: 'card_yellow', keep: true, at: { town: MINE_W, at: [2.6, 3.8] }, also: { town: MINE_E, at: [2.6, 3.8] }, open: 900 },
   // (the door at the foot of the Kupol's stair: while it stands open anybody can go through, and the train comes and goes by itself)
+  // (the bolt-hole's hatch from under it: its wheel always turns, and on one circuit with the blast door it needs nothing from above. src/game/bolt.ts)
+  bolt: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [BOLT.hatch.r, BOLT.hatch.f] }, open: 14, keep: true },
   train: { name: 'the station door', card: 'card_purple', at: { place: DOOR.reader }, open: 300 },
 };
 

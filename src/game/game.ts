@@ -105,6 +105,7 @@ import { MineSite } from '../world/mine';
 import { StationHall } from '../world/station';
 import { Tunnel } from '../world/tunnel';
 import { STATIONS, inTunnel, stationAt } from '../sim/train-line';
+import { BoltHole } from './bolt';
 import { GoodsLift } from './lift';
 import { TrainCar } from './train';
 import { Sites } from './sites';
@@ -453,6 +454,7 @@ export class Game {
   trainCar!: TrainCar;
   tunnel!: Tunnel;
   lift: GoodsLift | null = null;
+  bolt: BoltHole | null = null;
   halls!: StationHall[];
   /** night vision (src/game/goggles.ts) */
   goggles = new Goggles();
@@ -568,6 +570,7 @@ export class Game {
     this.tunnel = new Tunnel(atmo, r.scene);
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
     if (this.bunker.place) this.lift = new GoodsLift(r.scene, this.bunker.place, () => (Date.now() + this.net.clockOff) / 1000, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
+    if (this.bunker.place) this.bolt = new BoltHole(r.scene, this.bunker.place, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
     this.player.carry = (next) => this.trainCar.carry(next) + (this.lift?.carry(next) ?? 0);
     this.director.ride = this.trainCar.ride;
     RemotePlayer.wagon = (l, out) => void this.trainCar.world(l, out);
@@ -702,7 +705,7 @@ export class Game {
         o.rotation.y = 0.5;
         this.s.r.scene.add(o);
         return o;
-      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.halls[0].doorOpen = open), cab: () => this.lift?.cabFor(this.player.pos) ?? null, scene: r.scene, line: () => this.trainCar.line(this.player.pos), has: (id) => this.inv.count(id) > 0,
+      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.halls[0].doorOpen = open), bolted: () => this.bolt?.note(this.player.pos, this.bunker.open || this.sites.gateOpen('bolt')) ?? null, cab: () => this.lift?.cabFor(this.player.pos) ?? null, scene: r.scene, line: () => this.trainCar.line(this.player.pos), has: (id) => this.inv.count(id) > 0,
       doorAt: (i) => {
         const p = this.s.buildings.doors[i]?.pivot.position;
         return p ? [p.x, p.z] : null;
@@ -807,6 +810,7 @@ export class Game {
       changed: () => this.inventoryChanged(),
       bases: () => this.build.known,
     });
+    if (this.bolt) this.build.ladders.fixed.push(this.bolt.line);
     this.build = new Building({
       scene: r.scene,
       atmo,

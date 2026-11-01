@@ -30,6 +30,8 @@ export interface SiteHost {
   power(on: boolean): void;
   sealed(open: boolean): void;
   stationDoor(open: boolean): void;
+  /** what the bolt-hole's hatch says to whoever stands over it */
+  bolted(): string | null;
   /** the goods lift, for whoever is in its cab */
   cab(): { stop: number; left: number } | null;
   scene: THREE.Scene;
@@ -199,8 +201,12 @@ export class Sites {
     }
     for (const [id, g] of Object.entries(GATES)) {
       if (!this.at(g.at, 1.8) && !(g.also && this.at(g.also, 1.8))) continue;
-      const state = this.gates.get(id), name = ITEMS[g.card].name.toLowerCase();
+      const state = this.gates.get(id), name = g.card ? ITEMS[g.card].name.toLowerCase() : '';
       if (state?.open) return `<small>Open · ${this.left(state.until)}</small>`;
+      if (!g.card) {
+        if (go) this.h.send({ t: 'gate', g: id });
+        return `<kbd>F</kbd>${g.use}`;
+      }
       if (!this.h.has(g.card)) return `<small>Locked. It scans a ${name}, ${PASS_FROM[g.card]}</small>`;
       if (go) {
         this.scanning(this.at(g.at, 1.8) ? g.at : g.also!, 2);
@@ -216,6 +222,8 @@ export class Sites {
       if (go) this.h.work(w.doing, w.secs, '', () => this.h.send({ t: 'ride', w: id }));
       return `<kbd>F</kbd>${w.label}`;
     }
+    const bolted = this.h.bolted();
+    if (bolted) return bolted;
     // (you always know when the train is, on a platform and aboard it; and the lift, in its cab)
     const cab = this.h.cab();
     if (cab) return cab.stop ? `<small>The lift goes ${cab.stop === 1 ? 'down' : 'up'} in ${Math.ceil(cab.left)} s</small>` : `<small>Level ${cab.left < 0 ? 1 : 2}</small>`;
@@ -223,6 +231,11 @@ export class Sites {
     if (line.aboard) return line.stop >= 0 ? `<small>${STATIONS[line.stop].name} · leaves in ${clock(line.left)}</small>` : `<small>Next stop ${STATIONS[line.bound].name} · ${clock(line.left)}</small>`;
     if (st) return line.stop === st.stop ? `<small>The train is in · it leaves in ${clock(line.left)}</small>` : `<small>Next train in ${clock(untilAt(st.stop, line.t))}</small>`;
     return null;
+  }
+
+  /** is this gate open now? */
+  gateOpen(id: string) {
+    return !!this.gates.get(id)?.open;
   }
 
   private left(until = 0) {

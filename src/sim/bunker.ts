@@ -15,7 +15,7 @@
 // forward of its middle, forward being the way out (toward the middle of the map), and `y`
 // metres above the pad (the first level's floor is at -depth).
 
-import { HALL_DEEP, WING_AREAS, WING_DOORS, inWings, wingWalls } from './bunker-wings';
+import { BOLT, HALL_DEEP, WING_AREAS, WING_DOORS, inWings, wingAt, wingWalls } from './bunker-wings';
 
 export { inWings };
 
@@ -228,9 +228,11 @@ const old = (r: number, f: number) => Math.abs(r) < BUNKER.hall.r + 0.9 && f < B
  */
 function hallOfWings(stood: Stood[], made: Made[], spots: Spot[], lamps: Plan['lamps'], Y: number) {
   const q = WING_AREAS.find((a) => a.bare)!, low = Y - HALL_DEEP, dy = -HALL_DEEP;
-  for (const [r, f] of [[32, 11], [37.5, 11], [43, 11], [32, 17], [37.5, 17], [43, 17]]) made.push({ kind: 'generator', r, f, rot: Math.PI / 2, w: 3.4, d: 2, h: 2.1, y: dy });
-  for (const [r, f] of [[27.5, 8], [27.5, 13.5], [27.5, 19]]) made.push({ kind: 'tank', r, f, rot: 0, w: 1.3, d: 1.3, h: 2.6, y: dy });
-  for (const [r, f] of [[47.5, 10.5], [47.5, 19]]) stood.push({ id: 'painted_wooden_cabinet', r, f, rot: -Math.PI / 2, y: dy });
+  for (const [r, f] of [[33, 11], [38.5, 11], [44, 11], [33, 16.5], [38.5, 16.5], [44, 16.5]]) made.push({ kind: 'generator', r, f, rot: Math.PI / 2, w: 3.4, d: 2, h: 2.1, y: dy });
+  for (const [r, f] of [[29, 8.5], [29, 13.5], [29, 18.5]]) made.push({ kind: 'tank', r, f, rot: 0, w: 1.3, d: 1.3, h: 2.6, y: dy });
+  for (const [r, f] of [[51.2, 10.5], [51.2, 19]]) stood.push({ id: 'painted_wooden_cabinet', r, f, rot: -Math.PI / 2, y: dy });
+  // (the ladder out of the bolt-hole, flat to the far wall of its shaft)
+  stood.push({ id: 'bunker_ladder', r: BOLT.hatch.r, f: BOLT.hatch.f + BOLT.hatch.half - 0.1, rot: Math.PI, y: dy });
   for (const [r, f] of [[35, 14], [40, 14], [46, 14.5], [29.5, 10]]) spots.push({ r, f, y: low, floor: true });
   for (const [r, f] of [[28, 7.5], [37.5, 13.8], [47, 7.5], [37.5, 20]]) lamps.push([r, f, Y + BUNKER.tall - 0.25, 1]);
   void q;
@@ -1023,7 +1025,12 @@ export function bunkerWays(): Ways {
   const B = BUNKER, H = B.hall, plan = bunkerPlan(), n = plan.rooms.length;
   const MAIN = n, LEFT = n + 1, RIGHT = n + 2, STAIR = n + 3, WORLD = n + 4, COURT = n + 5;
   const head = B.stair.foot + B.stair.run;
+  const W0 = COURT + 1;
   const part = (r: number, f: number, h: number): number => {
+    if (h <= -2) {
+      const k = wingAt(r, f);
+      if (k >= 0) return W0 + k;
+    }
     // the stair's shaft below ground, and the hut over its head
     if (Math.abs(r) < B.hut.half && ((f > H.front - 0.15 && f < head + 0.5 && h < -0.6) || (f >= B.hut.back && f < B.hut.front))) return STAIR;
     // (the walled yard before the house's door: out of it is by its open side, not through its walls)
@@ -1054,8 +1061,24 @@ export function bunkerWays(): Ways {
   ways.push({ a: MAIN, b: STAIR, r: 0, f: H.front - 0.15, nr: 0, nf: 1, gate: true });
   ways.push({ a: STAIR, b: COURT, r: -0.24, f: B.hut.front, nr: 0, nf: 1 });
   ways.push({ a: COURT, b: WORLD, r: B.court.open * B.court.r, f: (B.hut.front + B.court.front) / 2 + 0.2, nr: B.court.open, nf: 0 });
+  // (the wings: the doors between their parts, the passages where they run into each other, and the old block's two ways out on to the ring)
+  for (const [r, f] of WING_DOORS) {
+    const across = wingAt(r - 0.4, f) !== wingAt(r + 0.4, f), [a, b] = across ? [wingAt(r - 0.4, f), wingAt(r + 0.4, f)] : [wingAt(r, f - 0.4), wingAt(r, f + 0.4)];
+    if (a >= 0 && b >= 0) ways.push({ a: W0 + a, b: W0 + b, r, f, nr: across ? 1 : 0, nf: across ? 0 : 1 });
+  }
+  WING_AREAS.forEach((p, i) => {
+    if (p.kind) return;
+    WING_AREAS.forEach((q, j) => {
+      if (j <= i || q.kind) return;
+      const lr = Math.max(p.r0, q.r0), hr = Math.min(p.r1, q.r1), lf = Math.max(p.f0, q.f0), hf = Math.min(p.f1, q.f1);
+      if (lr > hr || lf > hf || (lr === hr && lf === hf)) return;
+      const across = lr === hr;
+      ways.push({ a: W0 + i, b: W0 + j, r: (lr + hr) / 2, f: (lf + hf) / 2, nr: across ? Math.sign((q.r0 + q.r1) - (p.r0 + p.r1)) : 0, nf: across ? 0 : Math.sign((q.f0 + q.f1) - (p.f0 + p.f1)) });
+    });
+  });
+  ways.push({ a: LEFT, b: W0 + wingAt(-H.r - 1.2, plan.cross), r: -H.r - 0.25, f: plan.cross, nr: -1, nf: 0 }, { a: RIGHT, b: W0 + wingAt(H.r + 1.2, plan.cross), r: H.r + 0.25, f: plan.cross, nr: 1, nf: 0 });
   // the first step from each part to each other, by the fewest doorways
-  const parts = COURT + 1;
+  const parts = W0 + WING_AREAS.length;
   const first: ({ way: Way; dir: 1 | -1 } | null)[][] = [];
   for (let from = 0; from < parts; from++) {
     const step: ({ way: Way; dir: 1 | -1 } | null)[] = new Array(parts).fill(null);

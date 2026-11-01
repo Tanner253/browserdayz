@@ -12,7 +12,7 @@ import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GR
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
-import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelAt, levelY, type Place } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerLocal, inWings, bunkerWays, inBunker, levelAt, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
 import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, roundSpot, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
@@ -1008,6 +1008,7 @@ export class Horde {
     const P = this.bunker;
     if (!P) return;
     const H = BUNKER.hall, [r, f] = bunkerLocal(P, at.x, at.y, at.z);
+    if (inWings(r, f)) return;
     const [x, , z] = bunkerAt(P, THREE.MathUtils.clamp(r, -H.r + 1, H.r - 1), THREE.MathUtils.clamp(f, H.back + 1, H.front - 1));
     at.x = x;
     at.z = z;

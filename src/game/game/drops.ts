@@ -533,6 +533,7 @@ export const dropsMethods = {
     const onTrack = stationAt(cam.position.x, cam.position.y, cam.position.z) !== null || inTunnel(cam.position.x, cam.position.y, cam.position.z), train = this.trainCar.state();
     const stops = (at: { x: number; y: number; z: number }, burn: number) => this.lamps.glow(at as never, BUNKER_LAMP, burn * 1.2, 15);
     this.tunnel.update(cam.position, onTrack, stops);
+    this.bolt?.update(dt, this.bunker.open || this.sites.gateOpen('bolt'), cam.position);
     for (const h of this.halls) h.update(dt, cam.position, onTrack, train.stop === h.stop && train.left > 4, stops);
     // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
     // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace

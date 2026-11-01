@@ -7,7 +7,7 @@
 // breathing it does. The game draws it (src/world/atmosphere.ts, src/game/gas.ts) and takes
 // the health off (a survivor's health is their own game's to keep, as with a wound or thirst).
 
-import { BUNKER, bunkerAt, bunkerLocal, type Place } from './bunker';
+import { BUNKER, bunkerAt, bunkerLocal, type Place, inWings } from './bunker';
 import { bunkerPlace, heightAt, type World } from '../world/worldgen';
 
 export const GAS = {
@@ -103,7 +103,7 @@ export function cloudEdge(clouds: GasCloud[], x: number, z: number): number {
 export function bunkerUnder(p: Place | null, x: number, y: number, z: number): number {
   if (!p) return 0;
   const [r, f, h] = bunkerLocal(p, x, y, z);
-  return h < -0.8 && Math.abs(r) < BUNKER.hall.r + 1 && f > BUNKER.hall.back - 1 && f < BUNKER.stair.foot + BUNKER.stair.run + 1 ? BUNKER_GAS.under : 0;
+  return h < -0.8 && ((Math.abs(r) < BUNKER.hall.r + 1 && f > BUNKER.hall.back - 1 && f < BUNKER.stair.foot + BUNKER.stair.run + 1) || inWings(r, f)) ? BUNKER_GAS.under : 0;
 }
 
 /** where the gas lies in a world: over the place named in GAS, standing on the ground there */
