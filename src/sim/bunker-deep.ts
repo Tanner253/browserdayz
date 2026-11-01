@@ -213,8 +213,8 @@ export const LEVEL2: Deep = {
   ],
   lamps: [
     [-8.5, -8, 2.75, 1], [8.5, -8, 2.75, 1], [-8, -14.2, 2.75, 1], [8, -14.2, 2.75, 1], [0, -14.2, 2.75, 0.4], [0, -1.5, 2.75, 1],
-    [-6, 3.5, 3.15, 1], [6, 3.5, 3.15, 1], [-6, 12, 3.15, 1], [6, 12, 3.15, 1], [0, 13.5, 3.15, 0.4],
-    [-16.5, -15.5, 2.75, 1], [-27.5, -15.5, 2.75, 1], [-38.5, -15.5, 2.75, 0.3], [-16.5, -1.5, 2.75, 0.3],
+    [-6, 3.5, 3.15, 1], [6, 3.5, 3.15, 1], [-6, 12, 3.15, 1], [6, 12, 3.15, 1], [0, 13.5, 3.15, 0.4], [0, 8.5, 3.15, 1], [0, 2, 3.15, 1],
+    [-13.5, -15.5, 2.75, 1], [-19.5, -15.5, 2.75, 1], [-25, -15.5, 2.75, 1], [-30, -15.5, 2.75, 1], [-36, -15.5, 2.75, 0.3], [-41, -15.5, 2.75, 1], [-16.5, -1.5, 2.75, 0.3], [-25.5, -1.5, 2.75, 1],
     [-37.5, 1.2, 2.75, 1], [-37.5, -4.5, 2.75, 1], [-44, -1, 2.75, 0], [-31, -1, 2.75, 0.4], [-37.5, 7, 0.15, 0.3],
     [24, -20, 2.75, 1], [33, -20, 2.75, 0.4], [42, -20, 2.75, 1], [24, -10, 2.75, 1], [42, -10, 2.75, 0.3], [33, -5, 2.75, 1], [24, -1, 2.75, 0], [42, -1, 2.75, 1],
     [52, -14, 2.75, 0.3], [51, -2, -1.25, 0.3],
@@ -453,7 +453,8 @@ export const inDeep = (r: number, f: number, h: number, Y2: number, Y3: number) 
 /** where one deep level is seen from the other: through the glass floor from either side, and on the stair and at either end of it */
 export function bothLevels(r: number, f: number) {
   const G = GLASS_FLOOR, S = LEVEL3.areas.find((a) => a.name === 'The stair')!;
-  return inside({ r0: -13, r1: 13, f0: G.f0 - 12, f1: 8 }, r, f) || inside(S, r, f, 10);
+  // (from anywhere in the great hall the window in its roof is in sight, and from the observation room the hall through its floor)
+  return inside({ r0: -17.5, r1: 17.5, f0: -28.5, f1: 10.5 }, r, f) || inside({ r0: -11.5, r1: 11.5, f0: G.f0 - 4.5, f1: 0.5 }, r, f) || inside(S, r, f, 10);
 }
 
 export const WALL = 0.3;

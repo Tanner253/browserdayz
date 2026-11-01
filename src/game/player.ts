@@ -346,7 +346,8 @@ export class Player {
     const top = up > 0 && feet >= c.y1 + 0.06;
     const hx = c.x + c.nx * (RADIUS + 0.14), hz = c.z + c.nz * (RADIUS + 0.14), k = Math.min(1, 12 * h);
     const desired = top ? { x: -c.nx * 3 * h, y: 0.5 * h, z: -c.nz * 3 * h } : { x: (hx - t.x) * k, y: up * CLIMB_SPEED * h, z: (hz - t.z) * k };
-    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+    // (a ladder down a well goes through the ground's collider like any other way down it: physics.holes)
+    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, physics.through(t.x, t.z));
     const mv = this.kcc.computedMovement(), next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
     this.body.setNextKinematicTranslation(next);
     this.pos.set(next.x, next.y - this.half() - RADIUS, next.z);

@@ -57,7 +57,7 @@ export const HALL_DEEP = 3.8, WALKWAY = 2.4;
  */
 /** where the ladder up from Level 3 comes through the generator hall's floor */
 export const ESCAPE_HOLE = { r0: 39.88, r1: 41.12, f0: 7.63, f1: 8.87 };
-export const BOLT = { trap: { r: 53.6, f: 9, half: 0.6, high: 5.14 }, hatch: { r: 56, f: 6, half: 0.62 } };
+export const BOLT = { trap: { r: 53.2, f: 9, half: 0.6, high: 5.14 }, hatch: { r: 56, f: 6, half: 0.62 } };
 
 const inside = (a: Area, r: number, f: number, slack = 0) => r > a.r0 - slack && r < a.r1 + slack && f > a.f0 - slack && f < a.f1 + slack;
 
@@ -68,6 +68,12 @@ export const wingAt = (r: number, f: number, slack = 0) => WING_AREAS.findIndex(
 export function inWings(r: number, f: number, slack = 0.6) {
   const H = BOLT.hatch, W = BOLT.trap;
   return WING_AREAS.some((a) => inside(a, r, f, slack)) || (Math.abs(r - H.r) < 1.2 && Math.abs(f - H.f) < 1.2) || (Math.abs(r - W.r) < 1.2 && Math.abs(f - W.f) < 1.2);
+}
+
+/** is a spot in the cellar, or the well over it? It is on no map and behind no door: nobody is put out of it for the blast door standing shut */
+export function inCellar(r: number, f: number) {
+  const W = BOLT.trap;
+  return inside(WING_AREAS.find((a) => a.name === 'Cellar')!, r, f, 0.6) || (Math.abs(r - W.r) < 1.2 && Math.abs(f - W.f) < 1.2);
 }
 
 /** A stretch of wall, floor to ceiling, or from `y0` over the floor to `y1`. */

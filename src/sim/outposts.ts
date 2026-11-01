@@ -67,7 +67,7 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     // bunker some of the buildings are floating". `assets-src/_wf/me/gorodok-say.ts` measures them.)
     { type: 'barracks', x: 38, z: 14, rot: Q, up: -0.32, under: 1.55 },
     // (a trapdoor in the floor of its arms room, the way down to the bunker's bolt-hole: src/sim/bunker-wings.ts BOLT, in this building's own frame)
-    { type: 'barracks', x: 53, z: 14, rot: Q, up: -0.54, under: 1.5, trap: { x: 5, z: 0.6, half: 0.6 } },
+    { type: 'barracks', x: 53, z: 14, rot: Q, up: -0.54, under: 1.5, trap: { x: 5, z: 0.2, half: 0.6 } },
     { type: 'garage', x: 42, z: 40, rot: S, up: -0.72, under: 1.66 },
     { type: 'garage', x: 54, z: 40, rot: S, up: -1.48, under: 3.24 },
     { type: 'hut', x: 18, z: 48, rot: N, up: -0.08, under: 0.94 },

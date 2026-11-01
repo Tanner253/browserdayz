@@ -119,19 +119,19 @@ export type Spot = { level: number; at: [number, number]; /** only from under th
 const CABIN: [number, number] = [0, (CAB.back + CAB.front) / 2];
 
 /** A way shut until a pass is shown to it. How long it stays open, seconds; `keep`: the pass is shown and not cancelled. */
-export interface Gate { name: string; card: string; at: Spot; also?: Spot; open: number; keep?: boolean; /** what is done at it, where it wants no card */ use?: string }
+export interface Gate { name: string; card: string; at: Spot; also?: Spot; open: number; keep?: boolean; /** what is done at it, where it wants no card */ use?: string; /** it is on one circuit with the blast door, and opens that too (the owner: "both doors open together") */ blast?: boolean }
 export const GATES: Record<string, Gate> = {
   lift: { name: 'the goods lift', card: 'card_red', at: { level: 1, at: [BUNKER.door.half + 0.32, BUNKER.hall.back + 0.5] }, open: 1800 },
   // (it stays with whoever shows it: the yellow pass goes on to Bolotnaya, and the Pass is the long way round)
   mine: { name: 'the Old Mine', card: 'card_yellow', keep: true, at: { town: MINE_W, at: [2.6, 3.8] }, also: { town: MINE_E, at: [2.6, 3.8] }, open: 900 },
   // (the door at the foot of the Kupol's stair: while it stands open anybody can go through, and the train comes and goes by itself)
   // (the bolt-hole's hatch from under it: its wheel always turns, and on one circuit with the blast door it needs nothing from above. src/game/bolt.ts)
-  bolt: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [BOLT.hatch.r, BOLT.hatch.f] }, open: 14, keep: true },
+  bolt: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [BOLT.hatch.r, BOLT.hatch.f] }, open: 14, keep: true, blast: true },
   train: { name: 'the station door', card: 'card_purple', at: { place: DOOR.reader }, open: 300 },
   // (the other way into Level 3: the owner, "one from train tunnel underneath direct to bunker 3 and then one through bunker lvl 2". The same card, so the Kupol still has to be done)
   stair: { name: 'the stair to Level 3', card: 'card_purple', at: { level: 2, at: STAIR_DOOR.reader }, open: 300 },
   // (out of Level 3 by the top of its ladder: on one wheel like the bolt-hole's. Its height says Level 2, by `levelAt`)
-  escape: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [ESCAPE.r, ESCAPE.f], under: levelY(2) - 0.4 }, open: 14, keep: true },
+  escape: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [ESCAPE.r, ESCAPE.f], under: levelY(2) - 0.4 }, open: 14, keep: true, blast: true },
 };
 
 /** A way from one place to another that a body is carried by, seconds on the way; shut with its `gate` */

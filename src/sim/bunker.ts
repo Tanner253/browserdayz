@@ -16,9 +16,9 @@
 // metres above the pad (the first level's floor is at -depth).
 
 import { DEEP, ESCAPE, HALL3, LEVEL3, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, deepLinks, deepPartAt, deepParts, deepWalls, inDeep, middle, type Deep, type DeepArea } from './bunker-deep';
-import { BOLT, HALL_DEEP, WING_AREAS, WING_DOORS, inWings, wingAt, wingWalls } from './bunker-wings';
+import { BOLT, HALL_DEEP, WING_AREAS, WING_DOORS, inCellar, inWings, wingAt, wingWalls } from './bunker-wings';
 
-export { inWings };
+export { inWings, inCellar };
 
 export const BUNKER = {
   name: 'Bunker 17',

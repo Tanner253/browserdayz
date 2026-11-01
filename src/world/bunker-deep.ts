@@ -340,7 +340,8 @@ export class DeepWorks {
         const src = o as THREE.Mesh;
         if (!src.isMesh) return;
         const from = src.material as THREE.MeshStandardMaterial;
-        if (!kept.has(from)) kept.set(from, this.s.mat(from.clone() as THREE.MeshStandardMaterial));
+        // (the model's own word for its metal leaves it black with nothing to shine in down here)
+        if (!kept.has(from)) kept.set(from, this.s.mat(Object.assign(from.clone() as THREE.MeshStandardMaterial, { metalness: 0.25, roughness: 0.7 })));
         const mesh = new THREE.Mesh(inMetres(src), kept.get(from)!);
         mesh.rotation.y = Math.PI;
         mesh.position.y = -V.rad;

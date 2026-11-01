@@ -330,6 +330,8 @@ function byPaint(g: THREE.BoxGeometry, paints: THREE.Material[]): THREE.Material
 const LAMP_POOL = 7.5;
 /** and in a great hall, where it has further to come */
 const HALL_POOL = 11;
+/** and in the deep levels' rooms, which are bigger than the first's */
+const DEEP_POOL = 9.5;
 const LAMP_GLOW = 1.6;
 
 /**
@@ -955,7 +957,7 @@ export class BunkerSite {
             g.beginPath();
             g.rect(px(r0), py(f1), px(r1) - px(r0), py(f0) - py(f1));
             g.clip();
-            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), ((whole ? HALL_POOL : LAMP_POOL) / S0) * N);
+            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), ((whole ? HALL_POOL : wide && level <= LEVELS.last ? DEEP_POOL : LAMP_POOL) / S0) * N);
             for (const [at, c] of (battery ? [[0, 'rgb(150, 28, 18)'], [0.3, 'rgb(84, 14, 8)'], [0.65, 'rgb(30, 5, 3)'], [1, 'rgb(0, 0, 0)']] : [[0, 'rgb(255, 222, 164)'], [0.22, 'rgb(170, 140, 96)'], [0.55, 'rgb(74, 60, 40)'], [1, 'rgb(0, 0, 0)']]) as [number, string][]) grad.addColorStop(at, c);
             g.fillStyle = grad;
             g.fillRect(0, 0, N, N);
