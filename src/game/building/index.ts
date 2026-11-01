@@ -10,6 +10,8 @@
 // Online, what is built is the server's: this game shows what it says and asks it for what the player does. Alone,
 // this game's own store is the world's, by the same rules.
 
+import { doorsOf } from '../../sim/build/doors';
+import { shapeOf } from '../../sim/build/solids';
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio, buildRecordings } from '../../core/audio';
@@ -695,11 +697,34 @@ export class Building {
   private target(): { base: Base; id: number } | null {
     const cam = this.h.camera();
     cam.getWorldDirection(_dir);
-    const hit = physics.raycast(cam.getWorldPosition(new THREE.Vector3()), _dir, 3.2, SOLID_GROUPS, this.h.player());
+    const from = cam.getWorldPosition(new THREE.Vector3()), hit = physics.raycast(from, _dir, 3.2, SOLID_GROUPS, this.h.player());
     const ref = hit?.tag?.owner;
-    if (!(ref instanceof PieceRef)) return null;
+    if (!(ref instanceof PieceRef)) return this.doorway(from, hit?.toi ?? 3.2);
     const base = this.store.bases.get(ref.b);
     return base?.pieces.has(ref.p) ? { base, id: ref.p } : null;
+  }
+
+  /**
+   * A door that has rolled away is gone from sight and from the way, so what is looked at is the opening it shuts: F there brings it down, as in Rust (the owner, 2026-11-01: "i can
+   * still close the garage door right even after it dissapears?"). The aim is taken into the door's own frame, and asked whether it crosses the opening before it hits anything else.
+   */
+  private doorway(from: THREE.Vector3, reach: number): { base: Base; id: number } | null {
+    let best: { base: Base; id: number } | null = null, near = reach;
+    for (const base of this.store.bases.values()) {
+      if (Math.abs(base.ox - from.x) > 90 || Math.abs(base.oz - from.z) > 90) continue;
+      for (const p of doorsOf(base)) {
+        const leaf = shapeOf(p.k).leaves?.[0];
+        if (!p.open || !leaf?.rolls) continue;
+        const [wx, wy, wz] = toWorld(base, p.x, p.y, p.z), a = worldYaw(base, p.r), c = Math.cos(a), s = Math.sin(a), dx = from.x - wx, dz = from.z - wz;
+        const t = -(dx * s + dz * c) / (_dir.x * s + _dir.z * c);
+        if (!(t > 0) || t >= near) continue;
+        const x = dx * c - dz * s + (_dir.x * c - _dir.z * s) * t, y = from.y - wy + _dir.y * t;
+        if (Math.abs(x) > 1.2 || y < 0 || y > leaf.hinge[1]) continue;
+        near = t;
+        best = { base, id: p.id };
+      }
+    }
+    return best;
   }
 
   private hammerFrame(hammer: ItemInstance) {
