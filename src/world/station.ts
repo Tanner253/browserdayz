@@ -9,7 +9,7 @@ import { WORLD_GROUPS, physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
 import { painted } from './bunker';
 import { BORE_ARCH } from './tunnel';
-import { HALL, RIM, type Station } from '../sim/train-line';
+import { HALL, RIM, SHAFT, shaftFloor, type Station } from '../sim/train-line';
 
 /** how far under the platform the rails lie, and the bed under them */
 const RAILS = RIM + 1.4, BED = RAILS + 0.3;
@@ -29,6 +29,7 @@ export class StationHall {
   private gateBody;
   private shut = 0;
   private held = new THREE.Vector3();
+  private top = new THREE.Vector3();
   private buffers = false;
   get stop() {
     return this.t.stop;
@@ -37,6 +38,7 @@ export class StationHall {
   /** @param court the concourse behind the buffers, with a door at this far across (Level 3's): without one the hall just ends */
   constructor(atmo: Atmosphere, scene: THREE.Scene, private t: Station, court: number | null) {
     this.yaw = Math.atan2(-t.uz, t.ux);
+    this.top.set(...this.at(SHAFT.top, 6.5, SHAFT.high));
     const L = HALL.long, E = HALL.edge, B = HALL.back, F = HALL.far, T = HALL.tall, W = 0.6;
     const a0 = court === null ? -W : -COURT.deep, bMax = court === null ? B : COURT.wide;
     // (the platform, its walls, the track's bed and the roof)
@@ -48,7 +50,16 @@ export class StationHall {
     this.box(a0, L, F - W, F, -BED - 0.4, T, 'wall');
     this.box(0, L, E, E + 0.3, -0.03, 0.004, 'yellow', false);
     // (the end of the hall at the tunnel, round the bore: solid beside it and over it)
-    this.box(L, L + W, E + 1.28, B, -BED, T, 'wall');
+    if (court !== null) this.box(L, L + W, E + 1.28, B, -BED, T, 'wall');
+    else {
+      // (with a way through it at the platform's end, to the stair)
+      const S = SHAFT;
+      this.box(L, L + W, E + 1.28, S.b0, -BED, T, 'wall');
+      this.box(L, L + W, S.b1, B, -BED, T, 'wall');
+      this.box(L, L + W, S.b0, S.b1, S.tall, T, 'wall');
+      this.box(L, L + W, S.b0, S.b1, -BED, 0, 'floor');
+      this.shaft();
+    }
     this.box(L, L + W, F, -3, -BED, T, 'wall');
     this.box(L, L + W, -3, 3, -RAILS + 5.4, T, 'wall');
     // (the tiles to head height along both walls, and the pillars)
@@ -119,19 +130,80 @@ export class StationHall {
 
   /** a block of it, from corner to corner in the station's measure, tiled by its size in metres */
   private box(a0: number, a1: number, b0: number, b1: number, y0: number, y1: number, paint: Paint, solid = true) {
-    const w = a1 - a0, d = b1 - b0, h = y1 - y0, g = new THREE.BoxGeometry(w, h, d), pos = g.getAttribute('position'), nor = g.getAttribute('normal'), uv = g.getAttribute('uv');
+    const w = a1 - a0, d = b1 - b0, h = y1 - y0, g = new THREE.BoxGeometry(w, h, d), pos = g.getAttribute('position'), nor = g.getAttribute('normal'), uv = g.getAttribute('uv'), tile = paint === 'tile' ? 1.5 : 3;
     const [cx, cy, cz] = this.at((a0 + a1) / 2, (b0 + b1) / 2, (y0 + y1) / 2);
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i) + cx, y = pos.getY(i) + cy, z = pos.getZ(i) + cz;
-      if (Math.abs(nor.getY(i)) > 0.5) uv.setXY(i, x / 3, z / 3);
-      else if (Math.abs(nor.getX(i)) > 0.5) uv.setXY(i, z / 3, y / 3);
-      else uv.setXY(i, x / 3, y / 3);
+      if (Math.abs(nor.getY(i)) > 0.5) uv.setXY(i, x / tile, z / tile);
+      else if (Math.abs(nor.getX(i)) > 0.5) uv.setXY(i, z / tile, y / tile);
+      else uv.setXY(i, x / tile, y / tile);
     }
     g.rotateY(this.yaw);
     g.translate(cx, cy, cz);
     if (!this.bins.has(paint)) this.bins.set(paint, []);
     this.bins.get(paint)!.push(g);
     if (solid) physics.addStatic(physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2), paint === 'steel' ? 'metal' : 'concrete', { x: cx, y: cy, z: cz }, this.yaw);
+  }
+
+  /** a flat piece of it through four corners in the station's measure, facing the point given, tiled by its size in metres */
+  private quad(paint: Paint, corners: [number, number, number][], toward: [number, number, number]) {
+    const w = corners.map((c) => new THREE.Vector3(...this.at(...c))), t = new THREE.Vector3(...this.at(...toward)), mid = w[0].clone().add(w[2]).multiplyScalar(0.5);
+    let n = w[1].clone().sub(w[0]).cross(w[3].clone().sub(w[0])).normalize();
+    if (n.dot(t.sub(mid)) < 0) {
+      w.reverse();
+      n = n.negate();
+    }
+    const tile = paint === 'tile' ? 1.5 : 3, long = w[0].distanceTo(w[1]) / tile, high = w[0].distanceTo(w[3]) / tile, g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(w.flatMap((v) => [v.x, v.y, v.z]), 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(w.flatMap(() => [n.x, n.y, n.z]), 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, long, 0, long, high, 0, high], 2));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    if (!this.bins.has(paint)) this.bins.set(paint, []);
+    this.bins.get(paint)!.push(g);
+  }
+
+  /** something solid that is not square to the station: all its corners, in the station's measure */
+  private hull(corners: [number, number, number][]) {
+    physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array(corners.flatMap((c) => this.at(...c))))!, 'concrete', { x: 0, y: 0, z: 0 }, 0);
+  }
+
+  /** the long stair up to the ground, with lamps down a rail along its middle as a deep metro has: see SHAFT */
+  private shaft() {
+    const S = SHAFT, W = 0.3, F = shaftFloor, mid = (S.b0 + S.b1) / 2, n = 104, rise = S.high / n, run = (S.top - S.a0) / n, axis = (a: number): [number, number, number] => [a, mid, F(a) + 1.6];
+    // (the landing at its foot)
+    this.box(HALL.long + 0.6, S.a0, S.b0, S.b1, -0.4, 0, 'floor');
+    this.box(HALL.long + 0.6, S.a0, S.b0, S.b1, S.tall, S.tall + 0.3, 'wall');
+    for (const b of [S.b0 - W, S.b1]) this.box(HALL.long + 0.6, S.a0, b, b + W, 0, S.tall, 'tile');
+    // (its treads and risers, one ramp to walk on)
+    for (let k = 0; k < n; k++) {
+      const a = S.a0 + k * run, y = k * rise;
+      this.quad('floor', [[a, S.b0, y], [a, S.b1, y], [a, S.b1, y + rise], [a, S.b0, y + rise]], [a - 1, mid, y]);
+      this.quad('floor', [[a, S.b0, y + rise], [a, S.b1, y + rise], [a + run, S.b1, y + rise], [a + run, S.b0, y + rise]], [a, mid, y + 2]);
+    }
+    const under: [number, number, number][] = [[S.a0, S.b0, -1], [S.a0, S.b1, -1], [S.top + 0.5, S.b0, S.high - 1], [S.top + 0.5, S.b1, S.high - 1]];
+    this.hull([...under, [S.a0, S.b0, 0], [S.a0, S.b1, 0], [S.top + 0.5, S.b0, S.high], [S.top + 0.5, S.b1, S.high]]);
+    // (the rail down its middle, and its side walls: tiled to the height of a hand, plain over that, on up past the ground where the roof stops)
+    const a0 = S.a0, a1 = S.open, a2 = S.top, f1 = F(a1), top = S.high + 0.9;
+    for (const b of [S.b0, S.b1]) {
+      this.quad('tile', [[a0, b, 0], [a1, b, f1], [a1, b, f1 + 1.3], [a0, b, 1.3]], axis(50));
+      this.quad('wall', [[a0, b, 1.3], [a1, b, f1 + 1.3], [a1, b, f1 + S.tall], [a0, b, S.tall]], axis(50));
+      this.quad('tile', [[a1, b, f1], [a2, b, S.high], [a2, b, top], [a1, b, top]], axis(70));
+      const out = b === S.b0 ? b - W - 0.1 : b, wide = W + 0.1;
+      this.box(a0, a2 + 0.3, out, out + wide, -1, top, 'wall', true);
+    }
+    this.quad('wall', [[a0, S.b0, S.tall], [a1, S.b0, f1 + S.tall], [a1, S.b1, f1 + S.tall], [a0, S.b1, S.tall]], axis(50));
+    this.hull([[a0, S.b0, S.tall], [a0, S.b1, S.tall], [a1, S.b0, f1 + S.tall], [a1, S.b1, f1 + S.tall], [a0, S.b0, S.tall + 0.5], [a0, S.b1, S.tall + 0.5], [a1, S.b0, f1 + S.tall + 0.5], [a1, S.b1, f1 + S.tall + 0.5]]);
+    // (the end of its roof, standing out of the ground over the stair's mouth)
+    this.box(a1 - 1, a1, S.b0 - W - 0.1, S.b1 + W + 0.1, f1 + S.tall, S.high + 2.7, 'wall');
+    const rail: [number, number][] = [[-0.04, 0.05], [0.04, 0.05]];
+    for (const r of [0.95, 0.5]) for (const [d] of rail) this.quad('steel', [[a0, mid + d, r], [a2, mid + d, S.high + r], [a2, mid + d, S.high + r + 0.05], [a0, mid + d, r + 0.05]], [a0, d > 0 ? mid + 1 : mid - 1, r]);
+    this.hull([[a0, mid - 0.07, 0], [a0, mid + 0.07, 0], [a2, mid - 0.07, S.high], [a2, mid + 0.07, S.high], [a0, mid - 0.07, 1], [a0, mid + 0.07, 1], [a2, mid - 0.07, S.high + 1], [a2, mid + 0.07, S.high + 1]]);
+    for (let a = a0 + 2; a < a2; a += 4.5) {
+      const y = F(a);
+      this.box(a - 0.03, a + 0.03, mid - 0.03, mid + 0.03, y, y + 1.5, 'steel', false);
+      this.box(a - 0.1, a + 0.1, mid - 0.1, mid + 0.1, y + 1.5, y + 1.72, 'lamp', false);
+      this.lamps.push(new THREE.Vector3(...this.at(a, mid, y + 1.7)));
+    }
   }
 
   /** the wall round the tunnel's mouth, its opening the bore's own shape */
@@ -193,6 +265,15 @@ export class StationHall {
       g.fillText(sub, 512, 200);
     }, 1, false);
     const mat = atmo.register(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, metalness: 0.1 })), geo = new THREE.PlaneGeometry(3.2, 0.8);
+    if (!this.t.stop) {
+      // (and over the stair's mouth, for whoever comes across the hill)
+      const s = new THREE.Mesh(geo, mat), [x, h, z] = this.at(SHAFT.open + 0.02, (SHAFT.b0 + SHAFT.b1) / 2, SHAFT.high + 1.7);
+      s.position.set(x, h, z);
+      s.rotation.y = Math.atan2(this.t.ux, this.t.uz) + Math.PI;
+      s.rotation.y = Math.atan2(-this.t.ux, -this.t.uz);
+      s.scale.setScalar(1.3);
+      this.group.add(s);
+    }
     for (let a = 8.5; a < HALL.long - 2; a += 2 * PILLAR_EVERY) {
       for (const [b, y, face] of [[HALL.back - 0.05, 3, 1], [HALL.far + 0.05, 3, -1]] as const) {
         const s = new THREE.Mesh(geo, mat), [x, h, z] = this.at(a, b, y);
@@ -208,8 +289,10 @@ export class StationHall {
   update(dt: number, eye: THREE.Vector3, on: boolean, open: boolean, lit: (pos: THREE.Vector3, burn: number) => void) {
     this.shut = THREE.MathUtils.clamp(this.shut + (open ? dt : -dt) / GATE_TIME, 0, 1);
     this.gateBody.setEnabled(this.shut < 0.6);
-    this.group.visible = on;
-    if (!on) return;
+    // (the Kupol's stair is seen from the ground, down its open cut)
+    const up = !this.t.stop && Math.hypot(eye.x - this.top.x, eye.z - this.top.z) < 110;
+    this.group.visible = on || up;
+    if (!on && !up) return;
     if (!this.buffers) {
       this.buffers = true;
       // (its buffers look along its +z, here out along the track)

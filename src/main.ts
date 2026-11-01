@@ -25,6 +25,7 @@ import { Ocean } from './world/ocean';
 import { Waterways } from './world/water';
 import { waterAt } from './sim/water';
 import { caveMouths } from './sim/pass';
+import { STATION_MOUTHS } from './sim/train-line';
 import { caveLootPoints, inCave } from './world/caves-carved';
 import { PassCaves } from './world/caves';
 import { RockField } from './world/rock-field';
@@ -250,7 +251,7 @@ async function boot() {
   // (the mouths opened in the ground once the caves are built and solid: opened first, a body at a mouth, or one come
   // back to a cave, had no floor until the rock models had loaded)
   await caves.build({ carved: world.caves, heightTex: terrain.heightTex });
-  terrain.openWells(world.basements ?? [], caveMouths(passPlan));
+  terrain.openWells(world.basements ?? [], [...caveMouths(passPlan), ...STATION_MOUTHS]);
   // (and its walls' rock got ready as the outcrops' is: each of its lists empty until the eye comes near, none was in
   // the drawing of the world at the start, and the driver did its first work on each as somebody walked into the pass,
   // the card held in Present for 80 to 650 ms at a time; 2026-10-19, traced)

@@ -83,6 +83,15 @@ const station = (name: string, stop: number, end: number, way: 1 | -1, stands: n
   return { name, stop, end, way, x: p.x, y: p.y + RIM, z: p.z, ux: way * n, uz: way * c, vx: -c, vz: n, gate: Math.abs(stands - end) };
 };
 export const STATIONS: Station[] = [station('Kupol', 0, 1, 1, HEAD), station('Bunker 17', 1, LINE.length - 0.6, -1, HEAD + REACH)];
+/**
+ * The Kupol's way up: a long stair at thirty degrees from the far end of the platform to the ground, as a deep metro has, in the station's own measure. The ground stands
+ * some 21 m over the platform here. Its roof ends at `open`, where the ground comes down to it; from there to `top` it is an open cut with a wall round it.
+ */
+export const SHAFT = { a0: 36, top: 73.6, high: 21.7, open: 66.4, tall: 3.4, b0: 4, b1: 9 };
+export const shaftFloor = (a: number) => Math.max(0, Math.min(SHAFT.high, ((a - SHAFT.a0) / (SHAFT.top - SHAFT.a0)) * SHAFT.high));
+/** where it opens the ground, as the terrain's wells take such things */
+export const STATION_MOUTHS = [{ cave: -1, x: STATIONS[0].x + STATIONS[0].ux * 70.3, z: STATIONS[0].z + STATIONS[0].vz * 6.5, rot: 0, hx: 3.9, hz: 2.9, floor: 0 }];
+
 /** the tunnel proper, between the two halls */
 export const BORE = { from: 1 + HALL.long, to: LINE.length - 0.6 - HALL.long };
 
@@ -92,9 +101,10 @@ export const inFrame = (t: Station, x: number, z: number) => ({ a: (x - t.x) * t
 /** the station this point is in, if any */
 export function stationAt(x: number, y: number, z: number): Station | null {
   for (const t of STATIONS) {
-    if (y < t.y - 3.5 || y > t.y + HALL.tall + 1) continue;
+    if (y < t.y - 3.5 || y > t.y + SHAFT.high + 4) continue;
     const { a, b } = inFrame(t, x, z);
     if (a > -8 && a < HALL.long + 1 && b > HALL.far - 1 && b < (t.stop ? 30 : HALL.back + 1)) return t;
+    if (!t.stop && a >= HALL.long && a < SHAFT.top + 1 && b > SHAFT.b0 - 0.5 && b < SHAFT.b1 + 0.5 && y < t.y + shaftFloor(a) + SHAFT.tall + 1) return t;
   }
   return null;
 }
