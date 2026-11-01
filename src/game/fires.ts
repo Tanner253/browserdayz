@@ -66,6 +66,8 @@ export class Fires {
    * and how far it reaches (a campfire's: GLOW), from how dark (`dusk`: it begins, and it is so in full), and from
    * how far off the eye may be for it to be lit at all, when nothing burns nearer the eye.
    */
+  /** how far off the nearest torch on a wall is: heard as any fire is, and warming nobody */
+  torch = Infinity;
   readonly always: { at: THREE.Vector3; lamp?: { at: THREE.Vector3; strength: number; reach: number; from: number; dusk: [number, number] } }[] = [];
   /** what each is owed of smoke and of sparks, and the flames it has while it is near enough to be seen burning */
   private owed: { flame: number; smoke: number; fire?: Fire }[];
@@ -309,6 +311,7 @@ export class Fires {
     }
     // (and what burns for good is heard as a fireplace that is alight is: the nearest of them all)
     for (const s of this.always) nd = Math.min(nd, s.at.distanceTo(eye));
+    nd = Math.min(nd, this.torch);
     const on = nd < GLOW.from;
     if (glowing >= 0) {
       // The embers breathe with a fire's flicker (the nearest one's, where one is lit: every burning ring is

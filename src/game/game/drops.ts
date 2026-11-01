@@ -3,6 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import { inMine } from '../../sim/mine';
+import { TORCH_LIGHT } from '../../world/mine';
 import { DOOR } from '../../sim/train-line';
 import { inTunnel, stationAt } from '../../sim/train-line';
 import * as THREE from 'three';
@@ -533,7 +534,8 @@ export const dropsMethods = {
     this.halls[0].doorOpen = this.stationGate || Math.hypot(this.player.pos.x - DOOR.inside[0], this.player.pos.y - DOOR.inside[1], this.player.pos.z - DOOR.inside[2]) < 2.8;
     this.pumps.update(dt, cam.position, this.sites.turned('bolotnaya'), this.sites.spent('bolotnaya'));
     this.kupol.update(dt, cam.position, this.sites.turned('kupol'), this.sites.spent('kupol'), (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.6, far));
-    this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.1, 14), this.sites.gateOpen('mine'));
+    this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, TORCH_LIGHT, burn * 0.8, 8), this.effects.fire, this.sites.gateOpen('mine'));
+    this.fires.torch = this.oldMine.near;
     // the train's line: its tunnel, and the halls at its two ends, drawn from either
     const onTrack = stationAt(cam.position.x, cam.position.y, cam.position.z) !== null || inTunnel(cam.position.x, cam.position.y, cam.position.z), train = this.trainCar.state();
     const stops = (at: { x: number; y: number; z: number }, burn: number) => this.lamps.glow(at as never, BUNKER_LAMP, burn * 1.2, 15);

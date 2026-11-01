@@ -7,3 +7,5 @@
 - [ ] `assets-src/incoming/higgsfield/toys/radar_dome_uncut.glb`, `vault_door_raw*`, `radar_dish_raw*` | the cut and sized copies | 2026-11-01 | not in the repo, on this machine only
 - [ ] `Made` kind `generator` on Level 2 is hand-made shapes standing for a real thing; replace it with a model when the plant is next touched | CLAUDE.md, "real, downloaded models only" | 2026-11-01
 
+
+- The mine's bulbs (2026-11-01): gone with their sheet of pools; `TORCH_EVERY` in `src/world/mine.ts` is what lights it now. Nothing left to delete.
