@@ -526,6 +526,8 @@ export class Infected implements Damageable {
       }
       return true;
     }
+    // (Under the ground there are no buildings: a plot is only a place on the map, and one over Level 1's west hall drew them off to its door, up on the surface.)
+    if (this.horde.below(this.pos)) return this.walk(at.x, at.z, speed, dt);
     const there = this.horde.plotAt(at.x, at.z), here = this.horde.plotAt(this.pos.x, this.pos.z);
     // On another floor of the building it is in: by the stairs, to their near end and then along them.
     // (And upstairs with somewhere to be that is not in this building at all: down them first.)
