@@ -344,6 +344,7 @@ export class DeepWorks {
     for (const c of sides) {
       const pt = (v: number, y: number): [number, number, number] => (along ? [v, y, c] : [c, y, v]);
       if (q.steel) this.beam(pt(lo, y0 - 0.08), pt(hi, y1 - 0.08), 0.06, 0.16, this.s.steel);
+      else this.beam(pt(lo, y0 + 0.1), pt(hi, y1 + 0.1), 0.04, 0.2, this.s.grey);
       this.beam(pt(lo, y0 + 1), pt(hi, y1 + 1), 0.05, 0.05, this.s.grey);
       for (const t of [0.02, 0.5, 0.98]) {
         const v = lo + (hi - lo) * t, y = y0 + (y1 - y0) * t;
@@ -358,14 +359,29 @@ export class DeepWorks {
   }
 
   private ladder(r: number, f: number, nr: number, nf: number, y0: number, y1: number) {
-    const [x, , z] = bunkerAt(this.P, r, f), [ox, , oz] = bunkerAt(this.P, r + nr, f + nf), s = this.s.steel, tr = nf, tf = nr;
+    const [x, , z] = bunkerAt(this.P, r, f), [ox, , oz] = bunkerAt(this.P, r + nr, f + nf), s = this.s.grey, tr = nf, tf = nr;
+    // (the owner, 2026-11-01: "the ladders stairs and hatches also need love": rails with some weight to them, a yellow band at the head of each, brackets into the wall and a cage up a long one)
     for (const side of [-1, 1]) {
       const ar = r + tr * side * 0.24 + nr * 0.05, af = f + tf * side * 0.24 + nf * 0.05;
-      this.box(ar - 0.02, ar + 0.02, af - 0.02, af + 0.02, y0, y1, s);
+      this.box(ar - 0.028, ar + 0.028, af - 0.028, af + 0.028, y0, y1, s);
+      this.box(ar - 0.031, ar + 0.031, af - 0.031, af + 0.031, y1 - 0.5, y1, this.s.hazard);
+      for (let y = y0 + 0.6; y < y1 - 0.2; y += 1.2) {
+        const br = ar - nr * 0.09, bf = af - nf * 0.09;
+        this.box(Math.min(ar, br) - 0.018, Math.max(ar, br) + 0.018, Math.min(af, bf) - 0.018, Math.max(af, bf) + 0.018, y - 0.02, y + 0.02, this.s.dark);
+      }
     }
     for (let y = y0 + 0.3; y < y1 - 0.05; y += 0.3) {
-      const cr = r + nr * 0.05, cf = f + nf * 0.05, wr = Math.abs(tr) * 0.25 + 0.012, wf = Math.abs(tf) * 0.25 + 0.012;
-      this.box(cr - wr, cr + wr, cf - wf, cf + wf, y - 0.012, y + 0.012, s);
+      const cr = r + nr * 0.05, cf = f + nf * 0.05, wr = Math.abs(tr) * 0.25 + 0.018, wf = Math.abs(tf) * 0.25 + 0.018;
+      this.box(cr - wr, cr + wr, cf - wf, cf + wf, y - 0.018, y + 0.018, this.s.dark);
+    }
+    if (y1 - y0 > 3.4) for (let y = y0 + 2.3; y < y1 - 0.3; y += 0.9) {
+      // (a hoop of the cage, round the back of whoever climbs)
+      for (const side of [-1, 1]) {
+        const a = r + tr * side * 0.38 + nr * 0.06, b = f + tf * side * 0.38 + nf * 0.06, c = a + nr * 0.72, d = b + nf * 0.72;
+        this.box(Math.min(a, c) - 0.015, Math.max(a, c) + 0.015, Math.min(b, d) - 0.015, Math.max(b, d) + 0.015, y - 0.02, y + 0.02, s);
+      }
+      const hr = r + nr * 0.78, hf = f + nf * 0.78, wr = Math.abs(tr) * 0.38 + 0.015, wf = Math.abs(tf) * 0.38 + 0.015;
+      this.box(hr - wr, hr + wr, hf - wf, hf + wf, y - 0.02, y + 0.02, s);
     }
     this.ladders.push({ x, z, nx: ox - x, nz: oz - z, y0: this.P.y + y0, y1: this.P.y + y1 });
   }

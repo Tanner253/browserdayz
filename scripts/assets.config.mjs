@@ -1109,6 +1109,31 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
     credit: { name: 'Diesel generator set', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"Diesel generator set" made for ZONA with Higgsfield (image to 3D).' },
   },
+  oxygen_bottles: {
+    dir: '../incoming/higgsfield/toys', file: 'oxygen_bottles_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; thinned for the rooms of the bunker; textures capped at 1024; geometry compressed.',
+    credit: { name: 'oxygen bottles', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"oxygen bottles" made for ZONA with Higgsfield (image to 3D).' },
+  },
+  fire_extinguisher: {
+    dir: '../incoming/higgsfield/toys', file: 'fire_extinguisher_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; thinned for the rooms of the bunker; textures capped at 1024; geometry compressed.',
+    credit: { name: 'fire extinguisher', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"fire extinguisher" made for ZONA with Higgsfield (image to 3D).' },
+  },
+  wall_clock: {
+    dir: '../incoming/higgsfield/toys', file: 'wall_clock_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; thinned for the rooms of the bunker; textures capped at 1024; geometry compressed.',
+    credit: { name: 'wall clock', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"wall clock" made for ZONA with Higgsfield (image to 3D).' },
+  },
+  filing_cabinet: {
+    dir: '../incoming/higgsfield/toys', file: 'filing_cabinet_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; thinned for the rooms of the bunker; textures capped at 1024; geometry compressed.',
+    credit: { name: 'filing cabinet', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"filing cabinet" made for ZONA with Higgsfield (image to 3D).' },
+  },
+  paper_stack: {
+    dir: '../incoming/higgsfield/toys', file: 'paper_stack_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
+    changes: 'Made at its true size; thinned for the rooms of the bunker; textures capped at 1024; geometry compressed.',
+    credit: { name: 'paper stack', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"paper stack" made for ZONA with Higgsfield (image to 3D).' },
+  },
   radar_dome: {
     dir: '../incoming/higgsfield/toys', file: 'radar_dome_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 2048; geometry compressed.',

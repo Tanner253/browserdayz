@@ -38,7 +38,7 @@ export class Underground {
 
   constructor(private h: UndergroundHost) {
     // (a gun rack is dark steel: down the bunker it stood as a black block, and what was on it with it)
-    for (const o of h.scene.children) if (o.name.startsWith('gun_rack:')) selfLit((o as THREE.Mesh).material as THREE.MeshStandardMaterial, 0.45);
+    for (const o of h.scene.children) if (/^(gun_rack|bunker_machine|bunker_terminal|breaker_box|bunker_pipes?|utility_box_01|valve_stand):/.test(o.name)) selfLit((o as THREE.Mesh).material as THREE.MeshStandardMaterial, o.name.startsWith('gun_rack') ? 0.45 : 0.3);
   }
 
   /** a mote's drift, as the eye moves through a box of them that goes with it */

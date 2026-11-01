@@ -11,3 +11,5 @@
 - The mine's bulbs (2026-11-01): gone with their sheet of pools; `TORCH_EVERY` in `src/world/mine.ts` is what lights it now. Nothing left to delete.
 
 - Hand-made generators (2026-11-01): the bunker's now the model `diesel_genset`, the fort's the model `portable_generator`; both old shapes are gone from the code. `rocks_ground_02` stays for the terrain; the mine uses `rock_wall_10`.
+
+- Room dressing (2026-11-01): `src/world/bunker-dress.ts` is drawn only by the game, so nothing there needs the server. The kit's first `mop_bucket` Higgsfield job was not used: the id already had a downloaded model. Nothing left to delete.

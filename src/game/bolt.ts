@@ -3,6 +3,7 @@
 // nobody is shut in. Its lamp says how it stands.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { audio } from '../core/audio';
 import { WORLD_GROUPS, physics } from '../core/physics';
 import { bunkerAt, bunkerLocal, levelY, type Place } from '../sim/bunker';
@@ -28,11 +29,29 @@ export class BoltHole {
     this.hinge.rotation.y = P.rot;
     const plate = new THREE.Mesh(new THREE.BoxGeometry(H.half * 2, 0.08, H.half * 2), steel);
     plate.position.set(0, -0.04, H.half);
+    // (the owner, 2026-11-01: "the ladders stairs and hatches also need love": ribs across the lid, a hand wheel with its spokes and hub, hinges, and a painted frame set in the floor round it)
+    const yellow = new THREE.MeshStandardMaterial({ color: 0xc69a1f, roughness: 0.7, metalness: 0.1 });
+    const parts: THREE.BufferGeometry[] = [];
+    for (const k of [-0.6, 0.6]) {
+      parts.push(new THREE.BoxGeometry(H.half * 2 - 0.1, 0.03, 0.05).translate(0, 0.015, H.half * (1 + k)));
+      parts.push(new THREE.BoxGeometry(0.05, 0.03, H.half * 2 - 0.1).translate(H.half * k, 0.015, H.half));
+    }
+    parts.push(new THREE.CylinderGeometry(0.05, 0.06, 0.06, 12).translate(0, 0.05, H.half));
+    for (let a = 0; a < 3; a++) parts.push(new THREE.BoxGeometry(0.38, 0.016, 0.022).rotateY((a * Math.PI) / 3).translate(0, 0.06, H.half));
+    for (const k of [-0.7, 0.7]) parts.push(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8).rotateZ(Math.PI / 2).translate(H.half * k, 0.01, 0));
+    const ribs = new THREE.Mesh(mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)), false), steel);
     const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 8, 18), steel);
     wheel.rotation.x = Math.PI / 2;
     wheel.position.set(0, 0.06, H.half);
-    this.hinge.add(plate, wheel);
+    this.hinge.add(plate, ribs, wheel);
     this.group.add(this.hinge);
+    const rim: THREE.BufferGeometry[] = [], R = H.half + 0.12;
+    for (const [w, d, ox, oz] of [[R * 2, 0.12, 0, -H.half - 0.06], [R * 2, 0.12, 0, H.half + 0.06], [0.12, R * 2, -H.half - 0.06, 0], [0.12, R * 2, H.half + 0.06, 0]]) rim.push(new THREE.BoxGeometry(w, 0.024, d).translate(ox, 0.012, oz));
+    const frame = new THREE.Mesh(mergeGeometries(rim.map((g) => g.toNonIndexed()), false), yellow);
+    const [fx, fy, fz] = bunkerAt(P, H.r, H.f, Y);
+    frame.position.set(fx, fy, fz);
+    frame.rotation.y = P.rot;
+    this.group.add(frame);
     this.lamp = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
     const dot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), this.lamp), [lx, ly, lz] = bunkerAt(P, H.r - H.half - 0.25, H.f - H.half - 0.2, Y + 0.5);
     dot.position.set(lx, ly, lz);

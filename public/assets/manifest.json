@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-01T09:16:36.583Z",
+ "generated": "2026-11-01T12:56:51.312Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -15227,6 +15227,106 @@
    "hi": "assets/models/hi/diesel_genset.glb",
    "hiBytes": 1977088,
    "hiCard": 21
+  },
+  "filing_cabinet": {
+   "url": "assets/models/filing_cabinet.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 176532,
+   "srcTris": 8965,
+   "tris": 8965,
+   "min": [
+    -0.2831,
+    0,
+    -0.3757
+   ],
+   "max": [
+    0.2831,
+    1.35,
+    0.3757
+   ],
+   "lods": []
+  },
+  "oxygen_bottles": {
+   "url": "assets/models/oxygen_bottles.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 328124,
+   "srcTris": 6931,
+   "tris": 6931,
+   "min": [
+    -0.3163,
+    0,
+    -0.2335
+   ],
+   "max": [
+    0.3163,
+    1.5996,
+    0.2335
+   ],
+   "lods": []
+  },
+  "fire_extinguisher": {
+   "url": "assets/models/fire_extinguisher.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 219116,
+   "srcTris": 4453,
+   "tris": 4453,
+   "min": [
+    -0.1374,
+    0,
+    -0.0795
+   ],
+   "max": [
+    0.1374,
+    0.6185,
+    0.0795
+   ],
+   "lods": []
+  },
+  "wall_clock": {
+   "url": "assets/models/wall_clock.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 200708,
+   "srcTris": 2700,
+   "tris": 2700,
+   "min": [
+    -0.2097,
+    0,
+    -0.0342
+   ],
+   "max": [
+    0.2097,
+    0.4197,
+    0.0342
+   ],
+   "lods": []
+  },
+  "paper_stack": {
+   "url": "assets/models/paper_stack.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 280504,
+   "srcTris": 5510,
+   "tris": 5510,
+   "min": [
+    -0.2,
+    0,
+    -0.1489
+   ],
+   "max": [
+    0.2,
+    0.1847,
+    0.1489
+   ],
+   "lods": []
   }
  }
 }

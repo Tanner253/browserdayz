@@ -9,7 +9,7 @@ import { isSearchable } from '../sim/storage';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { TOUCH } from '../core/device';
-import { physics, type Surface } from '../core/physics';
+import { physics, type Surface, GLASS_GROUPS } from '../core/physics';
 import { boundsOf, extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind, snowUniforms, SNOW_LIES, SNOW_PAINT } from './foliage';
@@ -48,6 +48,8 @@ const VARIANTS: Record<string, ((node: string) => boolean)[]> = {
 
 /** how high a bed is to stand on: the top of its mattress (see BED in buildings.ts) */
 const BED_TOP = 0.6;
+/** what has air under it, and how thick its top is, metres: a round goes through the block and stops at that (nothing searched: what is opened is aimed at by its block) */
+const GAPPY: Record<string, number> = { WoodenTable_01: 0.07, painted_wooden_table: 0.07, steel_table: 0.06, autopsy_table: 0.08, lab_table: 0.08, old_bed_frame: 0.24 };
 /** props that block movement and bullets: surface type + footprint shrink factor */
 const SOLID: Record<string, [Surface, number]> = {
   card_reader: ['metal', 0.9],
@@ -1200,6 +1202,14 @@ export class Vegetation {
                 ? physics.addStaticQuat(physics.R.ColliderDesc.cuboid(hx * shrink, low, half), surface, { x: it.x + up.x, y: it.lean![2] + up.y, z: it.z + up.z }, turnOf(it))
                 : physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, low, half), surface, { x: it.x + Math.sin(it.rot) * dz, y: it.y + low, z: it.z + Math.cos(it.rot) * dz }, it.rot, drum);
               if (THIN.has(id)) physics.tagOf(col)!.thin = true;
+              // (what is mostly air stops a body as one block and a round only at its top: the owner, 2026-11-01, "you cant shoot through the gaps in the beds and chairs and tables")
+              const gap = GAPPY[id];
+              if (gap && !up) {
+                col.setCollisionGroups(GLASS_GROUPS);
+                col.setSolverGroups(GLASS_GROUPS);
+                const top = id === 'old_bed_frame' ? BED_TOP * it.scale : size.y * it.scale;
+                physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, gap / 2, half), surface, { x: it.x + Math.sin(it.rot) * dz, y: it.y + top - gap / 2, z: it.z + Math.cos(it.rot) * dz }, it.rot);
+              }
               if (low < hy) {
                 for (const [end, tall] of [[-1, size.y], [1, size.y * 0.68]] as const) {
                   const dz = end * (hz - 0.03), half = (tall * it.scale) / 2;

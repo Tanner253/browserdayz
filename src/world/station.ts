@@ -249,9 +249,11 @@ export class StationHall {
     // (the rail down its middle, and its side walls: tiled to the height of a hand, plain over that, on up past the ground where the roof stops)
     const a0 = S.a0, a1 = S.open, a2 = S.top, f1 = F(a1), top = S.high + 0.9;
     for (const b of [S.b0, S.b1]) {
-      this.quad('tile', [[a0, b, 0], [a1, b, f1], [a1, b, f1 + 1.3], [a0, b, 1.3]], axis(50));
-      this.quad('wall', [[a0, b, 1.3], [a1, b, f1 + 1.3], [a1, b, f1 + S.tall], [a0, b, S.tall]], axis(50));
-      this.quad('tile', [[a1, b, f1], [a2, b, S.high], [a2, b, top], [a1, b, top]], axis(70));
+      // (a finger proud of the wall behind: laid in its very plane they fought it all the way down, the owner, 2026-11-01: "in the tunnel z index issues for train station")
+      const face = b === S.b0 ? b + 0.012 : b - 0.012;
+      this.quad('tile', [[a0, face, 0], [a1, face, f1], [a1, face, f1 + 1.3], [a0, face, 1.3]], axis(50));
+      this.quad('wall', [[a0, face, 1.3], [a1, face, f1 + 1.3], [a1, face, f1 + S.tall], [a0, face, S.tall]], axis(50));
+      this.quad('tile', [[a1, face, f1], [a2, face, S.high], [a2, face, top], [a1, face, top]], axis(70));
       const out = b === S.b0 ? b - W - 0.1 : b, wide = W + 0.1;
       this.box(a0, a2 + 0.3, out, out + wide, -1, top, 'wall', true);
     }

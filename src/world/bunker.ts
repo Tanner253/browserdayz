@@ -10,6 +10,7 @@ import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { ranked, type Atmosphere } from './atmosphere';
+import { dressLevel } from './bunker-dress';
 import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, bunkerWings, inBunker, inWings, lampBurns, levelY, type Place, CAB, LEVELS, PLANT, levelAt, type Plan } from '../sim/bunker';
@@ -431,6 +432,8 @@ export class BunkerSite {
   private sealed: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; open: boolean; lamp: THREE.MeshStandardMaterial } | null = null;
   /** Level 2's plant is running */
   power = false;
+  /** what the consoles' screens are painted with */
+  private screen: THREE.MeshStandardMaterial | null = null;
   /** the paint of what stands in Level 2's dark until the plant runs */
   private plantPaints: THREE.MeshStandardMaterial[] = [];
   /** the light on the card reader beside the door */
@@ -618,6 +621,7 @@ export class BunkerSite {
     };
     const screen = new THREE.MeshStandardMaterial({ color: 0x0b120c, emissive: new THREE.Color(0.25, 1, 0.45), emissiveMap: screenPaint(), emissiveIntensity: 1.6, roughness: 0.3 });
     atmo.register(screen);
+    this.screen = screen;
     /** shapes waiting to be drawn, by what they are made of: all of one stuff is one thing to draw */
     const heap = new Map<THREE.Material, THREE.BufferGeometry[]>();
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
@@ -827,6 +831,10 @@ export class BunkerSite {
     }
     if (gensets.length) standGensets(gensets.slice(), into);
     contacts(plan, Y, into);
+    dressLevel(plan, Y, into, (m) => atmo.register(ranked(m)) as THREE.MeshStandardMaterial, selfLit, (s) => {
+      const [x, y, z] = bunkerAt(P, s.r, s.f, Y + s.y + s.h / 2);
+      physics.addStatic(physics.R.ColliderDesc.cuboid(s.w / 2, s.h / 2, s.d / 2), 'metal', { x, y, z }, P.rot + s.rot);
+    });
     };
     furnish(plan, Y);
 
@@ -1244,6 +1252,8 @@ export class BunkerSite {
       if (this.all.visible) this.buried(this.all, P, eye, near);
     }
     this.clock += dt;
+    // (the consoles are not dead: their screens swim and catch, each pass different)
+    if (this.screen) this.screen.emissiveIntensity = 1.5 + Math.sin(this.clock * 3.1) * 0.18 + (Math.sin(this.clock * 0.7) * Math.sin(this.clock * 1.13) > 0.72 ? Math.sin(this.clock * 40) * 0.7 : 0);
     const d = this.door;
     if (d) {
       const want = this.open ? 1 : 0;
