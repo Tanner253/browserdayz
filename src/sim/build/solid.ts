@@ -20,6 +20,7 @@ interface Leafed {
   axis: 'x' | 'y';
   open: number;
   parts: Convex[];
+  rolls?: true;
 }
 interface Kind {
   body: Convex[];
@@ -150,7 +151,7 @@ function kindOf(k: string): Kind {
   if (n) for (let i = 0; i < 3; i++) mid[i] /= n;
   const leaves = (s.leaves ?? []).map((l): Leafed => {
     for (const q of l.solid) for (const c of cornersOf(q)) for (let i = 0; i <= 4; i++) grow(sum(turn(l.axis, (l.open * i) / 4, c), l.hinge));
-    return { hinge: l.hinge, axis: l.axis, open: l.open, parts: l.solid.map(planesOf) };
+    return { hinge: l.hinge, axis: l.axis, open: l.open, parts: l.solid.map(planesOf), rolls: l.rolls };
   });
   kinds.set(k, (K = { body: s.solid.map(planesOf), leaves, lo, hi, mid, role: PIECES[k].role }));
   return K;
@@ -248,7 +249,8 @@ export class BaseSolids {
           if (tt && fn(tt, p, base)) return;
         }
         for (const l of K.leaves) {
-          // (and into the leaf's, as it stands: open or shut, as the server has it)
+          // (and into the leaf's, as it stands: open or shut, as the server has it. One that has rolled away is not there)
+          if (p.open && l.rolls) continue;
           const a2 = -(p.open ? l.open : 0), la = turn(l.axis, a2, sub(pa, l.hinge)), lb = turn(l.axis, a2, sub(pb, l.hinge)), ld = sub(lb, la);
           for (const cv of l.parts) {
             const tt = clip(cv, la, ld, g);

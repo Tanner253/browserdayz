@@ -486,6 +486,19 @@ ok('a door swings one way through where it sweeps, and not through a body there'
   assert.ok(pts.every(([, , z]) => z > 1.4), 'it never swings in');
 });
 
+ok('a garage door rolls up its own opening: nothing of it in the room, and gone when open', () => {
+  // (the owner, 2026-11-01: "the collision does not gi away and i cant eactually enter the doorways")
+  const bs = new Bases(flat), b = start(bs);
+  at(bs, b, 'wall_frame', 0, 1.5, 1.5);
+  const g = at(bs, b, 'garage_door', 0, 1.5, 1.5), solid = new BaseSolids(() => bs.bases.values());
+  assert.ok(inTheWay(g, [{ x: g.x + 0.4, y: g.y, z: g.z }]), 'a body in the doorway');
+  assert.ok(!inTheWay(g, [{ x: g.x + 0.4, y: g.y, z: g.z - 1.3 }]) && !inTheWay(g, [{ x: g.x + 0.4, y: g.y, z: g.z + 1.3 }]), 'a body either side of it');
+  const through = (h: number) => solid.hit(toWorld(b, g.x, g.y + h, g.z + 1), toWorld(b, g.x, g.y + h, g.z - 1));
+  assert.ok(through(1.2) !== null, 'a round stops at it shut');
+  g.open = true;
+  for (const h of [0.3, 1.2, 2.2]) assert.equal(through(h), null, 'a round through it open, ' + h + ' m up');
+});
+
 ok('nothing is set down where a door swings, nor a door hung to swing into what is set down', () => {
   const { bs, b } = hut();
   // (hung to swing in, then a box where it would swing)

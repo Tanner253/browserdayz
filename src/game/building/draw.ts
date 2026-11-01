@@ -373,7 +373,7 @@ export class BaseDraw {
       const [cx, cy, cz, sx, sy, sz] = s.box;
       d.parts[first + i].matrix.decompose(_s, _q, _p);
       _p.set(cx, cy, cz).applyMatrix4(d.parts[first + i].matrix);
-      return physics.world.intersectionWithShape(_p, _q, new physics.R.Cuboid(sx / 2, sy / 2, sz / 2), undefined, BODY_QUERY) !== null;
+      return physics.world.intersectionWithShape(_p, _q, new physics.R.Cuboid(sx / 2, (sy / 2) * _s.y, sz / 2), undefined, BODY_QUERY) !== null;
     }));
   }
 
@@ -403,6 +403,8 @@ export class BaseDraw {
         _p.set(s.box[0], s.box[1], s.box[2]).applyMatrix4(q.matrix);
         cols[k].setTranslation({ x: _p.x, y: _p.y, z: _p.z });
         cols[k].setRotation({ x: _q.x, y: _q.y, z: _q.z, w: _q.w });
+        // (a door that rolls away is that much less of a door: it does not turn, and left its full size it stood in the opening with nothing drawn. The owner, 2026-11-01: "the collision does not gi away and i cant eactually enter the doorways")
+        if (l.rolls) cols[k].setHalfExtents({ x: s.box[3] / 2, y: (s.box[4] / 2) * _s.y, z: s.box[5] / 2 });
       });
     });
   }

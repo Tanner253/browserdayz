@@ -50,7 +50,8 @@ export function swept(p: Piece, steps = 8): V3[] {
   const out: V3[] = [];
   for (const l of shapeOf(p.k).leaves ?? []) {
     const pts = l.solid.flatMap(samples);
-    for (let i = 0; i <= steps; i++) for (const q of pts) out.push(inBase(p, leafPoint(l, (l.open * i) / steps, q)));
+    // (one that rolls stays in its own opening: only a body in the doorway is in its way, not one in the room behind it)
+    for (let i = 0; i <= steps; i++) for (const q of pts) out.push(inBase(p, l.rolls ? leafPoint(l, 0, [q[0], q[1] * (1 - i / steps), q[2]]) : leafPoint(l, (l.open * i) / steps, q)));
   }
   return out;
 }

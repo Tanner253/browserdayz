@@ -69,7 +69,7 @@ export interface Leaf {
   paint?: Paint;
   /** its ironwork (straps, hinges, handles), drawn in iron of its own: made from what of its dress is shaded IRON (`ironOf`) */
   iron?: Solid[];
-  /** as it is drawn it runs up into the head of its opening and is gone, as the station's door does, and does not tip (what stops a body and a shot still turns on its hinge) */
+  /** it runs up into the head of its opening and is gone, as the station's door does, and does not tip: `open` says only how long that takes. What stops a body and a shot goes with it */
   rolls?: true;
 }
 
