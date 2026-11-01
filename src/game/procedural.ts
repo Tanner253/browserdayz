@@ -42,7 +42,7 @@ export function suppressorGeometry(): THREE.BufferGeometry {
 }
 
 let tagSteel: THREE.MeshStandardMaterial | null = null;
-let keycardMat: THREE.MeshStandardMaterial | undefined;
+const keycardMats: Record<string, THREE.MeshStandardMaterial> = {};
 
 /** the card's size (m): long, across, thick; and the sheet its two faces are painted on (each face so many dots long and across, a strip of bare plastic between them) */
 const CARD = { L: 0.0856, W: 0.054, T: 0.001, PX: 1024, PY: 646, GAP: 20 };
@@ -51,8 +51,15 @@ const CARD = { L: 0.0856, W: 0.054, T: 0.001, PX: 1024, PY: 646, GAP: 20 };
  * The pass card's two faces, painted one over the other on one sheet: its front above (the end
  * that is held on the left, the end that goes into the reader on the right), its back below.
  */
-function keycardPaint(): THREE.CanvasTexture {
-  const W = CARD.PX, H = CARD.PY, GAP = CARD.GAP, green = '#1d6a3c';
+/** the bunker's cards, by level: the colour of the field, the ink of the lettering, and what it says it opens */
+const KEYCARDS: Record<string, { field: string; ink: string; level: string }> = {
+  '@keycard': { field: '#1d6a3c', ink: '#1b3d28', level: 'LEVEL 1' },
+  '@keycard2': { field: '#a3241f', ink: '#4a1512', level: 'LEVEL 2' },
+  '@keycard3': { field: '#5c2d9e', ink: '#2c1650', level: 'LEVEL 3' },
+};
+
+function keycardPaint(look = KEYCARDS['@keycard']): THREE.CanvasTexture {
+  const W = CARD.PX, H = CARD.PY, GAP = CARD.GAP, green = look.field;
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H * 2 + GAP;
@@ -86,9 +93,9 @@ function keycardPaint(): THREE.CanvasTexture {
   g.font = '700 50px "Arial Narrow", Arial, sans-serif';
   g.fillText('RESTRICTED ACCESS', 212, 212, 470);
   // what it opens
-  g.fillStyle = '#1b3d28';
+  g.fillStyle = look.ink;
   g.font = '900 104px "Arial Black", Arial, sans-serif';
-  g.fillText('LEVEL 1', 285, 420, 330);
+  g.fillText(look.level, 285, 420, 330);
   g.font = '700 38px "Courier New", monospace';
   g.fillText('No. 0417 - KEEP ON PERSON', 288, 492, 380);
   g.fillText('PROPERTY OF THE GARRISON', 288, 544, 380);
@@ -315,10 +322,10 @@ export function proceduralParts(model: string): MeshPart[] {
     return [{ name: 'dogtag', geometry: dogTagGeometry(), material: tagSteel }];
   }
   if (model === '@suppressor') return [{ name: 'suppressor', geometry: suppressorGeometry(), material: gunSteel() }];
-  if (model === '@keycard') {
-    // a pass card: green and white plastic, printed, chipped, and carried about for years
-    keycardMat ??= new THREE.MeshStandardMaterial({ map: keycardPaint(), roughness: 0.42, metalness: 0.05, name: 'keycard' });
-    return [{ name: 'keycard', geometry: keycardGeometry(), material: keycardMat }];
+  if (KEYCARDS[model]) {
+    // a pass card: coloured and white plastic, printed, chipped, and carried about for years
+    const material = (keycardMats[model] ??= new THREE.MeshStandardMaterial({ map: keycardPaint(KEYCARDS[model]), roughness: 0.42, metalness: 0.05, name: 'keycard' }));
+    return [{ name: 'keycard', geometry: keycardGeometry(), material }];
   }
   throw new Error(`unknown procedural model ${model}`);
 }

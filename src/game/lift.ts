@@ -84,7 +84,10 @@ export class GoodsLift {
       const open = now.stop === g.level && now.left > 1.2;
       if (open !== g.was) {
         g.was = open;
-        if (near) audio.blastDoor(this.at.copy(g.mesh.position), g.mesh.position.distanceTo(eye), open);
+        // (heard from beside it and on its own level, and from nowhere else: it goes all day whether or not anybody is by. The owner, 2026-11-01: "i keep hearing doors open in
+        // the bunker when im in lvl 1"; "the door creak sound keeps happening")
+        const far = g.mesh.position.distanceTo(eye);
+        if (far < 7) audio.lightGate(this.at.copy(g.mesh.position), far, open);
       }
       g.up = THREE.MathUtils.clamp(g.up + (open ? dt : -dt) / 1.1, 0, 1);
       g.body.setEnabled(g.up < 0.7);

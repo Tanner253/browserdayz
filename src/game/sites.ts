@@ -1,5 +1,5 @@
 // The way down's stops as this game has them (the rules are src/sim/sites.ts, and the server runs them: server/sites.ts): the
-// prompts at readers, gates and rides, the strong room's lock, the plant on Level 2, and the siren for as long as it goes. A pass is
+// prompts at readers, gates and rides, the strong room's lock and the plant on Level 2. A pass is
 // scanned, not put in: see scripts/clearance-pass.mjs.
 
 import { STATIONS, stationAt, untilAt } from '../sim/train-line';
@@ -41,8 +41,8 @@ export interface SiteHost {
 
 /** how near a reader the prompt comes, metres */
 const NEAR = 2.2;
-/** how often the siren sounds, seconds, and how far off anybody is told of it, metres */
-const SIREN = 5;
+/** how often the infected are told where a place going off is, seconds; and how far off anybody is told of it, metres */
+const HEARD = 5;
 const TOLD = 1500;
 
 const _at = new THREE.Vector3();
@@ -55,7 +55,7 @@ export class Sites {
   private gates = new Map<string, { open: boolean; until: number }>();
   private doors = new Map<number, string>();
   private found = false;
-  private siren = 0;
+  private heard = 0;
   /** what lies at each site, once it has been fetched */
   private lying = new Map<string, THREE.Object3D | null>();
 
@@ -73,7 +73,7 @@ export class Sites {
       const me = this.h.feet(), [sx, sz] = sitePoint(s, s.reader), done = m.done?.length ?? 0, n = s.steps.at.length;
       if (Math.hypot(sx - me.x, sz - me.z) < 300) {
         if (was !== 'alarm') this.h.note(`${n} ${s.steps.name} to turn before the time is up. They are round the place`, 'warn');
-        else if (done > before) this.h.note(done < n ? `${done} of ${n} ${s.steps.name}` : `All ${n} ${s.steps.name}: the strong room is open${s.steps.after ? ', and now hold it' : ''}`, 'good');
+        else if (done > before) this.h.note(done < n ? `${done} of ${n} ${s.steps.name}` : `All ${n} ${s.steps.name}: the strong room is open`, 'good');
       }
     }
     if (s?.level === 2) this.h.power(m.phase !== 'idle');
@@ -91,9 +91,14 @@ export class Sites {
     }
     if (!s || was === m.phase) return;
     const [x, z] = sitePoint(s, s.reader), me = this.h.feet(), d = Math.hypot(x - me.x, z - me.z);
-    if (m.phase === 'alarm' && d < TOLD && !s.quiet) this.h.note(`A siren is going at ${s.name}`, 'warn');
+    // (out in the world a flare goes up, and that is all that is heard of it. Told of as it happens, not to somebody who comes in later)
+    if (was === 'idle' && m.phase !== 'idle' && !s.level && d < TOLD && m.left + 5 > (m.phase === 'spent' ? s.again : s.hold)) this.h.note(`A flare has gone up over ${s.name}`, 'warn');
+    if (m.phase === 'alarm' && s.level && !s.quiet) {
+      const [, y] = spotAt(siteSpot(s, s.reader), this.h.bunker());
+      audio.alarm(_at.set(x, y ?? me.y, z), d, true);
+    }
     if (m.phase === 'alarm' && s.quiet && d < 90) this.h.note('The plant turns over and the lamps come up. Everything down here heard it', 'warn');
-    if (m.phase === 'spent' && d < 120) this.h.note(`The locker at ${s.name} has opened`, 'good');
+    if (m.phase === 'spent' && d < 120 && s.level) this.h.note(`The locker at ${s.name} has opened`, 'good');
   }
 
   /** A pass shown to a reader: its lamp comes on red and a beam sweeps the card held up to it, a beep, and when the server has it the lamp goes green (the owner, 2026-10-31). */
@@ -180,8 +185,8 @@ export class Sites {
       }
       if (!this.at(siteSpot(s, s.reader), s.level ? 2.6 : NEAR)) continue;
       const phase = this.phase(id), name = s.card ? ITEMS[s.card].name.toLowerCase() : '';
-      if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : 'The alarm is going'} · ${this.left(this.state.get(id)?.until)}</small>`;
-      if (phase === 'spent') return `<small>Spent · back on line in ${this.left(this.state.get(id)?.until)}</small>`;
+      if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : s.steps ? `${s.steps.name[0].toUpperCase()}${s.steps.name.slice(1)} first` : 'It is running'} · ${this.left(this.state.get(id)?.until)}</small>`;
+      if (phase === 'spent') return `<small>Open · shuts in ${this.left(this.state.get(id)?.until)}</small>`;
       if (s.card && !this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}, ${PASS_FROM[s.card]}`}</small>`;
       if (go) {
         if (!s.what) this.scanning(siteSpot(s, s.reader), 2);
@@ -239,18 +244,15 @@ export class Sites {
     return !!id && this.h.online() && this.phase(id) === 'idle';
   }
 
-  update(dt: number, cam: THREE.Vector3) {
-    this.siren -= dt;
-    if (this.siren > 0) return;
-    this.siren = SIREN;
+  update(dt: number) {
+    this.heard -= dt;
+    if (this.heard > 0) return;
+    this.heard = HEARD;
     for (const [id, s] of Object.entries(SITES)) {
       if (this.phase(id) !== 'alarm') continue;
       const [x, z] = sitePoint(s, s.reader);
       const [, y] = spotAt(siteSpot(s, s.reader), this.h.bunker());
       this.h.noise(x, z, s.heard, y ?? undefined);
-      if (s.quiet) continue;
-      _at.set(x, y ?? cam.y, z);
-      audio.alarm(_at, _at.distanceTo(cam), true);
     }
   }
 

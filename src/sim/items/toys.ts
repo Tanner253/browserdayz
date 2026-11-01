@@ -35,19 +35,19 @@ export const TOY_ITEMS: ItemDef[] = [
   },
   {
     id: 'card_yellow', name: 'Yellow Clearance Pass', model: 'clearance_pass', paint: 0xd9a514, w: 1, h: 1, weight: 0.03, category: 'misc',
-    desc: 'A yellow pass from the locker at Stolovaya, cleared for the gate of the Old Mine in the canyon wall, and the pumps at Bolotnaya beyond it.',
+    desc: 'A yellow pass from the strong room at Stolovaya, cleared for the gate of the Old Mine in the canyon wall, and the pumps at Bolotnaya beyond it.',
   },
   {
-    id: 'card_red', name: 'Red Clearance Pass', model: 'clearance_pass', paint: 0xb02424, w: 1, h: 1, weight: 0.03, category: 'misc',
-    desc: 'A red pass out of the sunken room at Bolotnaya, cleared for the goods lift at the far end of Bunker 17.',
+    id: 'card_red', name: 'Level 2 Keycard', model: '@keycard2', w: 1, h: 1, weight: 0.02, category: 'misc',
+    desc: 'A red Bunker 17 keycard out of the room at Bolotnaya. It opens the way to the goods lift at the far end of Level 1, and Level 2 under it.',
   },
   {
     id: 'card_black', name: 'Black Clearance Pass', model: 'clearance_pass', paint: 0x34363c, w: 1, h: 1, weight: 0.03, category: 'misc',
     desc: 'A black pass out of the safe on Level 2, cleared for the radar dome above the snow line: the Kupol.',
   },
   {
-    id: 'card_purple', name: 'Purple Clearance Pass', model: 'clearance_pass', paint: 0x6f35b5, w: 1, h: 1, weight: 0.03, category: 'misc',
-    desc: 'A purple pass from the Kupol. It calls the carriage, and the carriage line is the only way into Level 3.',
+    id: 'card_purple', name: 'Level 3 Keycard', model: '@keycard3', w: 1, h: 1, weight: 0.02, category: 'misc',
+    desc: 'A purple Bunker 17 keycard out of the room at the Kupol. It opens the door at the foot of the stair west of the dome, and the train from there is the way into Level 3.',
   },
   // (the top of the way down: carried, and N puts it to the eye. It is the vault's, and is kept nowhere else)
   {

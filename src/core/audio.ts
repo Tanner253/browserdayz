@@ -844,6 +844,12 @@ export class AudioEngine {
    * Loud: it is meant to be heard from across the valley. (Made up, like the rest of what
    * this file makes up: nobody has recorded one.)
    */
+  /** a light steel gate, a lift's or a platform's: the recording of a gate moving, quick and low, and nothing of the blast door's slam or creak */
+  lightGate(pos: V3, distance: number, opening: boolean) {
+    if (!this.ready) return;
+    this.rec(opening ? 'gate_open' : 'gate_close', this.out(pos, 3, 1.6, distance), this.ctx.currentTime + distance / 343, 0.55, 1.5);
+  }
+
   blastDoor(pos: V3, distance: number, opening: boolean) {
     if (!this.ready) return;
     const ctx = this.ctx;

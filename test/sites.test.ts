@@ -93,40 +93,34 @@ try {
   ann.send({ t: 'site', s: 'stolovaya' });
   await ann.until('the card went in', () => ann.all('siteok').length === 1);
   assert.equal(ann.last('siteok')!.card, 'card_blue');
-  await bob.until('everybody hears the alarm', () => bob.last('site')?.phase === 'alarm');
-  assert.ok(bob.last('site')!.left >= 1 && bob.last('site')!.left <= 3, 'it tells how long is left');
+  await bob.until('a flare went up', () => bob.all('launch').some((m) => m.w === 'ammo_flare'));
   await bob.until('the strong room opened', () => bob.all('door').some((m) => m.open));
   const door = bob.all('door').find((m) => m.open)!.i;
+  await bob.until('everybody is told', () => bob.last('site')?.phase === 'spent');
   const crate = bob.all('drop+').find((m) => m.d.site?.includes('strong room'))?.d;
   assert.ok(crate, 'the strong room has a crate');
   const [cx, cz] = sitePoint(s, s.crate);
   assert.ok(Math.hypot(crate.x - cx, crate.z - cz) < 0.1);
-  ok('the card goes in: the room opens, a crate is set in it, and everybody is told');
-
-  await bob.until('the infected came', () => bob.all('i+').length >= s.wave.n);
-  ok(`${s.wave.n} infected come`);
+  ok('the card goes in: a flare goes up, and the door it stands in front of opens');
 
   ann.carry('card_blue');
   await sleep(250);
   ann.send({ t: 'site', s: 'stolovaya' });
   await sleep(300);
   assert.equal(ann.all('siteok').length, 1);
-  ok('a second card does nothing while it is going');
+  ok('a second card does nothing while it stands open');
 
-  await bob.until('the alarm ended', () => bob.last('site')?.phase === 'spent', 5000);
-  await bob.until('a locker stood', () => bob.all('drop+').some((m) => m.d.site?.includes('locker')));
-  const locker = bob.all('drop+').find((m) => m.d.site?.includes('locker'))!.d;
-  ann.at(locker.x, locker.y, locker.z);
+  ann.at(crate.x, crate.y, crate.z);
   await sleep(250);
-  ann.send({ t: 'copen', cid: locker.uid });
-  await ann.until('the locker opened', () => ann.all('cdata').some((m) => m.cid === locker.uid));
-  const inside = ann.all('cdata').find((m) => m.cid === locker.uid)!.items.map((i) => i.id);
-  assert.ok(inside.includes(s.gives), `the locker holds ${s.gives}: ${inside}`);
-  ok(`at the end of it the locker holds ${s.gives}`);
+  ann.send({ t: 'copen', cid: crate.uid });
+  await ann.until('the crate opened', () => ann.all('cdata').some((m) => m.cid === crate.uid));
+  const inside = ann.all('cdata').find((m) => m.cid === crate.uid)!.items.map((i) => i.id);
+  assert.ok(inside.includes(s.gives), `the room holds ${s.gives}: ${inside}`);
+  ok(`and in the room is ${s.gives}`);
 
   await bob.until('the place came back', () => bob.last('site')?.phase === 'idle', 5000);
   await bob.until('the room shut', () => bob.all('door').some((m) => m.i === door && !m.open));
-  await bob.until('the crates went', () => bob.all('drop-').length >= 2);
+  await bob.until('the crate went', () => bob.all('drop-').length >= 1);
   const doors = bob.all('door').length;
   bob.send({ t: 'door', i: door, open: true, swing: 1 });
   await sleep(300);

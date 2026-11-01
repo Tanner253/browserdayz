@@ -1,9 +1,10 @@
-// The server: the way down's stops out in the world (the rules are src/sim/sites.ts). A card in the reader, from somebody
-// standing at it, unlocks the strong room, sets a crate of the bunker's best in it, and starts the siren; the infected
-// come in waves until the time is up; then a locker holds the next card, and the place is spent for a while. Crates are set
-// down as a supply drop's is, and so they are marked on every map: everybody knows when one has gone off. Nothing here is
-// kept over a restart: a site that was going comes back ready.
+// The server: the way down's stops (the rules are src/sim/sites.ts). A card in the reader, from somebody standing at it, unlocks the door it stands in front of, and the next
+// card is in the room behind it, in a crate of the bunker's best; a flare goes up over the place, for everybody to see (the owner, 2026-11-01: "instead of an alarm at the step
+// 2 it should just shoot a flare up"; "the security gate should unlock the door that its infront of which houses the next card"). Where there is something to turn first, the
+// door opens when the last is turned, and the infected come until then. On a level of the bunker there is no sky: the time runs, and a locker opens at the end of it. Crates
+// are set down as a supply drop's is, and so they are marked on every map. Nothing here is kept over a restart: a site that was going comes back ready.
 
+import { LAUNCHED } from '../src/sim/grenades';
 import { Container } from '../src/sim/inventory';
 import { DROP, fillDrop } from '../src/sim/drops';
 import { fillCrate } from '../src/sim/crates';
@@ -109,6 +110,24 @@ function wave(s: Site, r: Run, now: number) {
   }
 }
 
+/** the flare a place sends up when it is set off, the same one the flare gun fires */
+function flare(s: Site) {
+  const [x, z] = sitePoint(s, s.reader);
+  broadcast({ t: 'launch', id: 0, o: [x, world.groundAt(x, z) + 3, z], v: [0.8, LAUNCHED.ammo_flare.speed, 0.5], w: 'ammo_flare' });
+}
+
+/** Its door opens on what it was keeping: the next card, among the bunker's best. */
+function openUp(id: string, s: Site, r: Run, now: number) {
+  const i = doorOf(id, s);
+  openRoom(i);
+  crate(s, r, s.crate, (b) => {
+    b.add(makeItem(s.gives, 1));
+    fillCrate(b, 'weapons_case', Math.random, 'bunker');
+  }, `The strong room at ${s.name}`, i >= 0 ? world.doorSpecs[i].m.elements[13] : undefined);
+  Object.assign(r, { phase: 'spent', until: now + againOf(s) * 1000 });
+  broadcast(said(id, r, now));
+}
+
 function openRoom(i: number) {
   if (i < 0) return;
   doors.set(i, [true, 1]);
@@ -121,10 +140,7 @@ export function useStep(c: Client, m: Extract<C2S, { t: 'sitestep' }>) {
   if (!s?.steps || !r || !at || !c.alive || r.phase !== 'alarm' || r.done.has(m.k) || !atSpot(siteSpot(s, at), world.bunker, c.pose[0], c.pose[1], c.pose[2], 3)) return;
   r.done.add(m.k);
   const now = Date.now();
-  if (r.done.size === s.steps.at.length) {
-    openRoom(doorOf(m.s, s));
-    r.until = now + (process.env.SITE_AFTER_S ? Number(process.env.SITE_AFTER_S) : s.steps.after) * 1000;
-  }
+  if (r.done.size === s.steps.at.length) return openUp(m.s, s, r, now);
   broadcast(said(m.s, r, now));
 }
 
@@ -134,14 +150,14 @@ export function useSite(c: Client, m: Extract<C2S, { t: 'site' }>) {
   if (!s || !r || !c.alive || r.phase !== 'idle' || (s.card && !carries(c.inv, s.card))) return;
   if (!atSpot(siteSpot(s, s.reader), world.bunker, c.pose[0], c.pose[1], c.pose[2], 4)) return;
   const now = Date.now();
-  Object.assign(r, { phase: 'alarm', until: now + holdOf(s) * 1000, nextWave: now });
   if (s.card) send(c, { t: 'siteok', card: s.card });
-  // (where there is something to be turned, the room stays shut until the last of it is)
-  const i = s.level ? -1 : doorOf(m.s, s);
-  if (!s.steps) openRoom(i);
-  crate(s, r, s.crate, (b) => fillCrate(b, 'weapons_case', Math.random, 'bunker'), `The strong room at ${s.name}`, floorOf(s) ?? (i >= 0 ? world.doorSpecs[i].m.elements[13] : undefined));
-  broadcast(said(m.s, r, now));
   log(`[site] ${c.name} set off ${s.name}`);
+  if (!s.level) flare(s);
+  // (nothing to turn: the door it stands in front of opens, and that is all)
+  if (!s.level && !s.steps) return openUp(m.s, s, r, now);
+  Object.assign(r, { phase: 'alarm', until: now + holdOf(s) * 1000, nextWave: now });
+  if (s.level) crate(s, r, s.crate, (b) => fillCrate(b, 'weapons_case', Math.random, 'bunker'), `The strong room at ${s.name}`, floorOf(s));
+  broadcast(said(m.s, r, now));
 }
 
 function ready(id: string, s: Site, r: Run, now: number) {
@@ -209,8 +225,8 @@ export function sitesSkip() {
     if (r.phase !== 'alarm') continue;
     const s = SITES[id];
     s.steps?.at.forEach((_, k) => r.done.add(k));
-    if (s.steps) openRoom(doorOf(id, s));
-    r.until = Date.now();
+    if (s.steps) openUp(id, s, r, Date.now());
+    else r.until = Date.now();
   }
 }
 
@@ -238,7 +254,7 @@ export function sitesTick(now: number) {
         broadcast(said(id, r, now));
         continue;
       }
-      crate(s, r, s.locker, (b) => {
+      crate(s, r, s.locker!, (b) => {
         b.add(makeItem(s.gives, 1));
         fillDrop(b);
       }, `The locker at ${s.name}`, floorOf(s));

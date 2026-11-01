@@ -21,10 +21,10 @@ export interface Site {
   /** the strong room's middle and where the reader stands, in the town's frame */
   room: [number, number];
   reader: [number, number];
-  /** where its crates are set down, in the town's frame: the strong room's as the alarm goes, the locker's at the end of it */
+  /** where its crates are set down, in the town's frame: out in the world there is the one, in the strong room, with the next card in it; a level's has a locker as well, for the end of its time */
   crate: [number, number];
-  locker: [number, number];
-  /** how long the alarm lasts, seconds, and how long the place is spent after it */
+  locker?: [number, number];
+  /** how long there is, seconds (0: the door just opens), and how long the place is spent after it */
   hold: number;
   again: number;
   /** how far off the siren is heard by the infected, metres */
@@ -37,8 +37,8 @@ export interface Site {
   what?: { use: string; doing: string; none: string };
   /** the siren does not sound */
   quiet?: boolean;
-  /** what is to be turned while it goes, in the town's frame: the strong room opens when the last is done, and `after` is how long it then has to be held, seconds. Time up with one left, and the place is spent for nothing */
-  steps?: { at: [number, number][]; name: string; use: string; doing: string; secs: number; after: number };
+  /** what is to be turned first, in the town's frame: the strong room opens when the last is done. Time up with one left, and the place is spent for nothing. */
+  steps?: { at: [number, number][]; name: string; use: string; doing: string; secs: number };
   /** how often the infected come, seconds; how many each time; the most on their feet at once; and how far out they start, metres */
   wave: { every: number; n: number; most: number; from: [number, number] };
 }
@@ -46,25 +46,25 @@ export interface Site {
 export const SITES: Record<string, Site> = {
   stolovaya: {
     town: STOLOVAYA, name: 'Stolovaya', card: 'card_blue', gives: 'card_yellow',
-    room: [22, -10], reader: [18.7, -12.3], crate: [22.2, -9], locker: [16.4, -7.6],
-    hold: 240, again: 1800, heard: 90,
+    room: [22, -10], reader: [18.7, -12.3], crate: [22.2, -9],
+    hold: 0, again: 1800, heard: 90,
     wave: { every: 28, n: 7, most: 26, from: [24, 42] },
   },
 };
 
 SITES.bolotnaya = {
   town: BOLOTNAYA, name: 'Bolotnaya', card: 'card_yellow', gives: 'card_red',
-  room: [14, -14], reader: [12, -10.6], crate: [15, -13.6], locker: [8, -7],
+  room: [14, -14], reader: [12, -10.6], crate: [15, -13.6],
   hold: 360, again: 1800, heard: 100,
   wave: { every: 24, n: 8, most: 30, from: [20, 38] },
-  steps: { at: [[-24, 8], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4, after: 0 },
+  steps: { at: [[-24, 8], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4 },
 };
 SITES.kupol = {
   town: KUPOL, name: 'the Kupol', card: 'card_black', gives: 'card_purple',
-  room: [-12, 14], reader: [-14.2, 10.7], crate: [-13, 13.6], locker: [-8, 8],
+  room: [-12, 14], reader: [-14.2, 10.7], crate: [-13, 13.6],
   hold: 240, again: 2400, heard: 130,
   wave: { every: 20, n: 10, most: 40, from: [22, 44] },
-  steps: { at: [[-12, -8], [12, -12], [0, 22]], name: 'breakers', use: 'Throw the breaker', doing: 'Throwing the breaker', secs: 4, after: 720 },
+  steps: { at: [[-12, -8], [12, -12], [0, 22]], name: 'breakers', use: 'Throw the breaker', doing: 'Throwing the breaker', secs: 4 },
 };
 
 /** Level 2's plant, and its armoury, as the plan lays them out */
@@ -89,7 +89,7 @@ SITES.vault = {
 };
 
 /** where each pass comes from, as a locked thing says it: nothing that stops you leaves you guessing */
-export const PASS_FROM: Record<string, string> = { card_blue: 'found on Level 1 of Bunker 17', card_yellow: 'from the locker at Stolovaya', card_red: 'from the locker at Bolotnaya', card_black: 'from the locker on Level 2', card_purple: 'from the locker at the Kupol' };
+export const PASS_FROM: Record<string, string> = { card_blue: 'found on Level 1 of Bunker 17', card_yellow: 'from the strong room at Stolovaya', card_red: 'from the strong room at Bolotnaya', card_black: 'from the locker on Level 2', card_purple: 'from the strong room at the Kupol' };
 
 /**
  * The way down in order, as the map tells it (the owner, 2026-10-31: "is it intuitive to the user what steps are required next"): each stop, what it asks and where it is.
@@ -97,11 +97,11 @@ export const PASS_FROM: Record<string, string> = { card_blue: 'found on Level 1 
  */
 export const WAY: { pass: string; name: string; say: string; x: number; z: number }[] = [
   { pass: '', name: 'Bunker 17', say: 'Find a blue clearance pass on Level 1 of Bunker 17', x: GORODOK.x, z: GORODOK.z },
-  { pass: 'card_blue', name: 'Stolovaya', say: `Stolovaya: scan the blue pass and hold out ${SITES.stolovaya.hold / 60} minutes`, x: STOLOVAYA.x, z: STOLOVAYA.z },
-  { pass: 'card_yellow', name: 'Bolotnaya', say: `Bolotnaya: scan the yellow pass, turn ${SITES.bolotnaya.steps!.at.length} valves, hold out ${SITES.bolotnaya.hold / 60} minutes`, x: BOLOTNAYA.x, z: BOLOTNAYA.z },
-  { pass: 'card_red', name: 'Bunker 17', say: 'Bunker 17: the red pass opens the goods lift at the end of Level 1. On Level 2, pour a jerrycan into the plant', x: GORODOK.x, z: GORODOK.z },
-  { pass: 'card_black', name: 'The Kupol', say: `The Kupol: scan the black pass, throw ${SITES.kupol.steps!.at.length} breakers, hold out ${SITES.kupol.steps!.after / 60} minutes`, x: KUPOL.x, z: KUPOL.z },
-  { pass: 'card_purple', name: 'Kupol station', say: "The stair west of the Kupol: scan the purple pass at its foot and take the train to Level 3", x: STATIONS[0].x + STATIONS[0].ux * SHAFT.top, z: STATIONS[0].z + STATIONS[0].vz * 6.5 },
+  { pass: 'card_blue', name: 'Stolovaya', say: 'Stolovaya: the blue pass unlocks the strong room, and the yellow pass is inside', x: STOLOVAYA.x, z: STOLOVAYA.z },
+  { pass: 'card_yellow', name: 'Bolotnaya', say: `Bolotnaya: scan the yellow pass and turn ${SITES.bolotnaya.steps!.at.length} valves in ${SITES.bolotnaya.hold / 60} minutes to open the room with the Level 2 keycard`, x: BOLOTNAYA.x, z: BOLOTNAYA.z },
+  { pass: 'card_red', name: 'Bunker 17', say: 'Bunker 17: the Level 2 keycard opens the goods lift at the end of Level 1. On Level 2, pour a jerrycan into the plant', x: GORODOK.x, z: GORODOK.z },
+  { pass: 'card_black', name: 'The Kupol', say: `The Kupol: scan the black pass and throw ${SITES.kupol.steps!.at.length} breakers in ${SITES.kupol.hold / 60} minutes to open the room with the Level 3 keycard`, x: KUPOL.x, z: KUPOL.z },
+  { pass: 'card_purple', name: 'Kupol station', say: 'The stair west of the Kupol: scan the Level 3 keycard at its foot and take the train', x: STATIONS[0].x + STATIONS[0].ux * SHAFT.top, z: STATIONS[0].z + STATIONS[0].vz * 6.5 },
 ];
 
 /** which of those somebody is at, by the furthest pass they carry */

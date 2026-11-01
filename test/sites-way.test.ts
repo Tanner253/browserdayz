@@ -82,7 +82,7 @@ try {
   await sleep(250);
   assert.equal(ann.site('bolotnaya')?.done?.length, 1, 'a valve from where nobody stands');
   await ann.until('the time ran out', () => ann.site('bolotnaya')?.phase === 'spent', 8000);
-  assert.equal(ann.all('drop+').filter((m) => m.d.site?.includes('locker')).length, 0, 'a locker for nothing');
+  assert.equal(ann.all('drop+').filter((m) => m.d.site?.includes('strong room')).length, 0, 'a crate for nothing');
   ok('turned from where they stand, one at a time; the room shut until the last; and time up gives nothing');
 
   // ---- and turned in time
@@ -99,13 +99,13 @@ try {
     await ann.until(`valve ${k}`, () => ann.site('bolotnaya')?.done?.length === k + 1);
   }
   await ann.until('the room opened', () => ann.all('door').some((m) => m.open));
-  await ann.until('the locker stood', () => ann.all('drop+').some((m) => m.d.site?.includes('locker')));
-  const locker = ann.all('drop+').find((m) => m.d.site?.includes('locker'))!.d;
-  await ann.go(locker.x, locker.y, locker.z);
-  ann.send({ t: 'copen', cid: locker.uid });
-  await ann.until('the locker opened', () => ann.all('cdata').some((m) => m.cid === locker.uid));
-  assert.ok(ann.all('cdata').find((m) => m.cid === locker.uid)!.items.some((i) => i.id === 'card_red'));
-  ok('all three turned in time: the room opens and the locker holds the red pass');
+  await ann.until('the crate stood', () => ann.all('drop+').some((m) => m.d.site?.includes('strong room')));
+  const room = ann.all('drop+').find((m) => m.d.site?.includes('strong room'))!.d;
+  await ann.go(room.x, room.y, room.z);
+  ann.send({ t: 'copen', cid: room.uid });
+  await ann.until('the crate opened', () => ann.all('cdata').some((m) => m.cid === room.uid));
+  assert.ok(ann.all('cdata').find((m) => m.cid === room.uid)!.items.some((i) => i.id === 'card_red'));
+  ok('all three turned in time: the room opens, and the next card is in it');
 
   // ---- the lift
   const [gx, gy, gz] = spotAt(GATES.lift.at, P);
