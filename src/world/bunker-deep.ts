@@ -645,12 +645,12 @@ export class DeepWorks {
   }
 
   /** Once a frame. @param gate is this gate of the place open? @param power Level 2's plant is running @param alarm the vault's breaker has been thrown */
-  update(dt: number, eye: THREE.Vector3, level: number, also: number, gate: (id: string) => boolean, power: boolean, alarm: boolean) {
+  update(dt: number, eye: THREE.Vector3, level: number, also: number, gate: (id: string) => boolean, power: boolean, alarm: boolean, crowd: (at: THREE.Vector3, far: number) => boolean) {
     this.glow += ((power ? 1 : 0.06) - this.glow) * Math.min(1, dt * 0.5);
     this.tanks.emissiveIntensity = this.glow * 0.7;
     for (const m of this.moving) {
       if (m.level !== level && m.level !== also) continue;
-      const near = m.at.distanceTo(eye) < (m.spec.heavy ? 3 : 3.4), open = m.spec.gate ? gate(m.spec.gate) || (near && this.behind(m, eye)) : near;
+      const near = m.at.distanceTo(eye) < (m.spec.heavy ? 3 : 3.4), open = m.spec.gate ? gate(m.spec.gate) || (near && this.behind(m, eye)) : near || crowd(m.at, 3);
       if (open !== m.was) {
         m.was = open;
         audio.lightGate(m.at, m.at.distanceTo(eye), open);

@@ -1151,7 +1151,7 @@ export class BunkerSite {
    * Each frame: the door slides, and the lamps burn or do not.
    * @param lit told of each lamp that is alight now, and how brightly (0..1)
    */
-  update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number, far: number) => void, gate: (id: string) => boolean = () => false, alarm = false) {
+  update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number, far: number) => void, gate: (id: string) => boolean = () => false, alarm = false, crowd: (at: THREE.Vector3, far: number) => boolean = () => false) {
     const P = this.place;
     if (!P) return;
     // (the lamps of Level 2 come on from the plant outward, room by room: the sheet painted again as each lot does)
@@ -1198,7 +1198,7 @@ export class BunkerSite {
     // (the lamps are not looked at from across the map)
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
-    this.works?.update(dt, eye, on, also, gate, this.power, alarm);
+    this.works?.update(dt, eye, on, also, gate, this.power, alarm, crowd);
     const want = on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;
     this.fill.intensity += (want - this.fill.intensity) * Math.min(1, dt * 3);
     this.fixtures.forEach((x, k) => {

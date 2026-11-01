@@ -528,7 +528,7 @@ export const dropsMethods = {
       if (this.bunkerEmpty > BUNKER.door.shut) this.bunker.setOpen(false);
     }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
-    this.bunker.update(dt, cam.position, (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * (far > 8 ? 1.5 : 0.5), far), (id) => (id === 'strong' ? this.sites.spent('level2') : id === 'vault' ? this.sites.spent('vault') : this.sites.gateOpen(id)), this.sites.going('vault'));
+    this.bunker.update(dt, cam.position, (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * (far > 8 ? 1.5 : 0.5), far), (id) => (id === 'strong' ? this.sites.spent('level2') : id === 'vault' ? this.sites.spent('vault') : this.sites.gateOpen(id)), this.sites.going('vault'), (at, far) => this.horde.near(at, far));
     // (a bar on the inside of the station's door, from the platform: nobody is shut in)
     this.halls[0].doorOpen = this.stationGate || Math.hypot(this.player.pos.x - DOOR.inside[0], this.player.pos.y - DOOR.inside[1], this.player.pos.z - DOOR.inside[2]) < 2.8;
     this.pumps.update(dt, cam.position, this.sites.turned('bolotnaya'), this.sites.spent('bolotnaya'));

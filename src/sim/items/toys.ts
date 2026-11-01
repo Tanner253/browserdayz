@@ -47,7 +47,7 @@ export const TOY_ITEMS: ItemDef[] = [
   },
   {
     id: 'card_purple', name: 'Level 3 Keycard', model: '@keycard3', w: 1, h: 1, weight: 0.02, category: 'misc',
-    desc: 'A purple Bunker 17 keycard out of the room at the Kupol. It opens the door at the foot of the stair west of the dome, and the train from there is the way into Level 3.',
+    desc: 'A purple Bunker 17 keycard out of the room at the Kupol. It opens the stair door on Level 2, and the door at the foot of the stair west of the dome: two ways into Level 3.',
   },
   // (the top of the way down: carried, and N puts it to the eye. It is the vault's, and is kept nowhere else)
   {

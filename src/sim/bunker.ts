@@ -292,7 +292,7 @@ export const bunkerVault = () => {
   const q = LEVEL3.areas.find((a) => a.name === 'The vault')!;
   return { room: middle(q), breaker: [0, 15.5] as [number, number], clear: [[0, 10], [0, 15.4]] as [[number, number], [number, number]], floor: HALL3.floor };
 };
-export { ESCAPE, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt };
+export { ESCAPE, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, inDeep };
 
 function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
   const wings = !!shape;

@@ -12,7 +12,7 @@ import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GR
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
-import { BUNKER, bunkerAt, bunkerLocal, inWings, bunkerWays, inBunker, levelAt, levelY, type Place } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerLocal, inDeep, inWings, bunkerWays, inBunker, levelAt, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
 import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, roundSpot, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
@@ -194,8 +194,8 @@ export class Infected implements Damageable {
     this.after = info.s[5];
     this.fallTo = y;
     this.still = info.w === 1;
-    // (the still ones live on the bunker's floor, whatever height they were found at)
-    if (this.still && this.horde.byBunker(this.home)) this.home.y = this.horde.floorOf(y) ?? y;
+    // (the still ones live on the bunker's floor, whatever height they were found at: on the deep levels, which have many floors, the one they were stood on)
+    if (this.still && this.horde.byBunker(this.home) && !this.horde.deep(this.home)) this.home.y = this.horde.floorOf(y) ?? y;
     // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
     const kind = kindOf(this.host.world(), this.i, this.home.x, this.home.z);
     this.avatar.zombieMoves = await infectedMoves(kind, this.i);
@@ -991,6 +991,20 @@ export class Horde {
     return Math.abs(r) < BUNKER.pad.r + 6 && f > BUNKER.pad.back - 6 && f < BUNKER.pad.front + 12;
   }
 
+  /** whether a spot is on one of the deep levels */
+  deep(at: THREE.Vector3): boolean {
+    const P = this.bunker;
+    if (!P) return false;
+    const [r, f, h] = bunkerLocal(P, at.x, at.y + 1, at.z);
+    return inDeep(r, f, h, levelY(2), levelY(3));
+  }
+
+  /** is one of them, on its feet, within so far of a spot? (the glass doors of the deep levels part for them too) */
+  near(at: THREE.Vector3, far: number): boolean {
+    for (const b of this.all.values()) if (!b.dead && b.pos.distanceToSquared(at) < far * far) return true;
+    return false;
+  }
+
   /** whether a spot is in the bunker's first level proper, beyond its door (not on its stair) */
   inLevel(at: THREE.Vector3): boolean {
     return inBunker(this.bunker, at.x, at.y + 1, at.z);
@@ -1007,8 +1021,8 @@ export class Horde {
   keepIn(at: THREE.Vector3) {
     const P = this.bunker;
     if (!P) return;
-    const H = BUNKER.hall, [r, f] = bunkerLocal(P, at.x, at.y, at.z);
-    if (inWings(r, f)) return;
+    const H = BUNKER.hall, [r, f, h] = bunkerLocal(P, at.x, at.y, at.z);
+    if (inWings(r, f) || inDeep(r, f, h + 1, levelY(2), levelY(3))) return;
     const [x, , z] = bunkerAt(P, THREE.MathUtils.clamp(r, -H.r + 1, H.r - 1), THREE.MathUtils.clamp(f, H.back + 1, H.front - 1));
     at.x = x;
     at.z = z;
