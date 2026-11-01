@@ -564,7 +564,7 @@ export class Game {
     this.tunnel = new Tunnel(atmo, r.scene);
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
     this.player.carry = this.trainCar.carry;
-    this.darkBeside.push((x, y, z) => (inTunnel(x, y, z) ? 0.92 : 0));
+    this.darkBeside.push((x, y, z) => (inTunnel(x, y, z) ? 0.8 : 0));
     // (the army's field posts by the western roads: src/world/posts.ts)
     void new FieldPosts(world.posts ?? [], atmo, r.scene);
     this.cellars = new Cellars(r.scene, world.basements ?? []);

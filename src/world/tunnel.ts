@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Atmosphere } from './atmosphere';
-import { concretePaint, painted } from './bunker';
+import { assets } from '../core/assets';
+import { painted } from './bunker';
 import { onLine } from '../sim/train';
 import { LINE } from '../sim/train-line';
 
@@ -15,7 +16,7 @@ const HALF = 3, CROWN = 5.4, SPRING = 2.6;
 /** the rails lie this far under the line, which runs at the wagon's deck */
 const RAIL = 1.4;
 const RIB_EVERY = 9, RIB_LONG = 0.6, RIB_IN = 0.2;
-const LAMP_EVERY = 24, LAMP_UP = 3.3;
+const LAMP_EVERY = 16, LAMP_UP = 3.3;
 const PIECE = 120, DRAWN = 300;
 const SLEEPER_EVERY = 0.75, GAUGE = 0.76;
 
@@ -57,7 +58,7 @@ function bore(from: number, to: number): THREE.BufferGeometry {
       place(r.s, q[0] + q[2] * r.in, q[1] + q[3] * r.in, pos);
       nor.push(c * q[2], q[3], -n * q[2]);
       uv.push(run / 4, r.s / 4);
-      lit.push(r.s / LAMP_EVERY, run / ROUND_IT);
+      lit.push(r.s / (LAMP_EVERY * 2), run / ROUND_IT);
     });
   }
   for (let j = 0; j + 1 < rings.length; j++) for (let i = 0; i + 1 < N; i++) {
@@ -123,24 +124,27 @@ export class Tunnel {
   private held = new THREE.Vector3();
 
   constructor(atmo: Atmosphere, scene: THREE.Scene) {
-    const L = LINE.length, Nx = 64, Ny = 128;
-    // (one lamp's pool on the bore's wall, on a tile that repeats every LAMP_EVERY metres: v runs from the left foot of the wall over the crown to the right foot)
+    const L = LINE.length, Nx = 256, Ny = 128;
+    // (the pools of two lamps, one on each wall, on a tile that repeats every two lamps: v runs from the left foot of the wall over the crown to the right foot; and a
+    // little over all of it, so that the stretch between two lamps is dim and not black)
     const glow = painted(Nx, Ny, (g) => {
-      g.fillStyle = '#000';
+      g.fillStyle = 'rgb(20, 18, 16)';
       g.fillRect(0, 0, Nx, Ny);
-      const y = Ny * (1 - (LAMP_UP + 0.3) / ROUND_IT);
-      for (const wrap of [0, Nx]) {
-        const grad = g.createRadialGradient(wrap, y, 0, wrap, y, Nx * 0.42);
+      g.globalCompositeOperation = 'lighter';
+      const v = (LAMP_UP + 0.3) / ROUND_IT, R = Nx * 0.24;
+      for (const [x, y] of [[0, Ny * (1 - v)], [Nx, Ny * (1 - v)], [Nx / 2, Ny * v]]) {
+        const grad = g.createRadialGradient(x, y, 0, x, y, R);
         grad.addColorStop(0, 'rgb(255, 226, 170)');
         grad.addColorStop(0.3, 'rgb(150, 124, 86)');
         grad.addColorStop(0.7, 'rgb(40, 32, 22)');
         grad.addColorStop(1, 'rgb(0, 0, 0)');
         g.fillStyle = grad;
-        g.fillRect(0, 0, Nx, Ny);
+        g.fillRect(x - R, y - R, R * 2, R * 2);
       }
     }, 1, true);
     glow.channel = 1;
-    const wall = atmo.register(new THREE.MeshStandardMaterial({ map: concretePaint(4177, [120, 118, 112]), roughness: 0.96, metalness: 0, lightMap: glow, lightMapIntensity: 2.2 }));
+    const concrete = assets.pbr('dirty_concrete');
+    const wall = atmo.register(new THREE.MeshStandardMaterial({ map: concrete.map, normalMap: concrete.normalMap, roughnessMap: concrete.armMap, roughness: 1, metalness: 0, lightMap: glow, lightMapIntensity: 2.6 }));
     const iron = atmo.register(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25, side: THREE.DoubleSide }));
     const bulb = atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.84, 0.56), emissiveIntensity: 4, roughness: 0.5 }));
 
@@ -159,7 +163,8 @@ export class Tunnel {
       const bulbs: THREE.BufferGeometry[] = [];
       for (let k = Math.ceil(s / LAMP_EVERY); k * LAMP_EVERY < end; k++) {
         const at = k * LAMP_EVERY, p = onLine(LINE, at), v: number[] = [];
-        place(at, -HALF + 0.12, LAMP_UP, v);
+        const side = k % 2 ? 1 : -1;
+        place(at, side * (HALF - 0.12), LAMP_UP, v);
         this.lamps.push(new THREE.Vector3(v[0], v[1], v[2]));
         const b = new THREE.CapsuleGeometry(0.06, 0.34, 4, 8);
         b.rotateX(Math.PI / 2);
