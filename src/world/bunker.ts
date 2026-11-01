@@ -13,7 +13,7 @@ import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, bunkerWings, inBunker, inWings, lampBurns, levelY, type Place, CAB, LEVELS, PLANT, levelAt, type Plan } from '../sim/bunker';
 import { BOLT, ESCAPE_HOLE, HALL_DEEP, WALKWAY, WING_AREAS, type Area } from '../sim/bunker-wings';
-import { bothLevels, deepLevelAt, ESCAPE } from '../sim/bunker-deep';
+import { bothLevels, deepFill, deepLevelAt, ESCAPE } from '../sim/bunker-deep';
 import { DeepWorks } from './bunker-deep';
 
 /** how much of the world the wings' sheet of painted light covers, metres, and where it starts */
@@ -328,6 +328,8 @@ function byPaint(g: THREE.BoxGeometry, paints: THREE.Material[]): THREE.Material
 
 /** the light a steady lamp is painted as throwing on the level's plan: how far it reaches (m), and how strong it is */
 const LAMP_POOL = 7.5;
+/** and in a great hall, where it has further to come */
+const HALL_POOL = 11;
 const LAMP_GLOW = 1.6;
 
 /**
@@ -383,7 +385,9 @@ export class BunkerSite {
     // (what stops a body is the doorway shut: it is there while the door is shut or all but, and not while it moves)
     d.collider.setEnabled(d.slide < 0.12);
   }
-  private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number; level: number; battery: boolean; /** seconds after the plant starts that it comes on */ wake: number }[] = [];
+  private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number; level: number; battery: boolean; /** seconds after the plant starts that it comes on */ wake: number; /** how far its real light reaches */ far: number }[] = [];
+  /** the light of a great space, where lamps a long way up leave the floor between them to it */
+  private fill = new THREE.AmbientLight(0xffe8cc, 0);
   /** what moves on the deep levels, and all that is built there */
   works: DeepWorks | null = null;
   private poweredAt = -1e6;
@@ -831,7 +835,7 @@ export class BunkerSite {
       const m = how >= 1 && level === 1 ? steady : (atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 0, roughness: 0.5 })) as THREE.MeshStandardMaterial);
       const made = [block(r - 0.3, r + 0.3, f - 0.08, f + 0.08, y + 0.13, y + 0.2, m, { solid: false }).mesh, block(r - 0.36, r + 0.36, f - 0.12, f + 0.12, y + 0.2, y + 0.25, dark, { solid: false }).mesh];
       const [x, wy, z] = bunkerAt(P, r, f, y);
-      this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0, level, battery: !plan.rooms.some((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1), wake: Math.hypot(r, f - PLANT.f) / WAKE });
+      this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0, level, battery: !plan.rooms.some((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1), wake: Math.hypot(r, f - PLANT.f) / WAKE, far: plan.areas?.some((a) => a.hall === 'H' && r >= a.r0 && r <= a.r1 && f >= a.f0 && f <= a.f1) || plan.rooms.some((q) => q.bare && (q.y ?? 0) < -2 && r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1) ? 17 : 8 });
       fittings.push({ at: [r, y + 0.25, f], glow: m, made, on: into });
     });
     hang(plan, 1);
@@ -951,7 +955,7 @@ export class BunkerSite {
             g.beginPath();
             g.rect(px(r0), py(f1), px(r1) - px(r0), py(f0) - py(f1));
             g.clip();
-            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), (LAMP_POOL / S0) * N);
+            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), ((whole ? HALL_POOL : LAMP_POOL) / S0) * N);
             for (const [at, c] of (battery ? [[0, 'rgb(150, 28, 18)'], [0.3, 'rgb(84, 14, 8)'], [0.65, 'rgb(30, 5, 3)'], [1, 'rgb(0, 0, 0)']] : [[0, 'rgb(255, 222, 164)'], [0.22, 'rgb(170, 140, 96)'], [0.55, 'rgb(74, 60, 40)'], [1, 'rgb(0, 0, 0)']]) as [number, string][]) grad.addColorStop(at, c);
             g.fillStyle = grad;
             g.fillRect(0, 0, N, N);
@@ -975,7 +979,10 @@ export class BunkerSite {
         // (what stands above the ground is lit by the sky, not by these: it is all laid on a corner of the plan where nothing burns)
         let high = -Infinity;
         for (let i = 0; i < pos.count; i++) high = Math.max(high, v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix).y);
-        const level = o.parent === this.wings ? LEVELS.last + 1 : [...this.deep].find(([, d]) => d === o.parent)?.[0] ?? (o.parent === group ? 1 : 0);
+        // (what hangs in a group of its own, the round door and the sliding ones, is of the level the group is in)
+        let top: THREE.Object3D | null = o.parent;
+        while (top && top !== this.wings && top !== group && ![...this.deep.values()].includes(top as THREE.Group)) top = top.parent;
+        const level = top === this.wings ? LEVELS.last + 1 : [...this.deep].find(([, d]) => d === top)?.[0] ?? (top === group ? 1 : 0);
         if (high <= under + 0.01 && level) {
           for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
@@ -995,7 +1002,7 @@ export class BunkerSite {
         s.lightMapIntensity = LAMP_GLOW;
       }
     }
-    scene.add(group);
+    scene.add(group, this.fill);
     this.all = group;
   }
   /**
@@ -1141,7 +1148,7 @@ export class BunkerSite {
    * Each frame: the door slides, and the lamps burn or do not.
    * @param lit told of each lamp that is alight now, and how brightly (0..1)
    */
-  update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number) => void, gate: (id: string) => boolean = () => false, alarm = false) {
+  update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number, far: number) => void, gate: (id: string) => boolean = () => false, alarm = false) {
     const P = this.place;
     if (!P) return;
     // (the lamps of Level 2 come on from the plant outward, room by room: the sheet painted again as each lot does)
@@ -1178,6 +1185,8 @@ export class BunkerSite {
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
     this.works?.update(dt, eye, on, gate, this.power, alarm);
+    const want = deepFill(on, here[0], here[1], this.power);
+    this.fill.intensity += (want - this.fill.intensity) * Math.min(1, dt * 3);
     this.fixtures.forEach((x, k) => {
       if (x.level !== on && x.level !== also) return;
       if (x.level === 2 && this.power && x.wake > since) return;
@@ -1195,7 +1204,7 @@ export class BunkerSite {
       x.burn = lampBurns(how, k, this.clock);
       x.mat.emissiveIntensity = x.burn * 3.2;
       // (said whether it burns this instant or not: which lamps are given the real lights must not change with every flicker)
-      lit(x.pos, x.burn > 0.2 ? x.burn : 0);
+      lit(x.pos, x.burn > 0.2 ? x.burn : 0, x.far);
     });
   }
 }

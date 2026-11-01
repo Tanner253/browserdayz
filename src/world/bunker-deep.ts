@@ -30,6 +30,70 @@ function worldBox(r0: number, r1: number, f0: number, f1: number, y0: number, y1
   return g;
 }
 
+/**
+ * What is in a tank, as the light comes through it: murk that is thick at the foot and thin at the head, and a shape hung in it with its lines going up. Wrapped round the tube, so
+ * painted twice, a side each.
+ */
+function tankPaint() {
+  const W = 512, H = 512, c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d')!, grad = g.createLinearGradient(0, 0, 0, H);
+  for (const [at, col] of [[0, '#1c5c3e'], [0.25, '#3ca672'], [0.6, '#4cc48a'], [0.85, '#2a7a58'], [1, '#0e3224']] as [number, string][]) grad.addColorStop(at, col);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, W, H);
+  let s = 77;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 220; k++) {
+    g.fillStyle = `rgba(${k % 3 ? '8,30,22' : '150,240,190'},${0.03 + rnd() * 0.05})`;
+    g.beginPath();
+    g.ellipse(rnd() * W, rnd() * H, 8 + rnd() * 34, 8 + rnd() * 60, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  // (a body hung by its lines: head, shoulders, arms let down, legs, in the shade the murk gives it)
+  for (const cx of [W * 0.25, W * 0.75]) {
+    g.save();
+    g.translate(cx, H * 0.5);
+    g.filter = 'blur(7px)';
+    g.fillStyle = 'rgba(6,20,16,0.62)';
+    g.strokeStyle = 'rgba(6,20,16,0.62)';
+    g.lineCap = 'round';
+    g.beginPath();
+    g.ellipse(0, -112, 15, 19, 0, 0, Math.PI * 2);
+    g.fill();
+    g.lineWidth = 34;
+    g.beginPath();
+    g.moveTo(0, -78);
+    g.lineTo(0, 12);
+    g.stroke();
+    g.lineWidth = 13;
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(side * 22, -78);
+      g.quadraticCurveTo(side * 46, -28, side * 34, 22);
+      g.stroke();
+    }
+    g.lineWidth = 17;
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(side * 10, 16);
+      g.lineTo(side * 15, 120);
+      g.stroke();
+    }
+    g.lineWidth = 2.5;
+    for (const x of [-9, 0, 11]) {
+      g.beginPath();
+      g.moveTo(x, -120);
+      g.quadraticCurveTo(x * 2.4, -200, x * 1.4, -256);
+      g.stroke();
+    }
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** a plate of a steel floor, tread pattern across it */
 function deckPaint() {
   const c = document.createElement('canvas');
@@ -76,7 +140,8 @@ export class DeepWorks {
   private v = new THREE.Vector3();
 
   constructor(private P: Place, private s: Stuffs) {
-    this.tanks = s.mat(new THREE.MeshStandardMaterial({ color: 0x1c3a2a, emissive: new THREE.Color(0.25, 0.95, 0.5), emissiveIntensity: 0.06, roughness: 0.3, transparent: true, opacity: 0.82, depthWrite: true }));
+    const murk = tankPaint();
+    this.tanks = s.mat(new THREE.MeshStandardMaterial({ map: murk, emissive: new THREE.Color(1, 1, 1), emissiveMap: murk, emissiveIntensity: 0.06, roughness: 0.25 }));
     this.glass = s.mat(new THREE.MeshStandardMaterial({ color: 0xa8c8c4, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.17, depthWrite: false, side: THREE.DoubleSide }));
     const map = deckPaint();
     map.repeat.set(1, 1);
@@ -395,9 +460,15 @@ export class DeepWorks {
   private crane(Y: number) {
     const { steel, dark, hazard } = this.s, f0 = -3.5, f1 = -2.5, y = Y + 1;
     for (const f of [f0, f1]) {
-      this.box(-17, 17, f - 0.12, f + 0.12, y - 0.74, y - 0.68, steel);
-      this.box(-17, 17, f - 0.03, f + 0.03, y - 0.68, y - 0.3, steel);
-      this.box(-17, 17, f - 0.12, f + 0.12, y - 0.3, y - 0.24, steel);
+      this.box(-13, 13, f - 0.12, f + 0.12, y - 0.74, y - 0.68, steel);
+      this.box(-13, 13, f - 0.03, f + 0.03, y - 0.68, y - 0.3, steel);
+      this.box(-13, 13, f - 0.12, f + 0.12, y - 0.3, y - 0.24, steel);
+    }
+    // (it stands on the gallery's edge, on a truck each end that ran along a rail there)
+    for (const s of [-1, 1]) {
+      this.box(s * 13 - 0.16, s * 13 + 0.16, -3.8, -3.5, Y, y - 0.06, steel, 'metal');
+      this.box(s * 13 - 0.16, s * 13 + 0.16, -2.5, -2.2, Y, y - 0.06, steel, 'metal');
+      this.box(s * 13 - 0.2, s * 13 + 0.2, -4.5, -1.5, Y, Y + 0.18, hazard, 'metal');
     }
     // (the trolley, and the wires down to the box)
     this.box(2.2, 5.8, -3.65, -2.35, y + 0.02, y + 0.5, hazard);
@@ -408,7 +479,7 @@ export class DeepWorks {
   /** Once a frame. @param gate is this gate of the place open? @param power Level 2's plant is running @param alarm the vault's breaker has been thrown */
   update(dt: number, eye: THREE.Vector3, level: number, gate: (id: string) => boolean, power: boolean, alarm: boolean) {
     this.glow += ((power ? 1 : 0.06) - this.glow) * Math.min(1, dt * 0.5);
-    this.tanks.emissiveIntensity = this.glow * 1.2;
+    this.tanks.emissiveIntensity = this.glow * 0.7;
     for (const m of this.moving) {
       if (m.level !== level) continue;
       const near = m.at.distanceTo(eye) < (m.spec.heavy ? 3 : 3.4), open = m.spec.gate ? gate(m.spec.gate) || (near && this.behind(m, eye)) : near;

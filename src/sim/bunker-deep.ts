@@ -175,9 +175,9 @@ export const LEVEL2: Deep = {
     { id: 'bunker_grate', r: 0, f: -22, rot: 0 }, { id: 'bunker_grate', r: 0, f: -18.5, rot: 0 },
     // the observation room, its desks turned to the glass
     { id: 'bunker_terminal', r: -8.5, f: -13.8, rot: 0.5, solid: true }, { id: 'bunker_terminal', r: 8.5, f: -13.8, rot: -0.5, solid: true },
-    { id: 'hospital_desk', r: -9, f: -7.5, rot: Q, solid: true }, { id: 'hospital_pc', r: -9.2, f: -7.5, rot: Q, y: 0.95 }, { id: 'SchoolChair_01', r: -7.6, f: -7.4, rot: -Q + 0.3 },
-    { id: 'hospital_desk', r: 9, f: -7.5, rot: -Q, solid: true }, { id: 'Television_01', r: 9.2, f: -7.5, rot: -Q, y: 0.95 }, { id: 'SchoolChair_01', r: 7.6, f: -6.8, rot: Q - 0.8 },
-    { id: 'metal_office_desk', r: 0, f: -1.2, rot: Math.PI, on: TOP }, { id: 'water_cooler', r: 10.3, f: -1, rot: -Q }, { id: 'painted_wooden_cabinet', r: -10.4, f: -1.2, rot: Q, on: TOP },
+    { id: 'hospital_desk', r: -9.8, f: -3.2, rot: Q, solid: true }, { id: 'hospital_pc', r: -10, f: -3.2, rot: Q, y: 0.95 }, { id: 'SchoolChair_01', r: -8.4, f: -3.1, rot: -Q + 0.3 },
+    { id: 'hospital_desk', r: 9.8, f: -3.2, rot: -Q, solid: true }, { id: 'Television_01', r: 10, f: -3.2, rot: -Q, y: 0.95 }, { id: 'SchoolChair_01', r: 8.4, f: -2.6, rot: Q - 0.8 },
+    { id: 'metal_office_desk', r: 4.8, f: -1, rot: Math.PI, on: TOP }, { id: 'water_cooler', r: 10.3, f: -0.8, rot: -Q }, { id: 'painted_wooden_cabinet', r: -10.4, f: -0.9, rot: Q, on: TOP },
     // the labs and the morgue
     ...lab(-22, -11, -22, -9, 0), ...lab(-33, -22, -22, -9, 1), ...lab(-44, -33, -22, -9, 2),
     { id: 'body_lockers', r: -21.5, f: -1.5, rot: Q, solid: true }, { id: 'body_lockers', r: -11.6, f: -1.5, rot: -Q, solid: true },
@@ -205,14 +205,14 @@ export const LEVEL2: Deep = {
     { id: 'bunker_machine', r: 51, f: -4.8, rot: 0, y: -3.8, solid: true }, { id: 'utility_box_01', r: 53.5, f: 0, rot: -Q, y: -3.8 }, { id: 'wooden_military_crate', r: 49.6, f: 1, rot: 0.2, y: -3.8 },
   ],
   spots: [
-    [0, -19, 0], [-8.8, -3, 0], [7.8, -1.6, 0],
+    [0, -19, 0], [-8.8, -1.4, 0], [6.8, -1.4, 0],
     [-20, -3, 0], [-13, 0, 0], [-37.5, 3.2, -2.4], [-42, 2.2, -2.4], [-34, 7, -2.4], [-39, 8.4, -2.4],
     [-5.2, 12, 0], [7.4, 12.4, 1.6], [9.2, 13.4, 1.6],
     [-19.6, 6, 0], [-17.4, 7, 0], [14.5, 0.75, 0],
     [33, -8, -3.8], [28, -24.6, -3.8], [43, -2, -3.8], [19.6, -14, 0], [46.2, -18, 0], [33.4, -13.2, 0.2], [51, -14, 0], [53, -11.6, 0], [50, 0, -3.8],
   ],
   lamps: [
-    [-6, -8, 2.75, 1], [6, -8, 2.75, 1], [0, -14, 2.75, 0.4], [0, -1.5, 2.75, 1],
+    [-8.5, -8, 2.75, 1], [8.5, -8, 2.75, 1], [-8, -14.2, 2.75, 1], [8, -14.2, 2.75, 1], [0, -14.2, 2.75, 0.4], [0, -1.5, 2.75, 1],
     [-6, 3.5, 3.15, 1], [6, 3.5, 3.15, 1], [-6, 12, 3.15, 1], [6, 12, 3.15, 1], [0, 13.5, 3.15, 0.4],
     [-16.5, -15.5, 2.75, 1], [-27.5, -15.5, 2.75, 1], [-38.5, -15.5, 2.75, 0.3], [-16.5, -1.5, 2.75, 0.3],
     [-37.5, 1.2, 2.75, 1], [-37.5, -4.5, 2.75, 1], [-44, -1, 2.75, 0], [-31, -1, 2.75, 0.4], [-37.5, 7, 0.15, 0.3],
@@ -283,8 +283,8 @@ export const LEVEL3: Deep = {
   ],
   tiers: [],
   decks: [
-    // the crane's bridge, from gallery to gallery; and its landing at the top of the stair from each
-    { r0: -17, r1: 17, f0: -3.7, f1: -2.3, y: 1 },
+    // the crane's bridge, across the hall from the edge of one gallery to the other: a body walks along the galleries past the foot of its steps
+    { r0: -13, r1: 13, f0: -3.7, f1: -2.3, y: 1 },
   ],
   flights: [
     // the great stair, straight at the door, with a landing half way
@@ -293,15 +293,15 @@ export const LEVEL3: Deep = {
     // out of the trench at each end, and up to the crane
     { r0: -12, r1: -10, f0: -20, f1: -18, up: 'r1', y0: -7.6, y1: HALL3.floor, steel: true },
     { r0: -12, r1: -10, f0: 2, f1: 4, up: 'r1', y0: -7.6, y1: HALL3.floor, steel: true },
-    { r0: -16, r1: -14.5, f0: -6.4, f1: -3.7, up: 'f1', y0: 0, y1: 1, steel: true },
-    { r0: 14.5, r1: 16, f0: -2.3, f1: 0.4, up: 'f0', y0: 0, y1: 1, steel: true },
+    { r0: -15.4, r1: -13, f0: -3.7, f1: -2.3, up: 'r1', y0: 0, y1: 1, steel: true },
+    { r0: 13, r1: 15.4, f0: -3.7, f1: -2.3, up: 'r0', y0: 0, y1: 1, steel: true },
     // the stair to Level 2
     { r0: -15.5, r1: -8.5, f0: -30.3, f1: -28.2, up: 'r1', y0: 0, y1: 3.8 },
   ],
   rails: [
     { ra: -17, fa: -22, rb: -3, fb: -22, y: 0 }, { ra: 3, fa: -22, rb: 13, fb: -22, y: 0 },
     { ra: -13, fa: -22, rb: -13, fb: -12, y: 0 }, { ra: -13, fa: -9.5, rb: -13, fb: -3.7, y: 0 }, { ra: -13, fa: -2.3, rb: -13, fb: 6, y: 0 },
-    { ra: 13, fa: -22, rb: 13, fb: -6, y: 0 }, { ra: 13, fa: 0, rb: 13, fb: 6, y: 0 },
+    { ra: 13, fa: -22, rb: 13, fb: -13, y: 0 }, { ra: 13, fa: -7, rb: 13, fb: -3.7, y: 0 }, { ra: 13, fa: -2.3, rb: 13, fb: 6, y: 0 },
     { ra: -13, fa: 6, rb: 8.4, fb: 6, y: 0 }, { ra: 9.6, fa: 6, rb: 13, fb: 6, y: 0 },
     { ra: -13, fa: -3.7, rb: 13, fb: -3.7, y: 1 }, { ra: -13, fa: -2.3, rb: 2, fb: -2.3, y: 1 }, { ra: 5.5, fa: -2.3, rb: 13, fb: -2.3, y: 1 },
     // and either side of the great stair's top, for the landing's edge
@@ -309,7 +309,7 @@ export const LEVEL3: Deep = {
   ],
   ladders: [
     { r: 9, f: 5.76, nr: 0, nf: -1, y0: HALL3.floor, y1: 0.05 },
-    { r: 11.8, f: 0.14, nr: 0, nf: 1, y0: HALL3.floor, y1: 0.45 },
+    { r: 11.8, f: -6.86, nr: 0, nf: 1, y0: HALL3.floor, y1: 0.45 },
     { r: ESCAPE.r, f: ESCAPE.f + ESCAPE.half - 0.14, nr: 0, nf: -1, y0: 0, y1: ESCAPE.high + 0.05 },
   ],
   glazed: [{ axis: 'f', at: 10, from: -2.5, to: 5.5, y0: 1, y1: 2.5 }],
@@ -320,18 +320,18 @@ export const LEVEL3: Deep = {
   noWall: [{ r0: -8.5, r1: -6.5, f0: -28.3, f1: -27.7 }],
   stood: [
     // the hall's floor: what was being got out when it ended. Three containers high against the east gallery, a ladder up the end of them, and the one on the crane
-    { id: 'container_shell@0', r: 11.8, f: -3, rot: 0, y: HALL3.floor }, { id: 'container_shell@1', r: 11.8, f: -3, rot: 0, y: HALL3.floor + 2.2 }, { id: 'container_shell@0', r: 11.8, f: -3, rot: 0, y: HALL3.floor + 4.4 },
+    { id: 'container_shell@0', r: 11.8, f: -10, rot: 0, y: HALL3.floor }, { id: 'container_shell@1', r: 11.8, f: -10, rot: 0, y: HALL3.floor + 2.2 }, { id: 'container_shell@0', r: 11.8, f: -10, rot: 0, y: HALL3.floor + 4.4 },
     { id: 'container_shell@1', r: 9.4, f: -3, rot: 0, y: HALL3.floor }, { id: 'container_shell@0', r: 9.4, f: -3, rot: 0, y: HALL3.floor + 2.2 },
     { id: 'container_shell@1', r: 4, f: -3, rot: Q, y: -3.8 },
-    { id: 'zil_wreck', r: -5, f: -6, rot: 0.25, y: HALL3.floor, solid: true }, { id: 'uaz_469', r: 5.5, f: -8.5, rot: 2.4, y: HALL3.floor, solid: true },
+    { id: 'zil_wreck', r: -5, f: -6, rot: 0.25, y: HALL3.floor, solid: true }, { id: 'tractor_wreck', r: 5.5, f: -8.5, rot: 2.4, y: HALL3.floor, solid: true },
     { id: 'crate_big', r: 8.8, f: 3.2, rot: 0.2, y: HALL3.floor, solid: true }, { id: 'crate_big', r: 10, f: 3.5, rot: 0.1, y: HALL3.floor, solid: true }, { id: 'crate_big', r: 9.4, f: 3.3, rot: 0.5, y: HALL3.floor + 1, solid: true },
     { id: 'wooden_military_crate', r: -7.6, f: 3.4, rot: 0.1, y: HALL3.floor }, { id: 'wooden_military_crate', r: -7.4, f: 3.3, rot: 0.3, y: HALL3.floor + 0.46 }, { id: 'old_military_crate', r: -3.8, f: 3.8, rot: 1.4, y: HALL3.floor },
     { id: 'Barrel_01', r: 11.8, f: 4.8, rot: 0, y: HALL3.floor }, { id: 'barrel_03', r: 12.2, f: 3.4, rot: 1, y: HALL3.floor }, { id: 'old_tyre', r: -8.8, f: -13, rot: 1.5, y: HALL3.floor },
     // up on the crane, and out on the box hung from it
-    { id: 'weapons_case', r: 3.2, f: -3, rot: 0.3, y: -1.6 }, { id: 'wooden_crate_01', r: -8, f: -3.2, rot: 0.2, y: 1 },
+    { id: 'weapons_case', r: 3.2, f: -3, rot: 0.3, y: -1.6 },
     { id: 'weapons_case', r: 4.6, f: -3.2, rot: 1.5, y: -3.8 + 0.1 },
     // vault control
-    { id: 'breaker_box', r: 0, f: 15.5, rot: -Q }, { id: 'bunker_terminal', r: -3.8, f: 11.2, rot: Math.PI, solid: true }, { id: 'bunker_terminal', r: 3.8, f: 11.2, rot: Math.PI, solid: true }, { id: 'SchoolChair_01', r: -3.4, f: 12.3, rot: 0.3 }, { id: 'metal_office_desk', r: 5, f: 15, rot: -Q, on: TOP },
+    { id: 'breaker_box', r: 0, f: 15.5, rot: -Q }, { id: 'bunker_terminal', r: 0.2, f: 11.1, rot: Math.PI, solid: true }, { id: 'bunker_terminal', r: 3.6, f: 11.1, rot: Math.PI, solid: true }, { id: 'SchoolChair_01', r: 1.8, f: 12.3, rot: 0.3 }, { id: 'metal_office_desk', r: 5, f: 15, rot: -Q, on: TOP },
     // the vault: racks down both sides, the cases on a table up the middle
     ...[8.5, 11, 13.5, 16].flatMap((f) => [{ id: 'gun_rack', r: -5.55, f, rot: Q } as Things, { id: 'rack_wide', r: 5.55, f, rot: -Q, y: 0, solid: true } as Things]).map((t) => ({ ...t, y: HALL3.floor })),
     { id: 'steel_table', r: 0, f: 13, rot: 0, y: HALL3.floor, on: [0.79], solid: true }, { id: 'weapons_case', r: 0, f: 16.8, rot: 0, y: HALL3.floor }, { id: 'weapons_case', r: -1.6, f: 16.8, rot: 0.2, y: HALL3.floor }, { id: 'weapons_case', r: 1.6, f: 16.8, rot: -0.2, y: HALL3.floor },
@@ -343,7 +343,7 @@ export const LEVEL3: Deep = {
   ],
   spots: [
     [-14.6, -14, 0], [15, -9, 0], [0, 8, 0], [-14, 8.4, 0], [-8, -2.9, 1], [10, -3.1, 1], [12.2, -26.5, 0],
-    [-5, 2.4, HALL3.floor], [6, 0, HALL3.floor], [11.6, -3, HALL3.floor], [-7, -16, HALL3.floor], [8, -18, HALL3.floor], [-11.5, -10, -7.6],
+    [-5, 2.4, HALL3.floor], [6, 0, HALL3.floor], [11.8, -10, HALL3.floor], [-7, -16, HALL3.floor], [8, -18, HALL3.floor], [-11.5, -7, -7.6],
     [1.8, -2.4, -1.6], [5.6, -3.6, -1.6], [2.6, -3, -3.7],
     [-15.2, -4.6, -7.6], [-14.8, -6.8, -7.6], [0.6, -16, HALL3.floor], [-23, 8, 0], [-14.6, -10.8, -2.5], [-2.4, 9.8, HALL3.floor], [2.4, 9.8, HALL3.floor], [0, 15.6, HALL3.floor],
   ],
@@ -357,6 +357,15 @@ export const LEVEL3: Deep = {
 };
 
 export const DEEP: Record<number, Deep> = { 2: LEVEL2, 3: LEVEL3 };
+
+/** how much light a great space has all through it, from a level and a spot in it: its halls have, its rooms keep what their lamps give */
+export function deepFill(level: number, r: number, f: number, power: boolean) {
+  if (level !== 2 && level !== 3) return 0;
+  const a = DEEP[level].areas[deepAreaAt(level, r, f)];
+  if (level === 3) return a?.hall === 'H' ? 0.3 : a?.name === 'Vault control' ? 0.15 : 0;
+  if (!power) return 0;
+  return a?.name === 'Tank hall' ? 0.3 : a?.name === 'Anatomy theatre' ? 0.22 : a?.name === 'Observation' || a?.name === 'Plant' ? 0.18 : 0;
+}
 
 /** rooms that are their own secret: nothing is stood in them to wake */
 export const HIDDEN = new Set(['Sump', 'Under the landing', 'Behind the morgue', 'Prep room', 'The vault', 'Strong room']);
