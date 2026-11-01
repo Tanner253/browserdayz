@@ -4,6 +4,7 @@
 
 import { inMine } from '../../sim/mine';
 import { inTunnel, stationAt } from '../../sim/train-line';
+import { wayStep } from '../../sim/sites';
 import { PLACES } from '../../sim/build/pieces';
 import { basementUnder } from '../../sim/basements';
 import { inCave } from '../../world/caves-carved';
@@ -92,6 +93,7 @@ export const handsMethods = {
 
   inventoryChanged(this: Game) {
     this.slowT = 1; // refresh carried weight on the next frame
+    this.map?.setWay(wayStep((id) => this.inv.count(id) > 0));
     this.showHands();
     this.syncGear();
     this.inv.forgetGone();

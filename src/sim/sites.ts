@@ -7,7 +7,7 @@
 import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, levelY, type Place } from './bunker';
 import { inMine, MINE } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, STOLOVAYA } from './outposts';
-import { DOOR, stationAt } from './train-line';
+import { DOOR, SHAFT, STATIONS, stationAt } from './train-line';
 import { townPoint, type Town } from './towns';
 
 export type SitePhase = 'idle' | 'alarm' | 'spent';
@@ -87,6 +87,28 @@ SITES.vault = {
   wave: { every: 24, n: 9, most: 32, from: [0, 0] },
   what: { use: 'Throw the vault breaker', doing: 'Throwing the breaker', none: '' },
 };
+
+/** where each pass comes from, as a locked thing says it: nothing that stops you leaves you guessing */
+export const PASS_FROM: Record<string, string> = { card_blue: 'found on Level 1 of Bunker 17', card_yellow: 'from the locker at Stolovaya', card_red: 'from the locker at Bolotnaya', card_black: 'from the locker on Level 2', card_purple: 'from the locker at the Kupol' };
+
+/**
+ * The way down in order, as the map tells it (the owner, 2026-10-31: "is it intuitive to the user what steps are required next"): each stop, what it asks and where it is.
+ * The pass in your pockets says which you are at; the figures are the sites' own.
+ */
+export const WAY: { pass: string; name: string; say: string; x: number; z: number }[] = [
+  { pass: '', name: 'Bunker 17', say: 'Find a blue clearance pass on Level 1 of Bunker 17', x: GORODOK.x, z: GORODOK.z },
+  { pass: 'card_blue', name: 'Stolovaya', say: `Stolovaya: scan the blue pass and hold out ${SITES.stolovaya.hold / 60} minutes`, x: STOLOVAYA.x, z: STOLOVAYA.z },
+  { pass: 'card_yellow', name: 'Bolotnaya', say: `Bolotnaya: scan the yellow pass, turn ${SITES.bolotnaya.steps!.at.length} valves, hold out ${SITES.bolotnaya.hold / 60} minutes`, x: BOLOTNAYA.x, z: BOLOTNAYA.z },
+  { pass: 'card_red', name: 'Bunker 17', say: 'Bunker 17: the red pass opens the goods lift at the end of Level 1. On Level 2, pour a jerrycan into the plant', x: GORODOK.x, z: GORODOK.z },
+  { pass: 'card_black', name: 'The Kupol', say: `The Kupol: scan the black pass, throw ${SITES.kupol.steps!.at.length} breakers, hold out ${SITES.kupol.steps!.after / 60} minutes`, x: KUPOL.x, z: KUPOL.z },
+  { pass: 'card_purple', name: 'Kupol station', say: "The stair west of the Kupol: scan the purple pass at its foot and take the train to Level 3", x: STATIONS[0].x + STATIONS[0].ux * SHAFT.top, z: STATIONS[0].z + STATIONS[0].vz * 6.5 },
+];
+
+/** which of those somebody is at, by the furthest pass they carry */
+export function wayStep(has: (id: string) => boolean) {
+  for (let k = WAY.length - 1; k > 0; k--) if (has(WAY[k].pass)) return k;
+  return 0;
+}
 
 /** where a thing is said to be: on a level of the bunker, at [right, forward]; or on the ground of a town, at a place in its frame */
 export type Spot = { level: number; at: [number, number] } | { town: Town; at: [number, number] } | { place: [number, number, number] };

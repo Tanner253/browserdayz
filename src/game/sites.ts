@@ -8,7 +8,7 @@ import { audio } from '../core/audio';
 import type { C2S, S2C } from '../net/protocol';
 import type { Place } from '../sim/bunker';
 import { ITEMS } from '../sim/items';
-import { GATES, RIDES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, type SitePhase } from '../sim/sites';
+import { GATES, RIDES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, type SitePhase, PASS_FROM } from '../sim/sites';
 
 export interface SiteHost {
   online(): boolean;
@@ -121,7 +121,7 @@ export class Sites {
       const phase = this.phase(id), name = s.card ? ITEMS[s.card].name.toLowerCase() : '';
       if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : 'The alarm is going'} · ${this.left(this.state.get(id)?.until)}</small>`;
       if (phase === 'spent') return `<small>Spent · back on line in ${this.left(this.state.get(id)?.until)}</small>`;
-      if (s.card && !this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}: they are kept down Bunker 17`}</small>`;
+      if (s.card && !this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}, ${PASS_FROM[s.card]}`}</small>`;
       if (go) this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? (s.card ? 6 : 3) : 2, s.card, () => this.h.send({ t: 'site', s: id }));
       return `<kbd>F</kbd>${s.what?.use ?? `Scan the ${name}`}`;
     }
@@ -129,7 +129,7 @@ export class Sites {
       if (!this.at(g.at, 1.8) && !(g.also && this.at(g.also, 1.8))) continue;
       const state = this.gates.get(id), name = ITEMS[g.card].name.toLowerCase();
       if (state?.open) return `<small>Open · ${this.left(state.until)}</small>`;
-      if (!this.h.has(g.card)) return `<small>Locked. It scans a ${name}</small>`;
+      if (!this.h.has(g.card)) return `<small>Locked. It scans a ${name}, ${PASS_FROM[g.card]}</small>`;
       if (go) this.h.work(`Scanning the ${name}`, 2, g.card, () => this.h.send({ t: 'gate', g: id }));
       return `<kbd>F</kbd>Scan the ${name}`;
     }

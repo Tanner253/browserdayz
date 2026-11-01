@@ -21,6 +21,7 @@
 //
 // The small round map in the corner of the screen is another thing (minimap.ts) and is as it was.
 
+import { WAY } from '../sim/sites';
 import { breathe } from '../core/breathe';
 import { bookmark, distanceText, drawLabel, drawPin, setBookmark } from './bookmark';
 import { layNames, type Box, type Mark } from './bigmap-names';
@@ -193,6 +194,18 @@ export class BigMap {
   }
   /** the others in the player's party, where they stand (src/game/party.ts marks): a green dot each and their name */
   private mates: { x: number; z: number; name: string }[] = [];
+  /** the stop the pass in the pockets is for, and the way down told beside the map: nothing until a pass has been held */
+  private next: { x: number; z: number; name: string } | null = null;
+  setWay(step: number) {
+    const was = this.next;
+    this.next = step > 0 ? WAY[step] : null;
+    if (this.next === was) return;
+    this.dirty = true;
+    const box = this.root.querySelector<HTMLElement>('.hm-way');
+    if (!box) return;
+    box.hidden = !this.next;
+    box.innerHTML = `<b>The way down</b>${WAY.map((w, k) => `<p class="${k < step ? 'done' : k === step ? 'now' : ''}">${w.say}</p>`).join('')}`;
+  }
   setMates(list: { x: number; z: number; name: string }[]) {
     if (!list.length && !this.mates.length) return;
     this.mates = list;
@@ -675,6 +688,7 @@ export class BigMap {
           </div>
           <div class="hm-tip" hidden></div></div>
         <div class="hm-key"></div>
+        <div class="hm-way" hidden></div>
       </div>`;
     this.view = this.root.querySelector('canvas')!;
     this.g = this.view.getContext('2d')!;
@@ -1606,6 +1620,21 @@ export class BigMap {
     if (this.admin && ((this.adm.on && this.people.length) || this.adm.ring)) {
       g.save();
       this.drawPeople(g, sx, sy, W, Hh, u, k);
+      g.restore();
+    }
+    // the next stop on the way down
+    if (this.next) {
+      const px = sx(this.next.x), py = sy(this.next.z), r = 8 * u;
+      g.save();
+      drawPin(g, px, py, r, { fill: '#ff8a1f', edge: '#2a1605', halo: 'rgba(255, 248, 224, 0.9)' });
+      g.font = `700 ${Math.round(14 * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+      g.textAlign = 'center';
+      g.lineJoin = 'round';
+      g.lineWidth = 3 * u;
+      g.strokeStyle = 'rgba(255, 248, 224, 0.9)';
+      g.strokeText(this.next.name, px, py + 15 * u);
+      g.fillStyle = '#8a3f06';
+      g.fillText(this.next.name, px, py + 15 * u);
       g.restore();
     }
     // the others in the player's party: green, as their dots over their heads are
