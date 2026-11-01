@@ -494,7 +494,7 @@ export class Infected implements Damageable {
     if (this.horde.crowded(this, x, z)) return false;
     const y = this.floor(x, z, this.pos.y);
     if (y - this.pos.y > 0.6) return false;
-    if (physics.world.intersectionWithShape({ x, y: Math.max(y, this.pos.y - 0.3) + 1.02, z }, { x: 0, y: 0, z: 0, w: 1 }, this.shape, undefined, PLAYER_GROUPS, undefined, this.body) !== null) return false;
+    if (physics.world.intersectionWithShape({ x, y: Math.max(y, this.pos.y - 0.3) + 1.02, z }, { x: 0, y: 0, z: 0, w: 1 }, this.shape, undefined, PLAYER_GROUPS, undefined, this.body, physics.through(x, z, y + 1)) !== null) return false;
     this.pos.x = x;
     this.pos.z = z;
     // (down a drop it falls, it is not set down)

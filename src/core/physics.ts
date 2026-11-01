@@ -135,6 +135,11 @@ export class Physics {
    */
   ground: RAPIER.Collider | null = null;
   holes: ((x: number, z: number) => boolean) | null = null;
+  /**
+   * Is a point in what was dug under the ground? The pit dug for the bunker's old block has a sloping edge, and the wings and their halls were built across it: that slope is the
+   * ground's collider, drawn nowhere and in the way of everything down there, a curved wall nobody could see (the owner: "invisible wall that is circular"). Down there it is not.
+   */
+  dugOut: ((x: number, y: number, z: number) => boolean) | null = null;
 
   raycast(origin: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }, maxToi: number, filterGroups = SHOT_GROUPS, exclude?: RAPIER.Collider): { collider: RAPIER.Collider; toi: number; point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; tag: ColliderTag | undefined } | null {
     const ray = new RAPIER.Ray(origin, dir);
@@ -142,7 +147,7 @@ export class Physics {
     if (!hit) return null;
     const p = ray.pointAt(hit.timeOfImpact);
     // (the ground where it is open: on through it, as if it were not there)
-    if (hit.collider === this.ground && this.holes?.(p.x, p.z) && exclude !== this.ground) {
+    if (hit.collider === this.ground && (this.holes?.(p.x, p.z) || this.dugOut?.(p.x, p.y, p.z)) && exclude !== this.ground) {
       const go = hit.timeOfImpact + 0.01, on = this.raycast({ x: origin.x + dir.x * go, y: origin.y + dir.y * go, z: origin.z + dir.z * go }, dir, maxToi - go, filterGroups, this.ground);
       return on ? { ...on, toi: on.toi + go } : null;
     }
@@ -150,9 +155,9 @@ export class Physics {
   }
 
   /** what the player's controller is to leave out where it stands: the ground, over a basement's open steps */
-  through(x: number, z: number): ((c: RAPIER.Collider) => boolean) | undefined {
+  through(x: number, z: number, y?: number): ((c: RAPIER.Collider) => boolean) | undefined {
     const g = this.ground;
-    return g && this.holes?.(x, z) ? (c) => c !== g : undefined;
+    return g && (this.holes?.(x, z) || (y !== undefined && this.dugOut?.(x, y, z))) ? (c) => c !== g : undefined;
   }
 }
 

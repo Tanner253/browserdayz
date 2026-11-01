@@ -347,7 +347,7 @@ export class Player {
     const hx = c.x + c.nx * (RADIUS + 0.14), hz = c.z + c.nz * (RADIUS + 0.14), k = Math.min(1, 12 * h);
     const desired = top ? { x: -c.nx * 3 * h, y: 0.5 * h, z: -c.nz * 3 * h } : { x: (hx - t.x) * k, y: up * CLIMB_SPEED * h, z: (hz - t.z) * k };
     // (a ladder down a well goes through the ground's collider like any other way down it: physics.holes)
-    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, physics.through(t.x, t.z));
+    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, physics.through(t.x, t.z, t.y));
     const mv = this.kcc.computedMovement(), next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
     this.body.setNextKinematicTranslation(next);
     this.pos.set(next.x, next.y - this.half() - RADIUS, next.z);
@@ -716,7 +716,7 @@ export class Player {
     const pace = { x: this.vel.x * h, z: this.vel.z * h }, wasOnGround = this.grounded;
     // (over a basement's open steps the ground is not there: see physics.through; and somebody already standing in
     // this body is not there either: see apart)
-    const at = this.collider.translation(), through = this.apart(at, physics.through(at.x, at.z));
+    const at = this.collider.translation(), through = this.apart(at, physics.through(at.x, at.z, at.y));
     // (Deep water is not gone into: a step that would take the body into it is not taken, along whichever way it
     // would, so that it slides along the edge. From deep water, as a body put down in it would be, it walks out and
     // never further in.)

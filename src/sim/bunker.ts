@@ -868,7 +868,8 @@ function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
       for (let v = 3.5; v < len - 1; v += 7) lamps.push([long ? a.r0 + v : cr, long ? cf : a.f0 + v, Y + B.tall - 0.25, pick([0.4, 0, 0.3])]);
       for (let v = 5; v < len - 3; v += between(8, 13)) {
         const side = rnd() < 0.5 ? -1 : 1, r = long ? a.r0 + v : cr + side * ((a.r1 - a.r0) / 2 - 0.55), f = long ? cf + side * ((a.f1 - a.f0) / 2 - 0.55) : a.f0 + v;
-        if (clear(r, f) && !old(r, f)) stood.push({ id: pick(['wooden_military_crate', 'Barrel_01', 'cardboard_box_01', 'metal_trash_can', 'old_military_crate']), r, f, rot: between(-0.3, 0.3) });
+        // (laid along the wall, not across a hall that is only so wide)
+        if (clear(r, f) && !old(r, f)) stood.push({ id: pick(['wooden_military_crate', 'Barrel_01', 'cardboard_box_01', 'metal_trash_can', 'old_military_crate']), r, f, rot: between(-0.15, 0.15) + (long ? 0 : Math.PI / 2) });
       }
       for (let v = 8; v < len - 2; v += 13) spots.push({ r: long ? a.r0 + v : cr, f: long ? cf : a.f0 + v, y: Y, floor: true });
     }

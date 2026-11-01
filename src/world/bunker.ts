@@ -424,6 +424,7 @@ export class BunkerSite {
     this.heights = world.heights;
     const P = this.place;
     if (!P) return;
+    physics.dugOut = (x, y, z) => inBunker(P, x, y, z, 1);
     const B = BUNKER, D = B.depth, Y = levelY();
     const mat = (m: THREE.MeshStandardMaterial) => atmo.register(m) as THREE.MeshStandardMaterial;
     const outside = mat(new THREE.MeshStandardMaterial({ map: concretePaint(17, [128, 126, 116]), roughness: 0.94, metalness: 0 }));
