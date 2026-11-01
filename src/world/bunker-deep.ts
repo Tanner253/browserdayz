@@ -327,8 +327,8 @@ export class DeepWorks {
       if (q.steel) {
         if (along) this.box(c0, c1, q.f0, q.f1, top - 0.05, top, this.tread);
         else this.box(q.r0, q.r1, c0, c1, top - 0.05, top, this.tread);
-      } else if (along) this.box(c0, c1, q.f0, q.f1, y0, top, stuff);
-      else this.box(q.r0, q.r1, c0, c1, y0, top, stuff);
+      } else if (along) this.box(c0, c1, q.f0, q.f1, Y + (q.foot ?? q.y0), top, stuff);
+      else this.box(q.r0, q.r1, c0, c1, Y + (q.foot ?? q.y0), top, stuff);
     }
     // (the stringers and the handrail, each a bar up the slope)
     const hi = at(1), lo = at(0), sides = along ? [q.f0, q.f1] : [q.r0, q.r1];

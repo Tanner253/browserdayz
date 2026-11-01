@@ -22,7 +22,7 @@ export type Door = [number, number, number?, number?, number?];
 /** a steel floor at a height, walked on and seen under */
 export interface Deck extends Box { y: number }
 /** a flight of stairs in a box of the plan, climbing toward `up` from y0 to y1; of steel, or a solid mass of concrete to the floor under it */
-export interface Flight extends Box { up: 'r0' | 'r1' | 'f0' | 'f1'; y0: number; y1: number; steel?: boolean }
+export interface Flight extends Box { up: 'r0' | 'r1' | 'f0' | 'f1'; y0: number; y1: number; steel?: boolean; /** how far down its mass goes, where that is below its foot */ foot?: number }
 export interface Rail { ra: number; fa: number; rb: number; fb: number; y: number }
 /** a ladder: where it stands, the way out from its rungs, its foot and top */
 export interface Rungs { r: number; f: number; nr: number; nf: number; y0: number; y1: number }
@@ -297,7 +297,7 @@ export const LEVEL3: Deep = {
   ],
   flights: [
     // the great stair, straight at the door, with a landing half way
-    { r0: -3, r1: 3, f0: -22, f1: -17.2, up: 'f0', y0: -3, y1: 0 },
+    { r0: -3, r1: 3, f0: -22, f1: -17.2, up: 'f0', y0: -3, y1: 0, foot: HALL3.floor },
     { r0: -3, r1: 3, f0: -15.2, f1: -10.4, up: 'f0', y0: HALL3.floor, y1: -3 },
     // out of the trench at each end, and up to the crane
     { r0: -12, r1: -10, f0: -20, f1: -18, up: 'r1', y0: -7.6, y1: HALL3.floor, steel: true },
