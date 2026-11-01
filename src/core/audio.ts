@@ -2726,6 +2726,53 @@ export class AudioEngine {
 
   /** the hum of the bunker (made when somebody first goes down), whether it is sounding, and how long until the place next makes a noise of its own */
   private bunkerAir: { bed: GainNode; on: boolean; nextT: number; wind: number } | null = null;
+  private swarm: GainNode | null = null;
+
+  /** a drop of water hitting a wet floor, close by */
+  drip(pos: V3) {
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime + 0.01, f0 = 700 + Math.random() * 500, o = ctx.createOscillator(), g = ctx.createGain(), tail = ctx.createGain();
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 2.4, t + 0.05);
+    this.env(g, t, 0.16, 0.001, 0.07);
+    tail.gain.value = 0.6;
+    o.connect(g).connect(this.out(pos, 1.6, 1.3, 0, this.bus.ambience));
+    g.connect(tail).connect(this.ambSend);
+    o.start(t);
+    o.stop(t + 0.16);
+  }
+
+  /** current finding its way out of something broken: a few cracks, close together */
+  spark(pos: V3) {
+    if (!this.ready) return;
+    for (let k = 0, at = 0; k < 5; k++, at += 0.02 + Math.random() * 0.09) this.click(3000 + Math.random() * 4500, 0.2 + Math.random() * 0.2, 0.012, at, pos, this.bus.ambience);
+  }
+
+  /** flies over what was left: one loop, as loud as the nearest of them. @param near 0 (none) to 1 (at your ear) */
+  flies(near: number) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    if (!this.swarm) {
+      if (near <= 0) return;
+      const lvl = ctx.createGain(), band = this.filter('bandpass', 620, 1.1);
+      lvl.gain.value = 0;
+      for (const f of [172, 211, 247]) {
+        const o = ctx.createOscillator(), wob = ctx.createOscillator(), depth = ctx.createGain(), each = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.value = f;
+        wob.frequency.value = 5 + f % 7;
+        depth.gain.value = 9;
+        each.gain.value = 0.3;
+        wob.connect(depth).connect(o.frequency);
+        o.connect(each).connect(band);
+        o.start();
+        wob.start();
+      }
+      band.connect(lvl).connect(this.bus.ambience);
+      this.swarm = lvl;
+    }
+    this.swarm.gain.setTargetAtTime(near * near * 0.05, ctx.currentTime, 0.4);
+  }
 
   /**
    * Down the bunker there are no birds: a low hum under everything, and now and then the place

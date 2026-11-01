@@ -104,7 +104,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `assets.ts` | 931 |  |
-| `audio.ts` | 2898 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
+| `audio.ts` | 2945 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `bones.ts` | 137 |  |
 | `breathe.ts` | 114 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `card-keep.ts` | 260 | Pictures taken off the graphics card that nothing in the world uses any more (2026-10-20, the owner: the card's memory at "7.4 of 8 GB — how do we reduce this?"). |
@@ -381,7 +381,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `bunker-deep.ts` | 561 | Levels 2 and 3, built by hand (the owner, 2026-11-01: |
 | `bunker-unclip.ts` | 120 | Nothing in the bunker's rooms stands in anything else (the owner, 2026-11-01: |
 | `bunker-wings.ts` | 136 | Level 1's wings (the owner, 2026-11-01: |
-| `bunker.ts` | 1144 | The bunker: a place under the ground on the far side of the map from the Chemical Works. |
+| `bunker.ts` | 1148 | The bunker: a place under the ground on the far side of the map from the Chemical Works. |
 | `camp-place.ts` | 20 | Where the traders stand (the owner, 2026-10-25: |
 | `camp.ts` | 238 | The trader camp (progression v3, the owner's yes 2026-10-25: |
 | `castle-post.ts` | 478 | ORLINOYE, "the Eagle's Nest": the fort on the mountain as the army's signals and observation post, above ground. |
@@ -660,8 +660,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `bridge.ts` | 679 | The road bridge as it is built (see src/sim/bridge.ts for what a bridge is, in figures, and src/world/worldgen.ts for where one stands): a reinforced-concrete road bridge of the kind the country it stands in built by... |
 | `buildings.ts` | 3857 | Procedural buildings: walls with door/window cut-outs (two material layers), floors, ceilings, gable / shed / flat roofs, window frames + glass, hinged doors, hand-authored interior layouts with Poly Haven furniture,... |
 | `bunker-deep.ts` | 725 | Levels 2 and 3 as they are built and as they move (src/sim/bunker-deep.ts says where everything is). |
-| `bunker-dress.ts` | 188 | What makes a room of the bunker look left and not laid out (the owner, 2026-11-01: |
-| `bunker.ts` | 1310 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
+| `bunker-dress.ts` | 377 | What makes a room of the bunker look left and not laid out (the owner, 2026-11-01: |
+| `bunker-life.ts` | 175 | What moves down the bunker with nobody there (the owner, 2026-11-01: |
+| `bunker.ts` | 1279 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
 | `canyon-beds.ts` | 46 | THE CANYON'S BEDS as a chunk of shader (the terrain's, src/world/terrain.ts, and any other rock of the canyon: the carved rock round the caves' mouths, rock-blend's face), so that where a piece meets the wall its... |
 | `castle-post-shape.ts` | 422 | The signals post on the fort (src/sim/castle-post.ts): the shapes of what is made by hand, as plain numbers. |
 | `castle-post.ts` | 289 | The signals post on the fort (src/sim/castle-post.ts), as it is drawn and as it stops a body: what the game has no model for and is made here by hand. |

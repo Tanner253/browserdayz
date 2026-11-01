@@ -5,12 +5,13 @@
 // by one turn about its middle.
 
 import * as THREE from 'three';
-import { physics } from '../core/physics';
+import { physics, GLASS_GROUPS } from '../core/physics';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { ranked, type Atmosphere } from './atmosphere';
 import { dressLevel } from './bunker-dress';
+import { BunkerLife } from './bunker-life';
 import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, bunkerWings, inBunker, inWings, lampBurns, levelY, type Place, CAB, LEVELS, PLANT, levelAt, type Plan } from '../sim/bunker';
@@ -374,6 +375,10 @@ export class BunkerSite {
   private fill = new THREE.AmbientLight(0xffe8cc, 0);
   /** what moves on the deep levels, and all that is built there */
   works: DeepWorks | null = null;
+  /** what moves in it */
+  private life: BunkerLife | null = null;
+  /** what the rooms were dressed with, level by level */
+  private dressed: { level: number; look: (r: number, f: number) => void }[] = [];
   private liftOpen = false;
   private poweredAt = -1e6;
   private waking = 0;
@@ -639,6 +644,7 @@ export class BunkerSite {
         // (the first of its boxes is the thing itself, for whoever looks at it and means to open it)
         const key = spotKey(x, z);
         if (!this.solidAt.has(key)) this.solidAt.set(key, c);
+        return c;
       };
       const { w, d, h } = m;
       switch (m.kind) {
@@ -709,7 +715,11 @@ export class BunkerSite {
             slab(inside, 0.42, 0.1, d - 0.2, -w / 2 + 0.3, y + 0.16, 0);
           }
           for (const y of [0.55, 0.85, 1.15]) slab(grey, 0.03, 0.03, 0.4, w / 2 - 0.02, y, d / 2 - 0.25);
-          solid('metal', w, h, d);
+          // (all of it stops a body, and only its two beds a round: the owner, 2026-11-01, "you cant shoot through the gaps in the beds")
+          const whole = solid('metal', w, h, d);
+          whole.setCollisionGroups(GLASS_GROUPS);
+          whole.setSolverGroups(GLASS_GROUPS);
+          for (const y of [0.42, 1.32]) solid('metal', w, 0.3, d, y);
           break;
         }
         case 'pipe': {
@@ -782,10 +792,13 @@ export class BunkerSite {
     }
     if (gensets.length) standGensets(gensets.slice(), into);
     contacts(plan, Y, into);
-    dressLevel(plan, Y, into, (m) => atmo.register(ranked(m)) as THREE.MeshStandardMaterial, selfLit, (s) => {
+    const dressed = dressLevel(plan, Y, into, (m) => atmo.register(ranked(m)) as THREE.MeshStandardMaterial, selfLit, (s) => {
       const [x, y, z] = bunkerAt(P, s.r, s.f, Y + s.y + s.h / 2);
       physics.addStatic(physics.R.ColliderDesc.cuboid(s.w / 2, s.h / 2, s.d / 2), 'metal', { x, y, z }, P.rot + s.rot);
     });
+    const level = Y === levelY(3) ? 3 : Y === levelY(2) ? 2 : 1;
+    this.dressed.push({ level, look: dressed.look });
+    (this.life ??= new BunkerLife(P, group)).add(level, Y, dressed.life);
     };
     furnish(plan, Y);
 
@@ -1230,9 +1243,14 @@ export class BunkerSite {
       q.mesh.position.x = q.slide * (BUNKER.door.half * 2 + 0.1);
     }
     // (the lamps are not looked at from across the map)
-    if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
+    if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) {
+      this.life?.away();
+      return;
+    }
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
     this.works?.update(dt, eye, on, also, gate, this.power, alarm, crowd);
+    for (const d of this.dressed) if (d.level === on || d.level === also) d.look(here[0], here[1]);
+    this.life?.update(dt, here, on, this.power);
     // (the lift's cab and its shaft lie past the end of the plan, and were lit by nothing at all: the owner, 2026-11-01, "the elevator seems low quality")
     const inCab = Math.abs(here[0]) < CAB.r + 0.4 && here[1] < BUNKER.hall.back && here[1] > CAB.back - 0.5 && here[2] < -1;
     const want = inCab ? 0.34 : on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;

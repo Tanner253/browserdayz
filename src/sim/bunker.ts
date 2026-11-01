@@ -193,6 +193,8 @@ export interface Plan {
   cross: number;
   /** the plan's parts, rooms and passages both, where it was built by hand */
   areas?: DeepArea[];
+  /** which of the deep levels it is (none: the first, or its wings) */
+  deep?: number;
 }
 
 /** is this something opened and looked into? */
@@ -897,7 +899,7 @@ function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
       for (let v = 8; v < len - 2; v += 13) spots.push({ r: long ? a.r0 + v : cr, f: long ? cf : a.f0 + v, y: Y, floor: true });
     }
     for (const add of later) add();
-    return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, 0], cross, areas: shape.areas };
+    return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, 0], cross, areas: shape.areas, deep: level > 1 ? level : undefined };
   }
 
   // ---- the passages: lamps down them, pipes and a duct along the ceiling, and what has been left standing about
