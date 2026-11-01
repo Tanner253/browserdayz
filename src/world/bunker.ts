@@ -374,9 +374,11 @@ export class BunkerSite {
     // (what stops a body is the doorway shut: it is there while the door is shut or all but, and not while it moves)
     d.collider.setEnabled(d.slide < 0.12);
   }
-  private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number; level: number }[] = [];
+  private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number; level: number; battery: boolean }[] = [];
   /** the levels under the first, each drawn only with the eye on it */
   private deep = new Map<number, THREE.Group>();
+  /** the painted light laid again, when Level 2's plant starts or stops */
+  private repaint: () => void = () => {};
   /** the door at the passage's far end: it slides aside for the red pass (see the site's gate, src/sim/sites.ts) */
   private sealed: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; open: boolean; lamp: THREE.MeshStandardMaterial } | null = null;
   /** Level 2's plant is running */
@@ -810,13 +812,12 @@ export class BunkerSite {
       const m = how >= 1 && level === 1 ? steady : (atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 0, roughness: 0.5 })) as THREE.MeshStandardMaterial);
       const made = [block(r - 0.3, r + 0.3, f - 0.08, f + 0.08, y + 0.13, y + 0.2, m, { solid: false }).mesh, block(r - 0.36, r + 0.36, f - 0.12, f + 0.12, y + 0.2, y + 0.25, dark, { solid: false }).mesh];
       const [x, wy, z] = bunkerAt(P, r, f, y);
-      this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0, level });
+      this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0, level, battery: !plan.rooms.some((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1) });
       fittings.push({ at: [r, y + 0.25, f], glow: m, made, on: into });
     });
     hang(plan, 1);
     // ---- and the levels under the first: the same walls, their own rooms, lamps and what stands in them. Each is a group of its
-    // own, drawn only with the eye on it, and none has a share in the painted light below: nothing is seen by it (Level 2 is dark
-    // until its plant runs, and Level 3 has only what still burns), and only the lamps nearest the eye are lit.
+    // own, drawn only with the eye on it, and burning in patches (see inPatches in src/sim/bunker.ts).
     for (let level = 2; level <= LEVELS.last; level++) {
       const deep = Object.assign(new THREE.Group(), { name: `bunker level ${level}`, visible: false });
       group.add(deep);
@@ -863,28 +864,43 @@ export class BunkerSite {
     {
       const N = 512, R0 = -L.r - 3, span = 2 * L.r + 6, F0 = L.back - 1.5;
       const px = (r: number) => ((r - R0) / span) * N, py = (f: number) => (1 - (f - F0) / span) * N;
-      const glow = painted(N, N, (g) => {
+      // (three levels side by side on one sheet, each room lit or not as its level has it. Level 2's is painted again when its plant starts: until then only the lamps of
+      // its passages that burn at all do, on their batteries, red and low.)
+      const sheet = (g: CanvasRenderingContext2D) => {
+        g.globalCompositeOperation = 'source-over';
         g.fillStyle = '#000';
-        g.fillRect(0, 0, N, N);
+        g.fillRect(0, 0, N * LEVELS.last, N);
         g.globalCompositeOperation = 'lighter';
-        for (const [r, f, , how] of plan.lamps) {
-          if (how < 1) continue;
-          const q = plan.rooms.find((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1);
-          const [r0, r1, f0, f1] = q ? [q.r0, q.r1, q.f0, q.f1] : f > L.front ? [-S.half, S.half, L.front - 0.3, head] : Math.abs(r) > B.passage ? [-L.r, L.r, plan.cross - B.across, plan.cross + B.across] : [-B.passage, B.passage, L.back, L.front];
+        for (let level = 1; level <= LEVELS.last; level++) {
+          const plan = bunkerPlan(level), battery = level === 2 && !this.power;
           g.save();
+          g.translate((level - 1) * N, 0);
           g.beginPath();
-          g.rect(px(r0), py(f1), px(r1) - px(r0), py(f0) - py(f1));
+          g.rect(0, 0, N, N);
           g.clip();
-          const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), (LAMP_POOL / span) * N);
-          grad.addColorStop(0, 'rgb(255, 222, 164)');
-          grad.addColorStop(0.22, 'rgb(170, 140, 96)');
-          grad.addColorStop(0.55, 'rgb(74, 60, 40)');
-          grad.addColorStop(1, 'rgb(0, 0, 0)');
-          g.fillStyle = grad;
-          g.fillRect(0, 0, N, N);
+          for (const [r, f, , how] of plan.lamps) {
+            if (how < 1) continue;
+            if (battery && plan.rooms.some((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1)) continue;
+            const q = plan.rooms.find((q) => r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1);
+            const [r0, r1, f0, f1] = q ? [q.r0, q.r1, q.f0, q.f1] : f > L.front ? [-S.half, S.half, L.front - 0.3, head] : Math.abs(r) > B.passage ? [-L.r, L.r, plan.cross - B.across, plan.cross + B.across] : [-B.passage, B.passage, L.back, L.front];
+            g.save();
+            g.beginPath();
+            g.rect(px(r0), py(f1), px(r1) - px(r0), py(f0) - py(f1));
+            g.clip();
+            const grad = g.createRadialGradient(px(r), py(f), 0, px(r), py(f), (LAMP_POOL / span) * N);
+            for (const [at, c] of (battery ? [[0, 'rgb(150, 28, 18)'], [0.3, 'rgb(84, 14, 8)'], [0.65, 'rgb(30, 5, 3)'], [1, 'rgb(0, 0, 0)']] : [[0, 'rgb(255, 222, 164)'], [0.22, 'rgb(170, 140, 96)'], [0.55, 'rgb(74, 60, 40)'], [1, 'rgb(0, 0, 0)']]) as [number, string][]) grad.addColorStop(at, c);
+            g.fillStyle = grad;
+            g.fillRect(0, 0, N, N);
+            g.restore();
+          }
           g.restore();
         }
-      }, 1, false);
+      };
+      const glow = painted(N * LEVELS.last, N, (g) => sheet(g), 1, false);
+      this.repaint = () => {
+        sheet((glow.image as HTMLCanvasElement).getContext('2d')!);
+        glow.needsUpdate = true;
+      };
       glow.channel = 1;
       const v = new THREE.Vector3(), stuffs = new Set<THREE.Material>();
       group.traverse((o) => {
@@ -895,10 +911,11 @@ export class BunkerSite {
         // (what stands above the ground is lit by the sky, not by these: it is all laid on a corner of the plan where nothing burns)
         let high = -Infinity;
         for (let i = 0; i < pos.count; i++) high = Math.max(high, v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix).y);
-        if (high <= under + 0.01 && o.parent === group) {
+        const level = [...this.deep].find(([, d]) => d === o.parent)?.[0] ?? (o.parent === group ? 1 : 0);
+        if (high <= under + 0.01 && level) {
           for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
-            uv1[i * 2] = (v.x - R0) / span;
+            uv1[i * 2] = ((v.x - R0) / span + level - 1) / LEVELS.last;
             uv1[i * 2 + 1] = (v.z - F0) / span;
           }
         }
@@ -953,8 +970,14 @@ export class BunkerSite {
 
   /** Level 2's plant, running or stopped. */
   setPower(on: boolean) {
+    if (on === this.power) return;
     this.power = on;
-    if (!on) for (const x of this.fixtures) if (x.level === 2) x.mat.emissiveIntensity = 0;
+    this.repaint();
+    for (const x of this.fixtures) {
+      if (x.level !== 2) continue;
+      x.mat.emissiveIntensity = 0;
+      x.mat.emissive.set(1, 0.86, 0.6);
+    }
   }
 
   /** The door at the passage's far end. */
@@ -1024,9 +1047,15 @@ export class BunkerSite {
     const on = levelAt(eye.y - P.y);
     this.fixtures.forEach((x, k) => {
       if (x.level !== on) return;
-      // (Level 2 is dark until its plant runs, and then every lamp it has is lit)
-      if (x.level === 2 && !this.power) return;
-      const how = x.level === 2 ? 1 : x.how;
+      // (Level 2 waits for its plant, the lamps of its passages that burn at all showing red on their batteries)
+      if (x.level === 2 && !this.power) {
+        if (x.how >= 1 && x.battery) {
+          x.mat.emissive.set(1, 0.09, 0.05);
+          x.mat.emissiveIntensity = 1.8;
+        }
+        return;
+      }
+      const how = x.how;
       // (a dead one is a fitting on the ceiling and no more)
       if (how <= 0) return;
       x.burn = lampBurns(how, k, this.clock);

@@ -2,7 +2,6 @@
 // (Methods of Game cut out of game.ts whole on 2026-10-14, so that they can be read and worked on alone: put back on
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
-import { levelAt } from '../../sim/bunker';
 import { inMine } from '../../sim/mine';
 import { inTunnel, stationAt } from '../../sim/train-line';
 import * as THREE from 'three';
@@ -544,7 +543,7 @@ export const dropsMethods = {
     // the basements: the bulbs near the eye, and the dark down them
     this.cellars.update(cam.position, this.lamps);
     const { x: cx, y: cy, z: cz } = cam.position;
-    const under = this.nightSight || this.goggles.on ? 0 : Math.max(bunkerDark(this.bunker.place, cx, cy, cz) * (this.bunker.power && levelAt(cy - (this.bunker.place?.y ?? 0)) === 2 ? 0.86 : 1), inMine(cx, cy, cz) ? 0.9 : 0, castleDark(this.s.world.castle, cx, cy, cz, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cx, cy, cz), ...this.darkBeside.map((d) => d(cx, cy, cz)));
+    const under = this.nightSight || this.goggles.on ? 0 : Math.max(bunkerDark(this.bunker.place, cx, cy, cz), inMine(cx, cy, cz) ? 0.9 : 0, castleDark(this.s.world.castle, cx, cy, cz, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cx, cy, cz), ...this.darkBeside.map((d) => d(cx, cy, cz)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
     // well so i can see in the dark without flashlight", 2026-10-13. Under a roof the day's light is the little

@@ -167,8 +167,26 @@ let made: Plan | null = null;
 const deeper: Plan[] = [];
 /** A level as it is laid out. (Worked out once: it is the same every time.) */
 export function bunkerPlan(level = 1): Plan {
-  if (level > 1) return (deeper[level] ??= apart(layOut(BUNKER.seed, level), level));
+  if (level > 1) return (deeper[level] ??= inPatches(apart(layOut(BUNKER.seed, level), level), level));
   return (made ??= layOut(BUNKER.seed));
+}
+
+/**
+ * The deep levels burn in patches (the owner, 2026-11-01: "some parts of the bunker lvl 2 and 3 should be illuminated and some parts not"): all of a room's lamps work or
+ * none do, about one room in two, a dead room keeping the odd one that stutters, and the passages run lit and dark by stretches of a dozen metres. A lamp's fate comes from
+ * where it hangs, so it is the same in every game.
+ */
+function inPatches(plan: Plan, level: number) {
+  const roll = (a: number, b: number) => {
+    const k = Math.imul(Math.round(a * 2) + 97, 2654435761) ^ Math.imul(Math.round(b * 2) + level * 131, 40503);
+    return ((k ^ (k >>> 13)) >>> 0) % 100;
+  };
+  plan.lamps = plan.lamps.map(([r, f, y]) => {
+    const q = plan.rooms.find((x) => r > x.r0 && r < x.r1 && f > x.f0 && f < x.f1);
+    if (q) return [r, f, y, roll(q.r0, q.f0) < 50 ? 1 : roll(r, f) < 25 ? 0.35 : 0];
+    return [r, f, y, roll(Math.floor(r / 12), Math.floor(f / 12)) < 55 ? 1 : 0];
+  });
+  return plan;
 }
 
 /** what is searched is told by where it stands on the map, whatever level it is on: nothing on a level stands right under something on the one above */
