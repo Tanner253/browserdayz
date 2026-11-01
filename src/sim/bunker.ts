@@ -189,7 +189,7 @@ export function bunkerPlan(level = 1): Plan {
 
 /** the wings of Level 1, a plan of their own laid round it: see src/sim/bunker-wings.ts */
 let winged: Plan | null = null;
-export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, true), 4), 4));
+export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, true), 4), 4, 72));
 
 /** the two outer walls of the first level cut where the passage across it comes to them, and on to the ring round it */
 function letOut(plan: Plan) {
@@ -206,15 +206,16 @@ function letOut(plan: Plan) {
  * none do, about one room in two, a dead room keeping the odd one that stutters, and the passages run lit and dark by stretches of a dozen metres. A lamp's fate comes from
  * where it hangs, so it is the same in every game.
  */
-function inPatches(plan: Plan, level: number) {
+function inPatches(plan: Plan, level: number, lit = 50) {
   const roll = (a: number, b: number) => {
     const k = Math.imul(Math.round(a * 2) + 97, 2654435761) ^ Math.imul(Math.round(b * 2) + level * 131, 40503);
     return ((k ^ (k >>> 13)) >>> 0) % 100;
   };
   plan.lamps = plan.lamps.map(([r, f, y]) => {
     const q = plan.rooms.find((x) => r > x.r0 && r < x.r1 && f > x.f0 && f < x.f1);
-    if (q) return [r, f, y, roll(q.r0, q.f0) < 50 ? 1 : roll(r, f) < 25 ? 0.35 : 0];
-    return [r, f, y, roll(Math.floor(r / 12), Math.floor(f / 12)) < 55 ? 1 : 0];
+    if (q?.bare) return [r, f, y, 1];
+    if (q) return [r, f, y, roll(q.r0, q.f0) < lit ? 1 : roll(r, f) < 25 ? 0.35 : 0];
+    return [r, f, y, roll(Math.floor(r / 12), Math.floor(f / 12)) < lit + 5 ? 1 : 0];
   });
   return plan;
 }

@@ -810,7 +810,6 @@ export class Game {
       changed: () => this.inventoryChanged(),
       bases: () => this.build.known,
     });
-    if (this.bolt) this.build.ladders.fixed.push(this.bolt.line);
     this.build = new Building({
       scene: r.scene,
       atmo,
@@ -900,6 +899,7 @@ export class Game {
       },
       impact: (surface, at, normal) => this.effects.impact(surface, at, normal, false),
     });
+    if (this.bolt) this.build.ladders.fixed.push(this.bolt.line);
     this.forges = new ForgeView({
       scene: r.scene,
       online: () => this.online,

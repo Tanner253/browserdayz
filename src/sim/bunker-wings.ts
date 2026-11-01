@@ -35,7 +35,7 @@ export const WING_AREAS: Area[] = [
   { r0: 23, r1: 52, f0: 2, f1: 5 }, { r0: 23, r1: 52, f0: -14, f1: -11 }, { r0: 23, r1: 52, f0: 22, f1: 25 },
   { r0: -6, r1: 6, f0: 17.5, f1: 36 }, { r0: -20.5, r1: -6, f0: 24, f1: 27 }, { r0: 6, r1: 20.5, f0: 24, f1: 27 },
   // the bolt-hole: the cellar under the steps, and the drift at the ladder's foot, through to the hall's floor
-  { r0: 55, r1: 62, f0: 2, f1: 10, kind: 'stores', name: 'Cellar' },
+  { r0: 55, r1: 61.5, f0: 2, f1: 10, kind: 'stores', name: 'Cellar' },
   { r0: 52, r1: 57.2, f0: 4.6, f1: 7.4, y: -3.8, top: -1.2 },
 ];
 
@@ -44,7 +44,7 @@ export const WING_DOORS: [number, number, number?][] = [
   [-44, -14], [-29.5, -14], [-36, -21], [-44, -11], [-44, 2], [-29.5, 2], [-23, -4.5], [-44, 5], [-30, 5], [-23, 14], [-44, 22], [-30, 22], [-45, 25], [-30, 25], [-38, 30.5],
   [30, -14], [44.5, -14], [37, -21], [30, -11], [23, -4.5], [44.5, -11], [44.5, 2], [30, 5], [44.5, 5], [23, 14], [30, 22], [44.5, 22], [30, 25], [45, 25], [38, 30.5],
   [-20.5, 17], [20.5, 17], [-20.5, 31.5], [20.5, 31.5], [-6, 20], [6, 20], [-6, 31.5], [6, 31.5], [-13, 24], [13, 24], [-13, 27], [13, 27],
-  [59.75, 10], [52, 6, -3.8],
+  [60.2, 10], [52, 6, -3.8],
 ];
 
 /** how deep the generator hall's floor lies, and the walkway round it at the level's own floor: how wide */
@@ -54,7 +54,7 @@ export const HALL_DEEP = 3.8, WALKWAY = 2.4;
  * The bolt-hole's fixed points. `steps`: the cellar steps, a flight beside the barracks rising from the cellar's back to the ground; `open`, where their roof ends and the ground is
  * cut for them. `hatch`: the steel plate in the cellar's floor, the ladder under it, the wheel beside it.
  */
-export const BOLT = { steps: { r0: 58.5, r1: 61, f0: 10, f1: 19, high: 4.9, open: 14.2 }, hatch: { r: 56, f: 6, half: 0.62 } };
+export const BOLT = { steps: { r0: 59, r1: 61.4, f0: 10, f1: 19, high: 3.3, open: 13 }, hatch: { r: 56, f: 6, half: 0.62 } };
 
 const inside = (a: Area, r: number, f: number, slack = 0) => r > a.r0 - slack && r < a.r1 + slack && f > a.f0 - slack && f < a.f1 + slack;
 
