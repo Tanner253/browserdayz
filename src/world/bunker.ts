@@ -644,7 +644,7 @@ export class BunkerSite {
           for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) slab(dark, 0.08, 0.22, 0.08, x * w * 0.3, 0, z * w * 0.3);
           // a pipe off the top of it into the wall behind
           part(new THREE.CylinderGeometry(0.045, 0.045, w * 0.7, 8), dark, 0, h - 0.3, -w * 0.45, new THREE.Euler(Math.PI / 2, 0, 0));
-          const [x, y, z] = bunkerAt(P, m.r, m.f, Y + h / 2);
+          const [x, y, z] = bunkerAt(P, m.r, m.f, Y + (m.y ?? 0) + h / 2);
           physics.addStatic(physics.R.ColliderDesc.cylinder(h / 2, w / 2), 'metal', { x, y, z });
           break;
         }
