@@ -76,6 +76,10 @@
       .entry li::before { content: ''; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; background: var(--brand); }
       .entry li b { font-weight: 600; color: var(--ink); }
       .entry li.fix::before { background: var(--ok); }
+      .entry h3 { margin: 26px 0 10px; font-size: 1.05rem; color: var(--ink); }
+      .entry .steps { max-width: 860px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+      .entry .steps li { counter-increment: step; padding: 0 0 12px 38px; }
+      .entry .steps li::before { content: counter(step); top: 0; width: 26px; height: 26px; line-height: 26px; text-align: center; font-size: 0.8rem; font-weight: 700; color: #111; }
       /* hearts, and what people say under an entry (kept by the game server: see src/sim/news.ts). Shut until opened. */
       .talk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 22px 0 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
       .talk[hidden] { display: none; }
@@ -196,33 +200,121 @@
       </section>
 
       <article class="entry" id="the-way-down">
-        <div class="when"><time datetime="2026-10-31">31 Oct 2026</time><span class="tag">Latest</span></div>
+        <div class="when"><time datetime="2026-11-01">1 Nov 2026</time><span class="tag">Latest</span></div>
         <div>
-          <h2>The way down: five clearance passes, a mine, a swamp, a radar dome, and Levels 2 and 3</h2>
-          <p class="lead">Bunker 17 goes three levels deep now, and getting to the bottom takes you across the whole map. Each stop hands you the pass for the next, and the best guns in the game only lie on the last level.</p>
+          <h2>The way down: Bunker 17 goes three levels deep, and here is how to reach the bottom</h2>
+          <p class="lead">The biggest update the Zone has had. Bunker 17 is no longer one level: it is three, and the road to the bottom runs across the whole map, from the gas to the desert, the swamp and the snow. Every stop hands you the pass for the next. The vault on Level 3 is the only place on the map that holds the heavy snipers. Nothing on the way teleports you: you walk it, or you ride the train.</p>
           <div class="media">
-            <figure class="wide"><img loading="lazy" src="/changelog/media/way-dome.jpg" alt="A white radar dome on a concrete tower on a snowy ridge."><figcaption>The Kupol, above the snow line</figcaption></figure>
+            <figure class="wide"><img loading="lazy" src="/changelog/media/way-hall.jpg" alt="The great hall of Level 3, seen from the balcony, with a stair running down to the round vault door."><figcaption>Level 3: the great hall and the round door</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-vault.jpg" alt="Gun racks along both walls of the vault, crates of ammunition up the aisles."><figcaption>Inside the vault</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-plant.jpg" alt="A heavy diesel generator on a plinth on Level 2."><figcaption>The plant on Level 2</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-torches.jpg" alt="The hoist room of the Old Mine, torches on its walls, the drift running off into the dark."><figcaption>The Old Mine by torchlight</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-catwalk.jpg" alt="The railed catwalk round the Kupol, over a snowy ridge."><figcaption>The catwalk round the Kupol</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-dome.jpg" alt="A white radar dome on a concrete tower on a snowy ridge."><figcaption>The Kupol, above the snow line</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-pumps.jpg" alt="A concrete pump house among reeds and shallow water."><figcaption>Bolotnaya, in the swamp</figcaption></figure>
             <figure><img loading="lazy" src="/changelog/media/way-labs.jpg" alt="An infected in an orange suit in a concrete passage, with BATCH 18 FAILED painted on the wall."><figcaption>Level 2, with the plant running</figcaption></figure>
             <figure><img loading="lazy" src="/changelog/media/way-pass.jpg" alt="An ID badge in a black holder with a printed QR code."><figcaption>A clearance pass. One model, five colours</figcaption></figure>
-            <figure><img loading="lazy" src="/changelog/media/way-gate.jpg" alt="A timber portal with a dark mouth at the foot of a red canyon wall, with a reader beside it."><figcaption>The Old Mine's east gate</figcaption></figure>
-            <figure><img loading="lazy" src="/changelog/media/way-boxcar.jpg" alt="A rusted boxcar on a length of track in the snow."><figcaption>The carriage at the Kupol siding</figcaption></figure>
-            <figure><img loading="lazy" src="/changelog/media/way-pumps.jpg" alt="A concrete pump house among reeds and shallow water."><figcaption>Bolotnaya, in the swamp</figcaption></figure>
           </div>
+
+          <h3>How to reach Level 3, step by step</h3>
+          <p>Your map tells you the next stop for the pass you are carrying, and a locked thing says where its pass comes from. Passes are scanned at a reader, and all but the yellow one are used up when they are. Bring a gas mask: the bunker lies under the gas.</p>
+          <ol class="steps">
+            <li><b>Get a green Bunker Keycard.</b> They lie under the gas, at the Chemical Works and in the other gas zones, and now and then at the fort. Carry it on foot: no car will take you while you have one. The reader at the bunker's door keeps it.</li>
+            <li><b>Go to Bunker 17.</b> It lies under Gorodok, the army camp in the gas. Down the stair, scan the green card, and the steel door opens. Level 1 has grown: nineteen more rooms round the old block, a passage all the way round it, and a generator hall two storeys deep.</li>
+            <li><b>Find the blue pass on Level 1.</b> It lies on this level and on no other.</li>
+            <li><b>Take it to Stolovaya</b>, the post on a mesa in the desert. Scan it at the reader by the blockhouse. The strong room's steel door opens, a flare goes up, and the infected come. The yellow pass is in the crate inside. Stolovaya then rests for 30 minutes.</li>
+            <li><b>Use the yellow pass twice.</b> It is the one pass you keep. At either gate of the Old Mine it opens the mine for 15 minutes, a walk through the canyon wall instead of round it. Its other job is at Bolotnaya.</li>
+            <li><b>Go to Bolotnaya</b>, the pump station in the swamp. Scan the yellow pass, then find and turn three valves in six minutes, four seconds at each. The infected climb up out of the swamp while you work. Run out of time with a valve left and the place rests for 30 minutes with nothing paid. Finish, and the strong room opens on the red pass, the Level 2 keycard.</li>
+            <li><b>Back to the bunker.</b> Scan the red pass at the reader at the far end of Level 1. The goods lift stands open for 30 minutes, and rides you down to Level 2.</li>
+            <li><b>Start the plant on Level 2.</b> The level is dark. A jerrycan always lies on that floor, by the lift, and is back five minutes after it is taken. Pour it into the generator in the plant: the lamps wake room by room, outward from the plant, and everything asleep down there wakes with them. Hold out for 75 seconds and the strong room opens on the black pass.</li>
+            <li><b>Go to the Kupol</b>, the radar dome high on the snowy ridge in the east. Scan the black pass, then throw three breakers in four minutes while the infected come. Each breaker lights a floodlight, and the last one starts the dish turning. The strong room opens on the purple pass, the Level 3 keycard. The Kupol then rests for 40 minutes.</li>
+            <li><b>Choose your way into Level 3.</b> The purple pass works once, at either of two places.
+              <br><b>The stair:</b> a door in the wall of Level 2's change room. It stands open for five minutes, and opens from the Level 3 side with no pass at all.
+              <br><b>The train:</b> the foot of the stair west of the Kupol. Scan the pass at the station door, which stands open for five minutes, and ride the wagon through a tunnel of more than two kilometres. A run takes 76 seconds, and the train comes and goes on its own clock.</li>
+            <li><b>Open the vault.</b> It lies under the far end of the great hall, behind a round steel door, and takes no pass. Find vault control, throw the breaker, and hold out for 90 seconds while a siren draws the level down on you. The door rolls aside. Thrown once, the breaker rests for an hour.</li>
+          </ol>
+
+          <h3>The vault</h3>
           <ul>
-            <li><b>Blue pass:</b> lies on Level 1 of the bunker. Scan it at the reader at Stolovaya, the new post on a mesa in the desert: a siren, the strong room opens, and the infected come for four minutes. The locker at the end holds the yellow pass.</li>
-            <li><b>Yellow pass:</b> opens the Old Mine, a way through the canyon wall, for 15 minutes. It is shown and kept, because it also starts the pumps at Bolotnaya in the swamp: three valves in the reeds to turn in six minutes while the infected come. Turn them all and the room opens, with the red pass in the locker. Run out of time and you get nothing.</li>
-            <li><b>Red pass:</b> opens the door at the far end of Level 1, and the goods lift behind it to Level 2.</li>
-            <li><b>Level 2:</b> dark. A jerrycan always lies on that floor and is back five minutes after it is taken. Pour it into the plant and the lamps come up, everything down there wakes, and three minutes later the locker in the armoury holds the black pass.</li>
-            <li><b>Black pass:</b> starts the Kupol, the radar dome high in the snow: three breakers to throw in four minutes, then twelve minutes to hold the place. The locker then holds the purple pass.</li>
-            <li><b>Purple pass:</b> calls the carriage at the Kupol siding, thirty seconds to Level 3 and the only way in. The ladder at the front wall is the way out, up into the camp over the bunker.</li>
-            <li><b>Level 3:</b> the L96, the Barrett and the VSSK are found here and nowhere else now. The vault breaker sets off a siren and four minutes of infected, and pays out night vision.</li>
-            <li><b>Night vision:</b> carried, N puts it to the eye.</li>
+            <li><b>Eight gun racks:</b> four down each wall, each stocked with the Barrett .50, the L96 AWP .50 and the VSSK, their magazines and their scopes, and what they fire.</li>
+            <li><b>Crates up the aisles:</b> six ammunition crates with six cases on top, and three more cases at the far end, full piles of .50 BMG and 12.7x55, magazines, now and then a plate carrier or night vision.</li>
+            <li><b>Night vision:</b> paid out when the door opens. Carried, N puts it to the eye.</li>
+            <li><b>Forty minutes:</b> what is taken from the vault's racks and crates takes forty minutes to come back.</li>
+            <li><b>Tappers:</b> the L96, the Barrett and the VSSK are found on Level 3 and nowhere else now.</li>
+          </ul>
+
+          <h3>Getting back out</h3>
+          <ul>
+            <li><b>The ladder:</b> in the east drift of Level 3, up to a wheel. Turn it and a hatch opens into the generator hall on Level 1.</li>
+            <li><b>The back way:</b> a trapdoor in the arms room of the far barracks at Gorodok, a ladder down to a cellar, and a hatch. Its wheel always turns from below, and it opens the bunker's door with it.</li>
+            <li><b>The train:</b> runs back the way it came.</li>
+            <li><b>The stair:</b> the door to Level 2 opens from below with no pass.</li>
+          </ul>
+
+          <h3>The places on the way</h3>
+          <ul>
+            <li><b>Level 1:</b> mess, wards, offices and the rest, round a generator hall you look down into from its walkway.</li>
+            <li><b>Level 2, the Institute:</b> decontamination with glass doors that part for you, a change room, labs behind glass, a morgue, an anatomy theatre, a director's office, a pump room, and a tank hall with eight tanks and a broken bridge. The observation room has a glass floor over Level 3.</li>
+            <li><b>Level 3:</b> a balcony over a great hall with a trench and a crane, galleries round it, an armoury, officers' quarters, a map room, cells, a sick bay and the last stores.</li>
+            <li><b>Secrets:</b> every level has places you only reach by jumping, crouching or going prone, and some of the best crates are in them. Look at the tops of things, and at the bottoms of walls.</li>
+            <li><b>The Old Mine:</b> a walked tunnel lit by torches with real dark between them. An incline from the west, a level drift, a hoist room half way, three galleries that end in dead sleepers, and a stretch where the roof came down and you go through bent double.</li>
+            <li><b>Minecarts can be searched:</b> pickaxes, scrap and metal fragments, in the mine and at its gates. Bring a torch.</li>
+            <li><b>The Kupol:</b> walk inside the dome now, up a stair and a ladder to the deck under it, and out of a hatchway on to the catwalk, the highest place to stand for kilometres.</li>
+            <li><b>Bolotnaya:</b> wheels that turn, and a settling tank that drains with a crate at the bottom of it.</li>
+          </ul>
+
+          <h3>Also in this update</h3>
+          <ul>
+            <li><b>Less drawn underground:</b> down the bunker the game no longer draws the surface, the sun's shadows or the floors you are not on, and the mine drops the surface too.</li>
+            <li><b>The ruins at Kalat:</b> loose stones and rubble round the edge of the town no longer hang in the air.</li>
+            <li><b>The fort:</b> its hand-made generator is a real model now.</li>
+            <li><b>The infected:</b> they find their way round all three levels and the mine, no longer crawl through Level 1's west hall, and only those on your floor are drawn.</li>
+            <li><b>Level 1:</b> the invisible wall that kept you out of its halls is gone, and nothing in its rooms stands in anything else.</li>
             <li><b>Rarer guns:</b> the Desert Eagle, the Benelli and heavy armour go from four or three to two each on Tier 5, and the AK leaves Tier 3.</li>
-            <li><b>A camp in the gas:</b> Gorodok, the army's camp over Bunker 17, with its own watchtower.</li>
             <li><b>Two new scenes</b> on the front page: the Kupol and Stolovaya.</li>
           </ul>
         </div>
       </article>
+
+      <article class="entry" id="halloween">
+        <div class="when"><time datetime="2026-11-01">1 Nov 2026</time><span class="tag">Event</span></div>
+        <div>
+          <h2>Halloween: twice the infected, and every tag pays 0.025 SOL</h2>
+          <p class="lead">For four hours, from 00:35 to 04:35 UTC on 1 November, the Zone is twice as full of the dead and every dog tag pays the top rate.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/halloween.jpg" alt="A crowd of the infected crossing the grass under a fortress and an orange moon, with the event's figures."><figcaption>The event card. The picture is Pokrov from the game, with the crowd and the moon painted in</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>Twice the infected:</b> every place on the map stands twice its usual number. When the event ends, the extra ones are not put back as they die.</li>
+            <li><b>0.025 SOL a tag, for everyone:</b> a tag cashed in during the event pays 0.025 SOL whatever its wallet holds, up from 0.01, even if it is paid after the event is over.</li>
+            <li><b>The limits stand:</b> five tags a wallet a day, and past your first 10 paid tags a wallet must hold 350,000 $ZONA.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="stolovaya">
+        <div class="when"><time datetime="2026-10-31">31 Oct 2026</time></div>
+        <div>
+          <h2>The first step of the way down: a blue pass, and a siren at Stolovaya</h2>
+          <p class="lead">Bunker 17 now sends you back out across the map. There is a new kind of key, a new event to fight through, and an army camp on the ground over the bunker. The next steps are coming.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/way-mesa.jpg" alt="A flat-topped red mesa in the desert with a small post on its top."><figcaption>Stolovaya, on its mesa in the desert</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-strong.jpg" alt="A concrete guard post with a card reader standing by its door."><figcaption>The strong room and its reader</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/way-pass.jpg" alt="An ID badge in a black holder with a printed QR code."><figcaption>A clearance pass</figcaption></figure>
+            <figure class="wide"><img loading="lazy" src="/changelog/media/way-camp.jpg" alt="An army camp of barracks and tents on the ground over Bunker 17."><figcaption>Gorodok, the army's camp over Bunker 17</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>The blue clearance pass:</b> lies on Level 1 of Bunker 17. Three are out at a time, and one that is taken comes back about five minutes on, while nobody is near.</li>
+            <li><b>Stolovaya:</b> a new post on a mesa in the desert, marked on your map. Scan the blue pass at the reader and the pass is cancelled, a siren starts, the strong room opens with a crate in it, and the infected come in waves for four minutes.</li>
+            <li><b>Everybody knows:</b> the crates are marked on every map and the siren is told to anybody within 1,500 metres, so you may have company.</li>
+            <li><b>The locker:</b> when the time is up it opens with a yellow clearance pass and a supply drop's worth of gear. Keep the yellow pass: what it opens is coming soon. Stolovaya is then spent for 30 minutes.</li>
+            <li><b>Gorodok:</b> the army's camp in the gas over Bunker 17, with barracks, tents, a motor pool and its own watchtower.</li>
+            <li><b>A new scene</b> on the front page: Stolovaya.</li>
+            <li><b>Fixed:</b> a thing that took a while to load no longer stays stuck in your hand after you have finished with it.</li>
+          </ul>
+        </div>
+      </article>
+
 
       <article class="entry" id="traps-smoke-flares">
         <div class="when"><time datetime="2026-10-31">31 Oct 2026</time></div>
