@@ -528,7 +528,7 @@ export const dropsMethods = {
     }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * (far > 8 ? 1.5 : 0.5), far), (id) => (id === 'strong' ? this.sites.spent('level2') : id === 'vault' ? this.sites.spent('vault') : this.sites.gateOpen(id)), this.sites.going('vault'));
-    this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.1, 14));
+    this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.1, 14), this.sites.gateOpen('mine'));
     // the train's line: its tunnel, and the halls at its two ends, drawn from either
     const onTrack = stationAt(cam.position.x, cam.position.y, cam.position.z) !== null || inTunnel(cam.position.x, cam.position.y, cam.position.z), train = this.trainCar.state();
     const stops = (at: { x: number; y: number; z: number }, burn: number) => this.lamps.glow(at as never, BUNKER_LAMP, burn * 1.2, 15);

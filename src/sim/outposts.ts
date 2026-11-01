@@ -76,12 +76,12 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     { type: 'guardpost', x: 10, z: 60, rot: N, up: 0.03, under: 0.8 },
   ],
   Stolovaya: [
-    // (the observers' quarters, the instrument shop, the crew tent; and the guard post, its door to the reader, the strong room)
+    // (the observers' quarters, the instrument shop, the crew tent; and the blockhouse, its door to the reader, the strong room)
     { type: 'hut', x: -10, z: -18, rot: N },
     { type: 'barracks', x: -30, z: 10, rot: Q },
     { type: 'garage', x: 30, z: 20, rot: S },
     { type: 'tent', x: -4, z: 20, rot: S },
-    { type: 'guardpost', x: 22, z: -10, rot: -Q },
+    { type: 'blockhouse', x: 22, z: -10, rot: -Q },
   ],
   Bolotnaya: [
     // (the pump house, its door to the south and the sunken room under it; the keeper's shed; a barn the swamp has had)
@@ -203,10 +203,10 @@ const THINGS: Record<string, TownThing[]> = {
   'Kupol Siding': [],
   'Old Mine': [
     // the portal in the rock (+x straight out of it), and the reader (+x) looking out with it, to one side
-    { kind: 'mine_portal', x: 0, z: 0, rot: 0 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },
+    { kind: 'mine_portal', x: 0, z: 0, rot: 0.6116 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },
   ],
   'Old Mine East': [
-    { kind: 'mine_portal', x: 0, z: 0, rot: 0 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'ore_cart', x: 5.2, z: 2.2, rot: 0.4 },
+    { kind: 'mine_portal', x: 0, z: 0, rot: 0.478 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'ore_cart', x: 5.2, z: 2.2, rot: 0.4 },
   ],
   Stolovaya: [
     // the range's instruments and what they ran on, up here for the view; concrete round the strong room's way in, and its reader

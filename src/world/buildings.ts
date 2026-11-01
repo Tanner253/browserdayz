@@ -16,7 +16,7 @@ import type { Tier } from '../sim/tiers';
 import { watchtowerTier } from '../sim/watchtowers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, bunkerWings, LEVELS, levelY } from '../sim/bunker';
-import { mineProps } from '../sim/mine';
+import { mineProps, minePlaces } from '../sim/mine';
 import { wreckUnder } from '../sim/bridge';
 import { LATER_TOWNS, TOWNS } from '../sim/towns';
 import { castleLoot, castleProps } from '../sim/castle';
@@ -1128,6 +1128,25 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         usage: ['Village', 'Town'],
       };
     }
+    case 'blockhouse':
+      // (a strong room with no business being looked into: poured walls, firing slits under the roof, and the one door. As many places for things as a guard post, which it replaced)
+      return {
+        w: 6.4, d: 4.4, h: 3, ext: 'concrete', int: 'concrete', floor: 'floor_concrete', roof: 'concrete', roofType: 'flat',
+        walls: [
+          { side: 'front', ext: 'concrete', int: 'concrete', openings: [win(-2.7, -1.5, 2.2, 2.45), door(-0.5, 0.5), win(1.5, 2.7, 2.2, 2.45)] },
+          { side: 'back', ext: 'concrete', int: 'concrete', openings: [win(-0.7, 0.7, 2.2, 2.45)] },
+          { side: 'left', ext: 'concrete', int: 'concrete', openings: [win(-0.7, 0.7, 2.2, 2.45)] },
+          { side: 'right', ext: 'concrete', int: 'concrete', openings: [win(-0.7, 0.7, 2.2, 2.45)] },
+        ],
+        furniture: [
+          { id: 'metal_office_desk', x: -1.6, z: -1.6, rot: 0 },
+          { id: 'SchoolChair_01', x: -1.4, z: -0.7, rot: Math.PI },
+          { id: 'weapons_case', x: 2.3, z: 1.25, rot: Math.PI / 2 },
+          { id: 'Shelf_01', x: -2.85, z: 0.6, rot: Math.PI / 2 },
+        ],
+        loot: [[-2.1, 0.81, -1.6], [-1.1, 0.81, -1.6], [2.3, 0.48, 1.25], [-2.88, 0.44, 0.6], [-2.88, 1.24, 0.6], [0.6, 0.02, -1.2]],
+        usage: ['Military'],
+      };
     case 'guardpost':
     default:
       return {
@@ -1676,6 +1695,8 @@ export class Buildings {
     }
     // (what stands in the Old Mine's drifts: src/sim/mine.ts)
     if (this.world.towns) for (const p of mineProps()) this.world.props.push({ ...p, scale: 1, far: 46 });
+    // (and what lies in them, after everything else's places)
+    if (this.world.towns) for (const q of minePlaces()) this.deepLoot.push({ x: q.x, y: q.y + 0.02, z: q.z, usage: ['Industrial', 'Military'], building: 'mine', floor: true, tier: 3 });
     // And the places on the boards of the racks (RACKS): after every other place on the map, the bunker's too, so
     // that not one of those is renumbered. Each is of the kind its building is, and on the step of the map that
     // building stands on, as that building's other places are.
@@ -3075,13 +3096,13 @@ export class Buildings {
     if (plot.arms) {
       const mine = this.lootPoints.slice(firstPoint);
       const pick = [...mine.filter((p) => p.floor), ...mine.filter((p) => !p.floor)].slice(0, plot.arms);
-      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'police_hq' || plot.type === 'guardpost' || plot.type === 'barracks' || plot.type === 'tent' ? 'guns' : 'any';
+      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'police_hq' || plot.type === 'guardpost' || plot.type === 'blockhouse' || plot.type === 'barracks' || plot.type === 'tent' ? 'guns' : 'any';
     }
 
     // yard clutter
     const later = this.world.buildings.indexOf(plot) >= this.world.buildings.findIndex((o) => o.type === 'hospital');
     const yard = ['Barrel_01', 'barrel_03', 'wooden_crate_01', 'cardboard_box_01', 'metal_trash_can', 'old_tyre', 'trashbag', 'trashbag', 'cardboard_box_01'];
-    const n = plot.type === 'guardpost' ? 1 : rng.int(2, 5);
+    const n = plot.type === 'guardpost' || plot.type === 'blockhouse' ? 1 : rng.int(2, 5);
     const placed: THREE.Vector3[] = [];
     for (let i = 0; i < n; i++) {
       const side = rng.int(0, 3);

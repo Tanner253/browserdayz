@@ -10,7 +10,7 @@ import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { levelY } from '../src/sim/bunker';
 import { makeItem } from '../src/sim/items';
-import { GATES, RIDES, SITES, sitePoint, siteSpot, spotAt } from '../src/sim/sites';
+import { GATES, SITES, sitePoint, siteSpot, spotAt } from '../src/sim/sites';
 
 const PORT = 8423, PAD = 35.6;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -180,7 +180,7 @@ try {
   ok('the vault wants a hand at its breaker on its own level, and pays out night vision');
 
   // ---- out by the ladder: its hatch turns from under it and from nowhere else, or the generator hall would be a way in for nothing
-  const before = ann.all('put').length, [hx, , hz] = spotAt(GATES.escape.at, P);
+  const [hx, , hz] = spotAt(GATES.escape.at, P);
   await ann.go(hx, Y2 + 0.1, hz);
   ann.send({ t: 'gate', g: 'escape' });
   await sleep(250);
@@ -202,28 +202,17 @@ try {
   await ann.until('the stair door opened', () => ann.all('gate').some((m) => m.g === 'stair' && m.open));
   ok('the stair from Level 2 opens to the purple card');
 
-  const [wx, , wz] = spotAt(GATES.mine.at, P), [ex, , ez] = spotAt(GATES.mine.also!, P), [ix, iy, iz] = spotAt(RIDES.mine_in.to, P);
+  const [wx, , wz] = spotAt(GATES.mine.at, P);
   await ann.go(wx, 2, wz);
-  ann.send({ t: 'ride', w: 'mine_in' });
+  ann.send({ t: 'gate', g: 'mine' });
   await sleep(250);
-  assert.equal(ann.all('put').length, before, 'the mine let somebody in with its gate shut');
+  assert.ok(!ann.all('gate').some((m) => m.g === 'mine' && m.open), 'the mine opened with no pass');
   ann.carry('card_yellow');
   await sleep(200);
   ann.send({ t: 'gate', g: 'mine' });
   await ann.until('the mine opened', () => ann.all('gate').some((m) => m.g === 'mine' && m.open));
   assert.equal(ann.all('siteok').filter((m) => m.card === 'card_yellow').length, 2, 'the mine took the yellow pass');
-  const [mx, , mz] = spotAt(RIDES.mine_in.from, P);
-  await ann.go(mx, 2, mz);
-  ann.send({ t: 'ride', w: 'mine_in' });
-  await ann.until('in by the west gate', () => ann.all('put').length === before + 1);
-  const inside = ann.all('put').pop()!;
-  assert.ok(Math.hypot(inside.x - ix, inside.z - iz) < 0.1 && Math.abs(inside.y! - iy!) < 0.1, 'the gate leads somewhere else');
-  await ann.go(ix + 1, iy!, iz);
-  ann.send({ t: 'ride', w: 'mine_out' });
-  await ann.until('out again', () => ann.all('put').length === before + 2);
-  assert.ok(Math.hypot(ann.all('put').pop()!.x - wx, ann.all('put').pop()!.z - wz) < 6, 'out by another gate');
-  assert.ok(ex !== wx && ez !== wz);
-  ok('the yellow pass opens the mine and stays with whoever showed it, and there is a way out from inside');
+  ok('the yellow pass opens the mine and stays with whoever showed it');
 } catch (e) {
   failed = e;
 }

@@ -27,6 +27,7 @@ import { waterAt } from './sim/water';
 import { caveMouths } from './sim/pass';
 import { STATION_MOUTHS } from './sim/train-line';
 import { boltMouth } from './sim/bunker-wings';
+import { MINE_MOUTHS } from './sim/mine';
 import { bunkerPlace } from './world/worldgen';
 import { caveLootPoints, inCave } from './world/caves-carved';
 import { PassCaves } from './world/caves';
@@ -254,7 +255,7 @@ async function boot() {
   // back to a cave, had no floor until the rock models had loaded)
   await caves.build({ carved: world.caves, heightTex: terrain.heightTex });
   const place = bunkerPlace(world);
-  terrain.openWells(world.basements ?? [], [...caveMouths(passPlan), ...STATION_MOUTHS, ...(place ? [boltMouth(place)] : [])]);
+  terrain.openWells(world.basements ?? [], [...caveMouths(passPlan), ...STATION_MOUTHS, ...MINE_MOUTHS, ...(place ? [boltMouth(place)] : [])]);
   // (and its walls' rock got ready as the outcrops' is: each of its lists empty until the eye comes near, none was in
   // the drawing of the world at the start, and the driver did its first work on each as somebody walked into the pass,
   // the card held in Present for 80 to 650 ms at a time; 2026-10-19, traced)

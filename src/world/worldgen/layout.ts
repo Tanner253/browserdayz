@@ -367,7 +367,7 @@ export const VILLAGE_STREETS = {
 /** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
 export const SERVICES = { from: 68, to: 116, out: 90 };
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage' | 'flats'
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'blockhouse' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage' | 'flats'
   // (2026-10-16: the new towns' own, see src/world/town-plans.ts)
   | 'cathedral' | 'belfry' | 'cells' | 'refectory' | 'abbot' | 'tavern' | 'merchant' | 'smithy' | 'izba' | 'izba_two' | 'chapel' | 'sawmill'
   // (the brick works by the river, its walls dressed in the factory and apartments facade kits: src/world/zavod-plans.ts)
@@ -386,7 +386,7 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   barn: [12, 8],
   shed: [4, 3.2],
   cabin: [6, 5],
-  guardpost: [4.4, 4.4],
+  guardpost: [4.4, 4.4], blockhouse: [6.4, 4.4],
   police: [14, 9],
   clinic: [11, 7.5],
   store: [10, 7],

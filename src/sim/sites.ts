@@ -5,7 +5,7 @@
 // only: the server runs it (server/sites.ts), and every number is here.
 
 import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, levelY, type Place } from './bunker';
-import { inMine, MINE } from './mine';
+import { inMine } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, STOLOVAYA } from './outposts';
 import { DOOR, SHAFT, STATIONS, stationAt } from './train-line';
 import { BOLT } from './bunker-wings';
@@ -139,11 +139,6 @@ export interface Ride { label: string; doing: string; secs: number; gate?: strin
 export const RIDES: Record<string, Ride> = {
   // (the lift itself runs by itself: src/game/lift.ts. A bar on the inside of the door it stands behind: nobody is shut in)
   lift_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, unless: 'lift', from: { level: 1, at: CABIN }, to: { level: 1, at: [0, BUNKER.hall.back + 1.6] } },
-  mine_in: { label: 'Go in', doing: 'Through the gate', secs: 2, gate: 'mine', from: { town: MINE_W, at: [3, 0] }, to: { place: [MINE.x0 + 1.5, MINE.y, MINE.z] } },
-  mine_in_e: { label: 'Go in', doing: 'Through the gate', secs: 2, gate: 'mine', from: { town: MINE_E, at: [3, 0] }, to: { place: [MINE.x1 - 1.5, MINE.y, MINE.z] } },
-  // (out is by a bar on the inside: nobody is shut in)
-  mine_out: { label: 'Out by the west gate', doing: 'Through the gate', secs: 2, from: { place: [MINE.x0 + 1.5, MINE.y, MINE.z] }, to: { town: MINE_W, at: [4, 0] } },
-  mine_out_e: { label: 'Out by the east gate', doing: 'Through the gate', secs: 2, from: { place: [MINE.x1 - 1.5, MINE.y, MINE.z] }, to: { town: MINE_E, at: [4, 0] } },
   // (off the platform by a bar on the inside: nobody is shut in)
   train_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, from: { place: DOOR.inside }, to: { place: DOOR.outside } },
 };
