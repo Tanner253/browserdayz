@@ -1145,6 +1145,8 @@ export function handle(c: Client, m: C2S) {
     case 'party':
       return partyAct(c, m);
     case 'ping':
+      // (their own word, and only ever a margin up to LOOK.late: a lie buys a step round a corner, and no look through a wall)
+      if (typeof m.ms === 'number' && Number.isFinite(m.ms)) c.ms = Math.max(0, Math.min(1000, m.ms));
       send(c, { t: 'pong', n: m.n, at: Date.now() });
       return;
     case 'report': {

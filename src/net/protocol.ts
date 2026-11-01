@@ -455,7 +455,7 @@ export type C2S =
   | { t: 'sitestep'; s: string; k: number }
   /** a pass shown to a gate, and a ride taken */
   | { t: 'gate'; g: string }
-  | { t: 'ping'; n: number }
+  | { t: 'ping'; n: number; /** how long the way to the server and back last took, ms: how far ahead the line of sight looks for them (server/sight.ts) */ ms?: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string; /** what sprang it: the reader's stack, or the hooking code (src/net/bait.ts) */ proof?: string }
   /** a report of their last death, from the death screen (src/sim/reports.ts) */

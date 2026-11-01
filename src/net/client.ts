@@ -423,7 +423,7 @@ export class Net {
           this.pingT = setInterval(() => {
             const n = performance.now();
             if (this.pingsOut.length < 30) this.pingsOut.push(n);
-            this.send({ t: 'ping', n });
+            this.send({ t: 'ping', n, ms: this.ping });
           }, 4000) as unknown as number;
           // (a script that read window.__game, before this connection or after it: src/net/bait.ts)
           onBait((what, proof) => this.send({ t: 'bait', what, proof }));

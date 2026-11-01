@@ -38,11 +38,14 @@ export interface Body {
   low: 0 | 1 | 2;
   vx: number;
   vz: number;
+  /** how long their way to the server and back takes, ms */
+  ms?: number;
 }
 
 /** how often a pair is looked at again (ms, near and far), how long one seen stays told of, how far ahead each is
- * taken to be going (s), a lean's width (m), and the most lines traced in one tick (what is not looked at is seen) */
-export const LOOK = { near: 60, nearMs: 0, farMs: 250, keepMs: 1000, ahead: 0.25, lean: 0.45, most: 2000 };
+ * taken to be going (s), a lean's width (m), the most lines traced in one tick (what is not looked at is seen), and
+ * for two far from the server: the most of their lateness allowed for (s), and how fast one may step out of cover (m/s) */
+export const LOOK = { near: 60, nearMs: 0, farMs: 250, keepMs: 1000, ahead: 0.25, lean: 0.45, most: 2000, late: 0.4, sidestep: 3.5 };
 
 /** the eye over the feet, standing, crouched, lying; and the head and chest */
 const EYE = [1.6, 1.1, 0.4], HEAD = [1.65, 1.1, 0.3], CHEST = [1.25, 0.8, 0.3];
@@ -82,7 +85,10 @@ export class Sight {
   }
 
   private look(me: Body, them: Body, d: number): boolean {
-    const dx = (them.x - me.x) / (d || 1), dz = (them.z - me.z) / (d || 1), sx = -dz, sz = dx, a = LOOK.ahead, w = LOOK.lean;
+    // (what one is told of reaches them half a trip after it left the other, and that came half a trip late. The margin was one size for everybody, and two far from the server used all of it, one
+    // starting from a stand had none: the owner's player in Europe, 2026-11-01, "people random either appear and kill me or dont show at all")
+    const late = Math.min(LOOK.late, ((me.ms ?? 0) + (them.ms ?? 0)) / 2000);
+    const dx = (them.x - me.x) / (d || 1), dz = (them.z - me.z) / (d || 1), sx = -dz, sz = dx, a = Math.max(LOOK.ahead, late + 0.07), w = LOOK.lean + LOOK.sidestep * late;
     const ey = me.y + EYE[me.low], hy = them.y + HEAD[them.low], cy = them.y + CHEST[them.low];
     const eyes: Vec3[] = [[me.x, ey, me.z], [me.x + sx * w, ey, me.z + sz * w], [me.x - sx * w, ey, me.z - sz * w], [me.x + me.vx * a, ey, me.z + me.vz * a]];
     const aims: Vec3[] = [[them.x, hy, them.z], [them.x, cy, them.z], [them.x + sx * w, hy, them.z + sz * w], [them.x - sx * w, hy, them.z - sz * w], [them.x + them.vx * a, hy, them.z + them.vz * a]];

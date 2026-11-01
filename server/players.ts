@@ -53,6 +53,8 @@ export interface Client {
   trail?: { t: number; p: Pose }[];
   /** whom they were last told the whereabouts of (server/sight.ts) */
   told?: Set<number>;
+  /** how long their way here and back takes, ms, as their game last measured it */
+  ms?: number;
   name: string;
   pose: Pose;
   /** when their game said that was so, by its own clock (ms) */

@@ -633,12 +633,21 @@ setInterval(() => {
 const loopDelay = monitorEventLoopDelay({ resolution: 20 });
 loopDelay.enable();
 export const LOOP = { p50: 0, p99: 0, max: 0 };
+/** the worst of those minutes since this server started, and how many were on: a quiet moment's figures say nothing of a busy evening's */
+const WORST = { ms: 0, on: 0, at: '' };
 setInterval(() => {
   const ms = (ns: number) => Math.round(ns / 1e5) / 10;
   Object.assign(LOOP, { p50: ms(loopDelay.percentile(50)), p99: ms(loopDelay.percentile(99)), max: ms(loopDelay.max) });
   loopDelay.reset();
+  if (LOOP.max > WORST.ms) Object.assign(WORST, { ms: LOOP.max, on: clients.size, at: new Date().toISOString() });
   if (LOOP.max > 200) log(`[stall] the server's thread was held up ${LOOP.max} ms in the last minute (slowest hundredth ${LOOP.p99} ms), ${clients.size} on`);
 }, 60_000).unref();
+
+/** how long the players' ways to the server and back are, ms, as their games last measured them */
+function pings() {
+  const all = [...clients.values()].map((c) => c.ms ?? 0).filter((v) => v > 0).sort((a, b) => a - b);
+  return { on: all.length, middle: all[all.length >> 1] ?? 0, longest: all[all.length - 1] ?? 0 };
+}
 
 setInterval(() => {
   if (clients.size < 2) return;
@@ -660,7 +669,7 @@ setInterval(() => {
     // (how they are going, from their last two places: where the line of sight takes them to be heading)
     const tr = c.trail, a = tr && tr.length > 1 ? tr[tr.length - 2] : null, b = tr?.[tr.length - 1], dt = a && b ? Math.max(0.05, (b.t - a.t) / 1000) : 1;
     const v = (k: 0 | 2) => (a && b ? Math.max(-12, Math.min(12, (b.p[k] - a.p[k]) / dt)) : 0);
-    rows.push({ id: c.id, x: p[0], z: p[2], hidden: !!c.power.hidden, json: JSON.stringify(row), body: { id: c.id, x: p[0], y: p[1], z: p[2], low: p[5] & F_PRONE ? 2 : p[5] & F_CROUCH ? 1 : 0, vx: v(0), vz: v(2) } });
+    rows.push({ id: c.id, x: p[0], z: p[2], hidden: !!c.power.hidden, json: JSON.stringify(row), body: { id: c.id, x: p[0], y: p[1], z: p[2], low: p[5] & F_PRONE ? 2 : p[5] & F_CROUCH ? 1 : 0, vx: v(0), vz: v(2), ms: c.ms } });
   }
   const shown = rows.filter((r) => !r.hidden);
   for (const c of clients.values()) {
@@ -940,7 +949,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, stashGuard: STASH_GUARD, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, today: seen.today(), queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), lootPrint: LOOT_PRINT, lootOdd: LOOT_ODD.games, loop: LOOP, walls: WALLS.on ? `${WALLS.pieces} pieces, ${WALLS.mb} MB` : WALLS.why, botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, stashGuard: STASH_GUARD, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, today: seen.today(), queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), lootPrint: LOOT_PRINT, lootOdd: LOOT_ODD.games, loop: LOOP, worst: WORST, ping: pings(), walls: WALLS.on ? `${WALLS.pieces} pieces, ${WALLS.mb} MB` : WALLS.why, botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
     return;
   }
   // whoever is about to deploy says so here first, and everything kept is written (see `deploying`)

@@ -52,4 +52,10 @@ s.tick();
 let n = 0;
 for (let i = 0; i < 400; i++) if (s.sees(body(1, 0, 0), body(100 + i, 10, 0), 0)) n++;
 assert.ok(n > 0 && s.traced <= LOOK.most, 'past the most lines a tick, whoever is not looked at is seen');
+// (two far from the server: somebody a step behind cover is told of in time to be drawn as they come out, and no ping buys a look through a wall)
+s = new Sight(wall);
+s.tick();
+assert.equal(s.sees({ ...body(1, 0, 0), ms: 0 }, { ...body(7, 10, 3), ms: 0 }, 0), false, 'a step behind the end of it, near the server: not seen');
+assert.equal(s.sees({ ...body(1, 0, 0), ms: 170 }, { ...body(8, 10, 3), ms: 170 }, 0), true, 'the same, both far from it: seen');
+assert.equal(s.sees({ ...body(1, 0, 0), ms: 1e6 }, { ...body(9, 10, 0), ms: 1e6 }, 0), false, 'no ping sees through the middle of a wall');
 console.log('sight ok');
