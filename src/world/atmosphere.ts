@@ -208,6 +208,20 @@ export function shadowFall(out: THREE.Vector3): number {
 /** how far from the eye a shadow can be seen, metres: the furthest cascade with its fade, and the longest shadow of a man's height now (until the first frame, everywhere) */
 export const shadowsReach = () => (SEEN.hi.length ? SEEN.hi[SEEN.hi.length - 1] + SEEN.long : Infinity);
 
+let rankNext = 0;
+/**
+ * Two surfaces of one plane argue over every pixel, and move as the eye does (the owner, 2026-11-01: "clean up overlapping z index arguing"). The bunker's rooms are laid floor by
+ * floor and wall by wall, and a thousand places have one finish lying in another's plane: each paint here is given a rank of its own, and the higher always wins. No shader is changed by it.
+ */
+export function ranked<T extends THREE.Material>(m: T): T {
+  if (m.transparent) return m;
+  rankNext = (rankNext % 14) + 1;
+  m.polygonOffset = true;
+  m.polygonOffsetFactor = -0.25 * rankNext;
+  m.polygonOffsetUnits = -2 * rankNext;
+  return m;
+}
+
 export class Atmosphere {
   sunDir =new THREE.Vector3(0.4, 0.7, 0.3).normalize(); // points toward the sun
   sunColor = new THREE.Color(1, 0.95, 0.88);

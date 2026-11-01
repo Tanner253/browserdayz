@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { BUNKER_FAR, bunkerSealed, type Place } from '../sim/bunker';
 import { MINE, inMine } from '../sim/mine';
+import { inTunnel, stationAt } from '../sim/train-line';
 import type { Atmosphere } from '../world/atmosphere';
 import { selfLit } from '../world/bunker';
 import type { Terrain } from '../world/terrain';
@@ -40,7 +41,8 @@ export class Underground {
   update(eye: THREE.Vector3) {
     const h = this.h, down = bunkerSealed(h.place(), eye.x, eye.y, eye.z);
     const mined = !down && inMine(eye.x, eye.y, eye.z) && Math.min(Math.abs(eye.x - MINE.west.x), Math.abs(eye.x - MINE.east.x)) > MOUTH;
-    const shut = down || mined;
+    const at = stationAt(eye.x, eye.y, eye.z), ridden = !down && !mined && (inTunnel(eye.x, eye.y, eye.z) || (!!at && eye.y < at.y + 6));
+    const shut = down || mined || ridden;
     if (shut !== this.shut) {
       this.shut = shut;
       h.terrain.mesh.visible = !shut;

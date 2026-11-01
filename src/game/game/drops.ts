@@ -531,7 +531,11 @@ export const dropsMethods = {
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * (far > 8 ? 1.5 : 0.5), far), (id) => (id === 'strong' ? this.sites.spent('level2') : id === 'vault' ? this.sites.spent('vault') : this.sites.gateOpen(id)), this.sites.going('vault'), (at, far) => this.horde.near(at, far));
     // (a bar on the inside of the station's door, from the platform: nobody is shut in)
-    this.halls[0].doorOpen = this.stationGate || Math.hypot(this.player.pos.x - DOOR.inside[0], this.player.pos.y - DOOR.inside[1], this.player.pos.z - DOOR.inside[2]) < 2.8;
+    {
+      // (to a hand from inside only: nearer the inside of it than the outside, however near it)
+      const { x, y, z } = this.player.pos, far = (q: readonly number[]) => Math.hypot(x - q[0], y - q[1], z - q[2]);
+      this.halls[0].doorOpen = this.stationGate || (far(DOOR.inside) < 2.8 && far(DOOR.inside) < far(DOOR.outside));
+    }
     this.pumps.update(dt, cam.position, this.sites.turned('bolotnaya'), this.sites.spent('bolotnaya'));
     this.kupol.update(dt, cam.position, this.sites.turned('kupol'), this.sites.spent('kupol'), (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.6, far));
     this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, TORCH_LIGHT, burn * 0.8, 8), this.effects.fire, this.sites.gateOpen('mine'));

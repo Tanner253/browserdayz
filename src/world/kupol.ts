@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { GLASS_GROUPS, physics } from '../core/physics';
 import { inMetres } from './bunker';
-import type { Atmosphere } from './atmosphere';
+import { ranked, type Atmosphere } from './atmosphere';
 import type { Line } from './bunker-deep';
 
 /** where it all is: its middle, how high its tower's foot, its control floor and roof, the floor under the dome and the dome's radius; the door's half width */
@@ -33,7 +33,7 @@ export class KupolInside {
   private plain: THREE.MeshStandardMaterial;
 
   constructor(atmo: Atmosphere, scene: THREE.Scene) {
-    const D = DOME, reg = (m: THREE.MeshStandardMaterial) => atmo.register(m) as THREE.MeshStandardMaterial;
+    const D = DOME, reg = (m: THREE.MeshStandardMaterial) => atmo.register(ranked(m)) as THREE.MeshStandardMaterial;
     this.wall = reg(new THREE.MeshStandardMaterial({ color: 0xc8c8c4, roughness: 0.9, side: THREE.BackSide }));
     this.plain = reg(new THREE.MeshStandardMaterial({ color: 0xc8c8c4, roughness: 0.9 }));
     const steel = reg(new THREE.MeshStandardMaterial({ color: 0x4c524e, roughness: 0.55, metalness: 0.6 }));

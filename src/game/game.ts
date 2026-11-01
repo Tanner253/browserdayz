@@ -580,7 +580,10 @@ export class Game {
     this.lamps.held = (lit) => r.warming(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid, (o) => r.ready(o).then(() => r.send(o)));
     this.oldMine = new MineSite(atmo, r.scene);
-    this.underground = new Underground({ place: () => this.bunker.place, floors: (eye) => this.bunker.floorsAt(eye), scene: r.scene, terrain: this.s.terrain, veg: this.s.veg, atmo, told: (floors) => (this.horde.floors = floors) });
+    this.underground = new Underground({ place: () => this.bunker.place, floors: (eye) => this.bunker.floorsAt(eye), scene: r.scene, terrain: this.s.terrain, veg: this.s.veg, atmo, told: (floors) => {
+      this.horde.floors = floors;
+      this.loot.offFloor = floors && ((y) => this.horde.offFloor(y));
+    } });
     this.kupol = new KupolInside(atmo, r.scene);
     pumpGround((x, z) => heightAt(world.heights, x, z));
     this.pumps = new PumpWorks(atmo, r.scene);

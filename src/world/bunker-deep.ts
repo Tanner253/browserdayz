@@ -10,6 +10,8 @@ import { physics } from '../core/physics';
 import { BUNKER, bunkerAt, bunkerPlan, levelY, type Place } from '../sim/bunker';
 import { inMetres } from './bunker';
 import { WING_AREAS } from '../sim/bunker-wings';
+import { ranked } from './atmosphere';
+import { SITES } from '../sim/sites';
 import { DEEP, ESCAPE, HALL3, VAULT_DOOR, WALL, deepAreaAt, middle, panes, type Box, type Flight, type Parting, type Rail, type Tank } from '../sim/bunker-deep';
 
 /** a shipping container, as src/world/buildings.ts has it */
@@ -185,6 +187,9 @@ export class DeepWorks {
   private disc = new THREE.Group();
   private discBody: ReturnType<typeof physics.addStatic> | null = null;
   private roll = 0;
+  /** seconds to the next groan of the door as it rolls, and where what stops a body stands shut */
+  private grind = 0;
+  private discAt: { x: number; y: number; z: number } | null = null;
   private rolled = false;
   private beacons: THREE.Object3D[] = [];
   private beaconOn = new THREE.Group();
@@ -213,7 +218,7 @@ export class DeepWorks {
     const key = `${id}|${per}|${tint ?? ''}`;
     let m = this.looks.get(key);
     if (!m) {
-      m = this.s.toned(new THREE.MeshStandardMaterial({ color: 0xc8c8c4, roughness: 0.85, metalness: 0 }));
+      m = this.s.toned(ranked(new THREE.MeshStandardMaterial({ color: 0xc8c8c4, roughness: 0.85, metalness: 0 })));
       this.looks.set(key, m);
       this.covers.set(m, per);
       this.sets.set(m, [id, tint]);
@@ -664,19 +669,26 @@ export class DeepWorks {
     if (level !== 3 && also !== 3) return;
     this.beaconOn.visible = alarm;
     if (alarm) for (const [k, b] of this.beacons.entries()) b.rotation.y += dt * (k ? 4.2 : -4.2);
-    const rolled = gate('vault');
-    if (rolled !== this.rolled) {
+    // (from the moment the breaker goes, and over the whole of the hold: the owner, 2026-11-01, "the main vault door is not animated and does not open". The last of it goes quickly when the time is up)
+    const done = gate('vault'), rolled = done || alarm;
+    this.grind -= dt;
+    if (rolled !== this.rolled || (alarm && this.grind <= 0)) {
       this.rolled = rolled;
+      this.grind = 9;
       this.v.set(...bunkerAt(this.P, VAULT_DOOR.r, VAULT_DOOR.f, levelY(3) + VAULT_DOOR.y));
       audio.blastDoor(this.v, this.v.distanceTo(eye), rolled);
     }
     const want = rolled ? 1 : 0;
     if (this.roll !== want) {
-      this.roll = Math.min(1, Math.max(0, this.roll + (rolled ? dt : -dt) / 9));
-      const x = THREE.MathUtils.smoothstep(this.roll, 0, 1) * VAULT_DOOR.roll;
+      this.roll = Math.min(1, Math.max(0, this.roll + dt * (!rolled ? -1 / 9 : done ? 1 / 5 : 1 / SITES.vault.hold)));
+      const x = THREE.MathUtils.smoothstep(this.roll, 0, 1) * VAULT_DOOR.roll, c = Math.cos(this.P.rot), n = Math.sin(this.P.rot);
       this.disc.position.x = VAULT_DOOR.r + x;
       this.disc.rotation.z = -x / VAULT_DOOR.rad;
-      this.discBody?.setEnabled(this.roll < 0.45);
+      // (what stops a body rolls with it: there is no way by until there is one to be seen)
+      if (this.discBody) {
+        this.discAt ??= { ...this.discBody.translation() };
+        this.discBody.setTranslation({ x: this.discAt.x + c * x, y: this.discAt.y, z: this.discAt.z - n * x });
+      }
     }
   }
 

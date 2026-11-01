@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { WORLD_GROUPS, physics } from '../core/physics';
-import type { Atmosphere } from './atmosphere';
+import { ranked, type Atmosphere } from './atmosphere';
 import { painted } from './bunker';
 import { BORE_ARCH } from './tunnel';
 import { HALL, RIM, SHAFT, shaftFloor, type Station } from '../sim/train-line';
@@ -107,11 +107,11 @@ export class StationHall {
       }
     }, 5, true);
     const paints: Record<Paint, THREE.Material> = {
-      wall: atmo.register(new THREE.MeshStandardMaterial({ map: c.map, normalMap: c.normalMap, roughnessMap: c.armMap, roughness: 1, metalness: 0 })),
-      floor: atmo.register(new THREE.MeshStandardMaterial({ map: f.map, normalMap: f.normalMap, roughnessMap: f.armMap, roughness: 1, metalness: 0 })),
-      tile: atmo.register(new THREE.MeshStandardMaterial({ map: tile, roughness: 0.45, metalness: 0 })),
-      steel: atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })),
-      yellow: atmo.register(new THREE.MeshStandardMaterial({ color: 0xc69a1f, roughness: 0.7 })),
+      wall: atmo.register(ranked(new THREE.MeshStandardMaterial({ map: c.map, normalMap: c.normalMap, roughnessMap: c.armMap, roughness: 1, metalness: 0 }))),
+      floor: atmo.register(ranked(new THREE.MeshStandardMaterial({ map: f.map, normalMap: f.normalMap, roughnessMap: f.armMap, roughness: 1, metalness: 0 }))),
+      tile: atmo.register(ranked(new THREE.MeshStandardMaterial({ map: tile, roughness: 0.45, metalness: 0 }))),
+      steel: atmo.register(ranked(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 }))),
+      yellow: atmo.register(ranked(new THREE.MeshStandardMaterial({ color: 0xc69a1f, roughness: 0.7 }))),
       lamp: atmo.register(new THREE.MeshStandardMaterial({ color: 0x222222, emissive: new THREE.Color(1, 0.93, 0.78), emissiveIntensity: 3 })),
     };
     for (const [k, list] of this.bins) {

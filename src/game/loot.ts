@@ -799,6 +799,8 @@ export class Stash {
 
 /** how near the eye a thing lying in the world is made, metres: well beyond the 55 at which it is first drawn, so that it is there by then */
 const MAKE_WITHIN = 90;
+/** and down the bunker, where three floors of it lie one over the other: this near, and on a floor in sight (the owner, 2026-11-01: "spawning for the entire bunker instead of proximity based") */
+const UNDER_WITHIN = 34;
 /**
  * How many things lying in the world are made in a frame, the nearest first (2026-10-19). Everything within
  * MAKE_WITHIN was made in the one look, a town's worth in a frame as somebody ran into it (the owner: "instead of
@@ -1076,6 +1078,9 @@ export class LootManager {
    * Distance culling. Every item is its own draw call, and one more in each shadow
    * cascade: a tin of beans is a few pixels at 55 m and its shadow is less than one at 26.
    */
+  /** is a height on a floor of the bunker out of the eye's sight? (null: the eye is not down there) */
+  offFloor: ((y: number) => boolean) | null = null;
+
   update(cam: THREE.Vector3, dt = 0, view?: THREE.Camera) {
     // (what the eye can see of them: a thing behind it is not told to the card. Asked of a view a metre and a half
     // wider than the thing: the eye turns between this and the picture being drawn.)
@@ -1093,8 +1098,9 @@ export class LootManager {
     (this.eye ??= new THREE.Vector3()).copy(cam);
     if (first || this.clock - this.looked > 0.25) {
       this.looked = this.clock;
+      const off = this.offFloor, reach = off ? UNDER_WITHIN : MAKE_WITHIN;
       for (const l of this.waiting.values()) {
-        if ((l.x - cam.x) ** 2 + (l.z - cam.z) ** 2 >= MAKE_WITHIN * MAKE_WITHIN) continue;
+        if ((l.x - cam.x) ** 2 + (l.z - cam.z) ** 2 >= reach * reach || off?.(l.y)) continue;
         this.waiting.delete(l.uid);
         this.due.set(l.uid, l);
       }
@@ -1114,7 +1120,7 @@ export class LootManager {
       // (the height counted too: from a helicopter sixty metres up, everything lying in the town below was drawn, a
       // speck of a pixel each, some forty draws a frame and their shadows, 2026-10-18)
       const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.y - cam.y) ** 2 + (w.loot.z - cam.z) ** 2;
-      const near = d2 < 55 * 55;
+      const near = this.offFloor ? d2 < UNDER_WITHIN * UNDER_WITHIN && !this.offFloor(w.loot.y) : d2 < 55 * 55;
       let seen = near;
       if (near && view && d2 > 16) {
         _ball.center.set(w.loot.x, w.loot.y, w.loot.z);

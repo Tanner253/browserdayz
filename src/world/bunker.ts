@@ -9,7 +9,7 @@ import { physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import type { Atmosphere } from './atmosphere';
+import { ranked, type Atmosphere } from './atmosphere';
 import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, bunkerWings, inBunker, inWings, lampBurns, levelY, type Place, CAB, LEVELS, PLANT, levelAt, type Plan } from '../sim/bunker';
@@ -439,7 +439,7 @@ export class BunkerSite {
     if (!P) return;
     physics.dugOut = (x, y, z) => inBunker(P, x, y, z, 1);
     const B = BUNKER, D = B.depth, Y = levelY();
-    const mat = (m: THREE.MeshStandardMaterial) => atmo.register(m) as THREE.MeshStandardMaterial;
+    const mat = (m: THREE.MeshStandardMaterial) => atmo.register(ranked(m)) as THREE.MeshStandardMaterial;
     const outside = mat(new THREE.MeshStandardMaterial({ map: concretePaint(17, [128, 126, 116]), roughness: 0.94, metalness: 0 }));
     const inside = mat(new THREE.MeshStandardMaterial({ map: concretePaint(4711, [112, 114, 106]), roughness: 0.9, metalness: 0 }));
     const floor = mat(new THREE.MeshStandardMaterial({ map: concretePaint(909, [86, 88, 84]), roughness: 0.8, metalness: 0 }));
