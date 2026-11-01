@@ -50,7 +50,7 @@ export function mineProps(): { kind: string; x: number; y: number; z: number; ro
   out.push({ kind: 'portable_generator', x: H.x + 7, y: M.y, z: M.z - 5.6, rot: 0.4 }, { kind: 'Barrel_01', x: H.x + 8.6, y: M.y, z: M.z - 5, rot: 0 }, { kind: 'barrel_03', x: H.x + 8, y: M.y, z: M.z - 6, rot: 1 }, { kind: 'wooden_military_crate', x: H.x - 8, y: M.y, z: M.z - 5.6, rot: 0.2 }, { kind: 'wooden_crate_01', x: H.x - 7.8, y: M.y + 0.46, z: M.z - 5.5, rot: 0.6 }, { kind: 'scrap_pile', x: H.x + 3, y: M.y, z: M.z + 5.4, rot: 0 });
   // (what came down: heaped against the fall's two faces, either side of the way under it)
   const F = M.fall;
-  for (const [dx, dz, k, rot] of [[-3, -1.3, 'namaqualand_boulder_04', 0.4], [3, 1.3, 'namaqualand_boulder_04', 2.1], [-3.1, 1.4, 'namaqualand_boulder_02', 1.2], [3.2, -1.4, 'namaqualand_boulder_02', 0.2], [-4, 0.9, 'boulder_01', 0.8]] as [number, number, string, number][]) out.push({ kind: k, x: F.x + dx, y: M.y, z: M.z + dz, rot });
+  for (const [dx, dz, k, rot] of [[-3.1, -1.3, 'boulder_01', 0.4], [3.1, 1.3, 'boulder_01', 2.1], [-3.4, 1.35, 'boulder_01', 1.2], [3.4, -1.35, 'boulder_01', 0.2]] as [number, number, string, number][]) out.push({ kind: k, x: F.x + dx, y: M.y, z: M.z + dz, rot });
   for (const g of M.galleries) out.push({ kind: g.side > 0 ? 'wooden_military_crate' : 'ore_cart', x: g.x + 0.6, y: M.y, z: M.z + g.side * (M.half + g.long - 1.2), rot: 0.3 });
   return out;
 }
@@ -69,6 +69,9 @@ export function mineSpots(): [number, number, number][] {
   for (const g of M.galleries) out.push([g.x, M.y, M.z + g.side * (M.half + g.long - 3)]);
   return out;
 }
+
+/** is a point on the line of the way in? There the ground's own surface is no floor or wall to a body: it lies over the rock of the incline, and a body is under it */
+export const onMineLine = (x: number, z: number) => Math.abs(z - MINE.z) < 3 && (x < MINE.x0 + 2 || x > MINE.x1 - 2) && x > MINE.west.x - 3 && x < MINE.east.x + 3;
 
 /** where each portal opens the ground, as the terrain's wells take such things */
 // (only where the face comes down across the way itself: a hole any bigger shows the sky over the lintel)

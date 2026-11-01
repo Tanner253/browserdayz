@@ -10,7 +10,7 @@ import type { Atmosphere } from './atmosphere';
 import type { Line } from './bunker-deep';
 
 /** where it all is: its middle, how high its tower's foot, its control floor and roof, the floor under the dome and the dome's radius; the door's half width */
-export const DOME = { x: 720, z: -540, foot: 212.9, door: 217.6, floor: 220.6, roof: 224.1, deck: 224.4, r: 5.3, inner: 7, half: 1 };
+export const DOME = { x: 720, z: -540, foot: 212.9, door: 217.6, floor: 221.6, roof: 224.1, deck: 224.4, r: 5.3, inner: 7, half: 1 };
 /** the floodlights, one to a breaker: where each stands over the yard */
 const FLOODS: [number, number, number][] = [[708, 225, -548], [732, 225, -552], [720, 226, -518]];
 
@@ -75,16 +75,16 @@ export class KupolInside {
       for (let i = 0; i < p.count; i++) q.setXY(i, p.getX(i) / 2.5, p.getZ(i) / 2.5);
       return g;
     };
-    const well: [number, number, number, number] = [-1, 1, -5.3, -1], hatch: [number, number, number, number] = [3.2, 4.4, -0.6, 0.6];
+    const well: [number, number, number, number] = [-1, 1, -5.3, 0.3], hatch: [number, number, number, number] = [3.2, 4.4, -0.6, 0.6];
     add(disc(D.r, well), this.plainFloor(reg), D.x, D.floor);
     const lid = disc(D.r, hatch);
     add(lid, this.plain, D.x, D.roof);
     add(disc(D.inner, hatch).rotateX(Math.PI), steel, D.x, D.deck);
-    for (const [hx, cx, hz, cz] of [[(D.r - 1) / 2, -(D.r + 1) / 2, D.r, 0], [(D.r - 1) / 2, (D.r + 1) / 2, D.r, 0], [1, 0, (D.r - 1) / 2, (D.r + 1) / 2]]) solid(hx, 0.2, hz, D.x + cx, D.floor - 0.2, D.z + cz);
+    for (const [hx, cx, hz, cz] of [[(D.r - 1) / 2, -(D.r + 1) / 2, D.r, 0], [(D.r - 1) / 2, (D.r + 1) / 2, D.r, 0], [1, 0, (D.r - 0.3) / 2, (D.r + 0.3) / 2]]) solid(hx, 0.2, hz, D.x + cx, D.floor - 0.2, D.z + cz);
     // (the deck of steel under the dome, round its hatch)
     for (const [hx, cx, hz, cz] of [[(D.inner + 3.2) / 2, (3.2 - D.inner) / 2, D.inner, 0], [(D.inner - 4.4) / 2, (D.inner + 4.4) / 2, D.inner, 0], [0.6, 3.8, (D.inner - 0.6) / 2, (D.inner + 0.6) / 2], [0.6, 3.8, (D.inner - 0.6) / 2, -(D.inner + 0.6) / 2]]) solid(hx, 0.15, hz, D.x + cx, D.deck - 0.15, D.z + cz, 0, 'metal');
     // (the stair up from the door over the slope)
-    const steps = 16, run = 4.3, z0 = D.z - 5.3;
+    const steps = 21, run = 5.6, z0 = D.z - 5.3;
     for (let k = 0; k < steps; k++) add(new THREE.BoxGeometry(2, 0.05, run / steps + 0.03), steel, D.x, D.door + ((k + 1) * (D.floor - D.door)) / steps - 0.025, z0 + ((k + 0.5) * run) / steps);
     const ramp = [[-1, D.door - 0.3, z0], [1, D.door - 0.3, z0], [-1, D.floor - 0.3, z0 + run], [1, D.floor - 0.3, z0 + run], [-1, D.door, z0], [1, D.door, z0], [-1, D.floor, z0 + run], [1, D.floor, z0 + run]].map(([x, y, z]) => [D.x + x, y, z]);
     physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array(ramp.flat()))!, 'metal', { x: 0, y: 0, z: 0 }, 0);

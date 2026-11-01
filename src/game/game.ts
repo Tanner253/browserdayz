@@ -101,6 +101,7 @@ import { Lockers } from './lockers';
 import '../sim/injury';
 import { Base28 } from '../trailer/base28';
 import { Goggles } from './goggles';
+import { MINE } from '../sim/mine';
 import { MineSite } from '../world/mine';
 import { KupolInside } from '../world/kupol';
 import { StationHall } from '../world/station';
@@ -1607,7 +1608,14 @@ export class Game {
         let crest = -Infinity;
         for (let t = 0; t <= 1; t += 0.125) crest = Math.max(crest, heightAt(world.heights, ax + (bx - ax) * t, az + (bz - az) * t));
         const top = crest + RIDGE_OVER;
-        for (const { from, to, foot } of wallParts(L, caveSpansUnder(passPlan, ax, az, bx, bz), -400, 0.6)) {
+        const spans = caveSpansUnder(passPlan, ax, az, bx, bz);
+        // (and the Old Mine, the other way through it: from over its roof, as a cave's)
+        if ((az - MINE.z) * (bz - MINE.z) <= 0) {
+          const q = (MINE.z - az) / (bz - az);
+          spans.push({ from: Math.max(0, q - 6 / L), to: Math.min(1, q + 6 / L), roof: MINE.y + 6 });
+          spans.sort((p, r) => p.from - r.from);
+        }
+        for (const { from, to, foot } of wallParts(L, spans, -400, 0.6)) {
           if (top - foot < 1) continue;
           const m = (from + to) / 2;
           physics.addStaticQuat(physics.R.ColliderDesc.cuboid((to - from) / 2, (top - foot) / 2, 0.6), 'rock', { x: ax + ux * m, y: (top + foot) / 2, z: az + uz * m }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });

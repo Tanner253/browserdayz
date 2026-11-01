@@ -200,7 +200,7 @@ const THINGS: Record<string, TownThing[]> = {
     { kind: 'breaker_box', x: -12, z: -8, rot: -0.588 }, { kind: 'breaker_box', x: 12, z: -12, rot: -2.356 }, { kind: 'breaker_box', x: 0, z: 22, rot: 1.571 },
     { kind: 'portable_generator', x: -18, z: 4, rot: 0.4 }, { kind: 'propane_tank', x: -20, z: 8, rot: 0 }, { kind: 'Barrel_01', x: 12, z: 18, rot: 0 }, { kind: 'wooden_military_crate', x: -7, z: 10, rot: 0.3 },
     // (the control floor inside it, over the stair from its door: src/world/kupol.ts)
-    { kind: 'bunker_terminal', x: -3.6, z: 2.4, rot: 1.0, y: 220.6 }, { kind: 'bunker_terminal', x: -1.6, z: 4, rot: 0.3, y: 220.6 }, { kind: 'bunker_machine', x: 2.2, z: 3.6, rot: Math.PI, y: 220.6 }, { kind: 'SchoolChair_01', x: -2.4, z: 2, rot: 2.6, y: 220.6 }, { kind: 'metal_office_desk', x: -3.9, z: -2, rot: Q, y: 220.6 }, { kind: 'bunker_pipes', x: 4.9, z: -1.8, rot: -Q, y: 220.6 },
+    { kind: 'bunker_terminal', x: -3.6, z: 2.4, rot: 1.0, y: 221.6 }, { kind: 'bunker_terminal', x: -1.6, z: 4, rot: 0.3, y: 221.6 }, { kind: 'bunker_machine', x: 2.2, z: 3.6, rot: Math.PI, y: 221.6 }, { kind: 'SchoolChair_01', x: -2.4, z: 2, rot: 2.6, y: 221.6 }, { kind: 'metal_office_desk', x: -3.9, z: -2, rot: Q, y: 221.6 }, { kind: 'bunker_pipes', x: 4.9, z: -1.8, rot: -Q, y: 221.6 },
   ],
   'Kupol Siding': [],
   'Old Mine': [
