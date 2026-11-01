@@ -104,6 +104,7 @@ import { Goggles } from './goggles';
 import { MINE } from '../sim/mine';
 import { MineSite } from '../world/mine';
 import { KupolInside } from '../world/kupol';
+import { PumpWorks, pumpGround } from '../world/pump-works';
 import { StationHall } from '../world/station';
 import { Tunnel } from '../world/tunnel';
 import { STATIONS, inTunnel, stationAt } from '../sim/train-line';
@@ -454,6 +455,8 @@ export class Game {
   oldMine!: MineSite;
   /** inside the Kupol's dome (src/world/kupol.ts) */
   kupol!: KupolInside;
+  /** Bolotnaya's valves and settling tank (src/world/pump-works.ts) */
+  pumps!: PumpWorks;
   /** the car on the line (src/game/train.ts) */
   trainCar!: TrainCar;
   tunnel!: Tunnel;
@@ -574,6 +577,8 @@ export class Game {
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid, (o) => r.ready(o).then(() => r.send(o)));
     this.oldMine = new MineSite(atmo, r.scene);
     this.kupol = new KupolInside(atmo, r.scene);
+    pumpGround((x, z) => heightAt(world.heights, x, z));
+    this.pumps = new PumpWorks(atmo, r.scene);
     this.tunnel = new Tunnel(atmo, r.scene);
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
     if (this.bunker.place) this.lift = new GoodsLift(r.scene, this.bunker.place, () => (Date.now() + this.net.clockOff) / 1000, atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })));
@@ -909,7 +914,7 @@ export class Game {
     });
     if (this.bolt) this.build.ladders.fixed.push(...this.bolt.lines);
     if (this.bunker.works) this.build.ladders.fixed.push(...this.bunker.works.ladders);
-    this.build.ladders.fixed.push(this.kupol.ladder);
+    this.build.ladders.fixed.push(this.kupol.ladder, this.pumps.ladder);
     this.forges = new ForgeView({
       scene: r.scene,
       online: () => this.online,

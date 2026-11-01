@@ -192,6 +192,8 @@ const THINGS: Record<string, TownThing[]> = {
     // the works of the pumps, and the reader by the door. A valve's wheel is its +z: each looks in at the pump house; the reader's panel, its +x, looks south
     { kind: 'card_reader', x: 12, z: -10.6, rot: -Q },
     { kind: 'valve_stand', x: -24, z: 8, rot: 2.09 }, { kind: 'valve_stand', x: 8, z: 16, rot: 2.94 }, { kind: 'valve_stand', x: 0, z: -24, rot: 0.95 },
+    // (down in the settling tank, under the water until the valves have gone: src/world/pump-works.ts)
+    { kind: 'wooden_military_crate', x: -7, z: -16.4, rot: 0.3, y: 17.5 }, { kind: 'bunker_grate', x: -2, z: -13.6, rot: 0, y: 17.5 },
     { kind: 'Barrel_01', x: 19, z: -9, rot: 0 }, { kind: 'barrel_03', x: 20.2, z: -9.6, rot: 0.3 }, { kind: 'portable_generator', x: 8, z: -17, rot: 0.8 }, { kind: 'concrete_road_barrier', x: 7, z: -8, rot: 0.1 },
   ],
   Kupol: [
@@ -205,7 +207,7 @@ const THINGS: Record<string, TownThing[]> = {
   'Kupol Siding': [],
   'Old Mine': [
     // the portal in the rock (+x straight out of it), and the reader (+x) looking out with it, to one side
-    { kind: 'mine_portal', x: 0, z: 0, rot: 0.6116 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },
+    { kind: 'mine_portal', x: 0, z: 0, rot: 0.6116 }, { kind: 'namaqualand_boulder_04', x: 2.6, z: -3.8, rot: 0.8 }, { kind: 'namaqualand_boulder_02', x: 1.6, z: 3.6, rot: 2 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },
   ],
   'Old Mine East': [
     { kind: 'mine_portal', x: 0, z: 0, rot: 0.478 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'ore_cart', x: 5.2, z: 2.2, rot: 0.4 },

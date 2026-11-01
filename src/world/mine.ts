@@ -96,7 +96,7 @@ export class MineSite {
     room(h0, h1, Z - H.hz, Z + H.hz, M.tall + 1.4, { n: [[h0, h1]], s: [[h0, h1]] });
     // (the fall's two faces, from the top of the way under it to the drift's roof)
     for (const [x, n] of [[f0, -1], [f1, 1]] as const) {
-      parts.push(n < 0 ? face(v(x, Y0 + Fall.tall, z0), v(x, Y0 + Fall.tall, z1), v(x, Y1, z0), v(-1, 0, 0)) : face(v(x, Y0 + Fall.tall, z1), v(x, Y0 + Fall.tall, z0), v(x, Y1, z1), v(1, 0, 0)));
+      parts.push(n < 0 ? face(v(x, Y0 + Fall.tall, z1), v(x, Y0 + Fall.tall, z0), v(x, Y1, z1), v(-1, 0, 0)) : face(v(x, Y0 + Fall.tall, z0), v(x, Y0 + Fall.tall, z1), v(x, Y1, z0), v(1, 0, 0)));
       box(x - (n < 0 ? 0 : 0), x + 0.01, Y0 + Fall.tall, Y1, z0, z1);
     }
     box(f0, f1, Y0 + Fall.tall, Y1, z0, z1);
@@ -200,6 +200,24 @@ export class MineSite {
         this.gated.add(hinge);
       }
     }
+    // (a collar of rock round each portal: the ground is opened for the way in, and what is seen past the lintel is this, not the sky)
+    this.collar = atmo.register(new THREE.MeshStandardMaterial({ color: 0x9a8a78, roughness: 0.95 })) as THREE.MeshStandardMaterial;
+    for (const [x0, x1, y] of [[M.west.x - 2.4, M.west.x + 0.4, M.west.y], [M.east.x - 0.4, M.east.x + 1.2, M.y]] as const) {
+      const cx = (x0 + x1) / 2, w = x1 - x0, wall = (z0a: number, z1a: number, y0: number, y1: number) => {
+        const g = new THREE.BoxGeometry(w, y1 - y0, z1a - z0a).translate(cx, (y0 + y1) / 2, (z0a + z1a) / 2), uv = g.getAttribute('uv'), p = g.getAttribute('position'), nor = g.getAttribute('normal');
+        for (let i = 0; i < uv.count; i++) {
+          const across = Math.abs(nor.getX(i)) > 0.5 ? p.getZ(i) : p.getX(i), up = Math.abs(nor.getY(i)) > 0.5 ? p.getZ(i) : p.getY(i);
+          uv.setXY(i, across * 0.25, up * 0.25);
+        }
+        const mesh = new THREE.Mesh(g, this.collar!);
+        mesh.receiveShadow = true;
+        this.gated.add(mesh);
+        physics.addStatic(physics.R.ColliderDesc.cuboid(w / 2, (y1 - y0) / 2, (z1a - z0a) / 2), 'rock', { x: cx, y: (y0 + y1) / 2, z: (z0a + z1a) / 2 }, 0);
+      };
+      wall(Z - 3.6, Z - M.half - 0.04, y - 0.4, y + 7.4);
+      wall(Z + M.half + 0.04, Z + 3.6, y - 0.4, y + 7.4);
+      wall(Z - M.half - 0.04, Z + M.half + 0.04, y + M.tall + 1.3, y + 7.4);
+    }
     scene.add(this.gated);
     const bulb = atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.8, 0.5), emissiveIntensity: 3, roughness: 0.5 }));
     const bulbs: THREE.BufferGeometry[] = [];
@@ -214,12 +232,13 @@ export class MineSite {
 
   /** what is in the rock's picture, the first time anybody comes to a portal */
   private rock: THREE.MeshStandardMaterial | null = null;
+  private collar: THREE.MeshStandardMaterial | null = null;
   private dressed = false;
   private fill = new THREE.AmbientLight(0xffdcb0, 0);
 
   /** Once a frame. @param open the yellow pass has been shown */
   update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number) => void, open = false) {
-    const M = MINE, at = Math.min(Math.hypot(eye.x - M.west.x, eye.z - M.z), Math.hypot(eye.x - M.east.x, eye.z - M.z)), on = inMine(eye.x, eye.y, eye.z) || at < 60;
+    const M = MINE, at = Math.min(Math.hypot(eye.x - M.west.x, eye.z - M.z), Math.hypot(eye.x - M.east.x, eye.z - M.z)), on = inMine(eye.x, eye.y, eye.z) || at < 90;
     this.all.visible = on;
     this.gated.visible = at < 90 || on;
     this.fill.intensity += ((inMine(eye.x, eye.y, eye.z) ? 0.24 : 0) - this.fill.intensity) * Math.min(1, dt * 3);
@@ -231,6 +250,12 @@ export class MineSite {
       this.rock.normalMap = t.normalMap;
       this.rock.roughnessMap = t.armMap;
       this.rock.needsUpdate = true;
+      if (this.collar) {
+        this.collar.color.setRGB(1.25, 0.72, 0.5);
+        this.collar.map = t.map;
+        this.collar.normalMap = t.normalMap;
+        this.collar.needsUpdate = true;
+      }
     }
     // (from inside, a bar: nobody is shut in)
     for (const [k, g] of this.gates.entries()) {
