@@ -10,13 +10,13 @@ import { DROP, fillDrop } from '../src/sim/drops';
 import { fillCrate } from '../src/sim/crates';
 import { ITEMS, makeItem } from '../src/sim/items';
 import { levelSpots, levelY } from '../src/sim/bunker';
-import { GATES, RIDES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, waveSpot, type Site, type SitePhase } from '../src/sim/sites';
+import { GATES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, waveSpot, type Site, type SitePhase } from '../src/sim/sites';
 import type { C2S, S2C } from '../src/net/protocol';
 import { boxes, doors, economy, horde, issue, log, world, type Box } from './index';
 import { place } from './keep';
 import { broadcast, send, type Client } from './players';
 import { dropInfo } from './drops';
-import { carries } from './tags';
+import { bunkerDoor, carries } from './tags';
 
 interface Run {
   phase: SitePhase;
@@ -206,17 +206,16 @@ export function useGate(c: Client, m: Extract<C2S, { t: 'gate' }>) {
   if (!atSpot(g.at, world.bunker, x, y, z, 4) && !(g.also && atSpot(g.also, world.bunker, x, y, z, 4))) return;
   const until = now + (Number(process.env.SITE_GATE_S) || g.open) * 1000;
   gates.set(m.g, until);
+  if (g.blast) {
+    bunkerDoor.emptyAt = now;
+    if (!bunkerDoor.open) {
+      bunkerDoor.open = true;
+      broadcast({ t: 'bunker', open: true });
+    }
+  }
   if (!g.keep) send(c, { t: 'siteok', card: g.card });
   broadcast(gateSaid(m.g, until, now));
   log(`[gate] ${c.name} opened ${g.name}`);
-}
-
-/** A ride taken: from where it leaves, and only while its gate is open. */
-export function useRide(c: Client, m: Extract<C2S, { t: 'ride' }>) {
-  const w = RIDES[m.w], now = Date.now();
-  if (!w || !c.alive || c.seatAt || (w.gate && (gates.get(w.gate) ?? 0) <= now) || !atSpot(w.from, world.bunker, c.pose[0], c.pose[1], c.pose[2], 3.5)) return;
-  const [x, y, z] = spotAt(w.to, world.bunker);
-  place(c, x, y, z, c);
 }
 
 /** An admin's: whatever is going, all it wanted turned turned, and its time up now (/site skip). */

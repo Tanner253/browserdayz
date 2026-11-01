@@ -64,7 +64,7 @@ import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
 import { setTrap, takeTrap } from './traps';
-import { doorLocked, takeFuel, useGate, useRide, useSite, useStep } from './sites';
+import { doorLocked, takeFuel, useGate, useSite, useStep } from './sites';
 import { byTheTrain, inTunnel, platformAhead } from '../src/sim/train-line';
 import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
@@ -446,8 +446,6 @@ export function handle(c: Client, m: C2S) {
       return useStep(c, m);
     case 'gate':
       return useGate(c, m);
-    case 'ride':
-      return useRide(c, m);
     case 'trade':
       return trade(c, m);
     case 'book':

@@ -53,7 +53,7 @@ import { regrowing } from './gather';
 import { keepBases, restoreBases, sighting } from './build';
 import { charges } from './raid';
 import { trapSight, trapsTick } from './traps';
-import { levelAt } from '../src/sim/bunker';
+import { bunkerLocal, inCellar, levelAt } from '../src/sim/bunker';
 import { sitesReady, sitesTick } from './sites';
 import { upkeep } from './claims';
 import { ROT } from '../src/sim/build/upkeep';
@@ -756,7 +756,8 @@ setInterval(() => {
     // first: whoever is pressed against it as it shuts is not counted in.
     const [ox, , oz] = bunkerOutside(world.bunker);
     for (const c of clients.values()) {
-      if (!c.alive || !inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], -0.4) || levelAt(c.pose[1] + 1 - world.bunker.y) > 1) {
+      const [cr, cf] = bunkerLocal(world.bunker, c.pose[0], c.pose[1], c.pose[2]);
+      if (!c.alive || !inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], -0.4) || levelAt(c.pose[1] + 1 - world.bunker.y) > 1 || inCellar(cr, cf)) {
         shutIn.delete(c.id);
         continue;
       }
