@@ -107,4 +107,4 @@ export function onMineLine(x: number, z: number) {
 // (only the slice of the face between the way's floor and the top of the portal, and laid along the face: it stands so steep that a metre of ground here is eight of cliff, and any more
 // of it shows the sky over the lintel)
 const mouth = (p: { x: number; z: number; rot: number }, at: number, hx: number, rot: number) => ({ cave: -1, x: p.x - Math.cos(p.rot) * at, z: p.z + Math.sin(p.rot) * at, rot, hx, hz: 2.1, floor: 0 });
-export const MINE_MOUTHS = [mouth(MINE.west, 0.62, 0.53, 2.356), mouth(MINE.east, 2.35, 0.95, -0.785)];
+export const MINE_MOUTHS = [mouth(MINE.west, 0.52, 0.4, 2.356), mouth(MINE.east, 2.35, 0.95, -0.785)];
