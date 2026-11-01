@@ -16,6 +16,7 @@
 // metres above the pad (the first level's floor is at -depth).
 
 import { DEEP, ESCAPE, HALL3, HIDDEN, LEVEL3, STAIR_DOOR, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, deepLinks, deepPartAt, deepParts, deepWalls, inDeep, middle, type Deep, type DeepArea } from './bunker-deep';
+import { unclip } from './bunker-unclip';
 import { BOLT, HALL_DEEP, WING_AREAS, WING_DOORS, inCellar, inWings, wingAt, wingWalls } from './bunker-wings';
 
 export { inWings, inCellar };
@@ -184,17 +185,19 @@ export interface Plan {
   areas?: DeepArea[];
 }
 
+/** is this something opened and looked into? */
+const kept = (s: Stood) => !!SEARCHED[s.id];
 let made: Plan | null = null;
 const deeper: Plan[] = [];
 /** A level as it is laid out. (Worked out once: it is the same every time.) */
 export function bunkerPlan(level = 1): Plan {
-  if (level > 1) return (deeper[level] ??= inPatches(apart(layOut(BUNKER.seed, level, deepShape(DEEP[level], level)), level), level));
-  return (made ??= letOut(layOut(BUNKER.seed)));
+  if (level > 1) return (deeper[level] ??= inPatches(unclip(apart(layOut(BUNKER.seed, level, deepShape(DEEP[level], level)), level), kept), level));
+  return (made ??= unclip(letOut(layOut(BUNKER.seed)), kept));
 }
 
 /** the wings of Level 1, a plan of their own laid round it: see src/sim/bunker-wings.ts */
 let winged: Plan | null = null;
-export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, wingShape()), 4), 4, 85));
+export const bunkerWings = (): Plan => (winged ??= inPatches(unclip(apart(layOut(BUNKER.seed ^ 0x51c, 1, wingShape()), 4), kept), 4, 85));
 
 /** a plan built by hand, as the rules take one: its parts, its ways through, its walls, and what it holds that no rule lays */
 interface Shape { areas: DeepArea[]; doors: [number, number, number?, number?, number?][]; walls: Wall[]; extra(stood: Stood[], made: Made[], spots: Spot[], lamps: Plan['lamps'], Y: number): void }
@@ -581,8 +584,10 @@ function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
     switch (q.kind) {
       case 'barracks': {
         // bunks down the two longest walls, lockers along a third, a table in the middle if there is room
-        for (const wl of longest.slice(0, 2)) along(wl, (r, f, rot) => build('bunk', r, f, rot, 2.05, 0.95, 1.75), 1.15, 0.95, 5);
-        along(longest[2], (r, f, rot) => build('locker', r, f, rot, 0.5, 0.5, 1.85), 0.42, 0.5, 6);
+        // (their heads to the wall: laid along it, two metres long on a metre's spacing, each stood half in the next)
+        // (and where two rows come to one corner, not through each other)
+        for (const wl of longest.slice(0, 2)) along(wl, (r, f, rot) => (builtList.some((m) => m.kind === 'bunk' && Math.abs(Math.sin(m.rot - rot - Math.PI / 2)) > 0.5 && Math.hypot(m.r - r, m.f - f) < 2) ? false : build('bunk', r, f, rot + Math.PI / 2, 2.05, 0.95, 1.75)), 1.15, 0.95, 5);
+        along(longest[2], (r, f, rot) => (builtList.some((m) => m.kind === 'bunk' && Math.hypot(m.r - r, m.f - f) < 1.6) ? false : build('locker', r, f, rot, 0.5, 0.5, 1.85)), 0.42, 0.5, 6);
         // (and a gun rack on the fourth wall where it is free: where the men sleep their rifles are kept to hand. The owner,
         // 2026-10-18: "i want to see more of the new weapon lockers in the bunker")
         // (on the first wall along which there is room for it: the fourth's corners are the bunks')
@@ -669,6 +674,8 @@ function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {
       case 'armoury': {
         // benches along the two longest walls, racks on a third, cases on the floor: where the long things are kept
         for (const wl of longest.slice(0, 2)) along(wl, (r, f, rot) => {
+          // (not through the end of the one on the next wall, round the corner)
+          if (builtList.some((m) => m.kind === 'bench' && Math.hypot(m.r - r, m.f - f) < 1.75)) return false;
           build('bench', r, f, rot, 2.2, 0.7, 0.92);
           const c = Math.cos(rot), sn = Math.sin(rot);
           for (const k of [-0.55, 0.55]) spots.push({ r: r + k * c, f: f - k * sn, y: Y + 0.92, floor: false });

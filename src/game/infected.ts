@@ -481,7 +481,7 @@ export class Infected implements Damageable {
     const f = hit ? y + 1.25 - hit.toi : -1e9;
     if (f > ground + 0.04) return f;
     // (a level under the first, or the mine: all of it is under the map's ground, and what is under the feet is the floor)
-    if (hit && y < ground - 1) return f;
+    if (hit && (y < ground - 1 || physics.dugOut?.(x, y + 1, z))) return f;
     // Nothing under it but the ground: over the bunker that is its lid, the ground as it is seen, for one that was up
     // on it (the bottom of the hole under the lid is five metres down: at a seam in the lid one fell through it).
     const top = heightAt(world.surface, x, z);

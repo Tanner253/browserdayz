@@ -63,7 +63,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `forge.ts` | 52 | The server: forges (2026-10-25, plan-crafting; the rules are src/sim/craft/forge.ts). |
 | `gate.ts` | 792 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 143 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 1174 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 1172 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1411 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 835 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `learn.ts` | 101 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
@@ -84,7 +84,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `searched.ts` | 220 | Crates, bodies, stashes, drops, furniture and bags lying about, gone through by several at once (2026-10-23, the owner's list: the "Opening…" wait and "Someone else is searching that"; "We should not have cut any... |
 | `seen.ts` | 40 | Who has played lately, for the door's "N played today" (the owner, offered a true number in place of fake players to fill the count: |
 | `sight.ts` | 97 | Where everybody is, told only to those who could see them (the owner, 2026-10-27: |
-| `sites.ts` | 276 | The server: the way down's stops (the rules are src/sim/sites.ts). |
+| `sites.ts` | 268 | The server: the way down's stops (the rules are src/sim/sites.ts). |
 | `solid.ts` | 147 | A base's pieces as solid as the game has them, where the server judges (2026-10-24). |
 | `stash-guard.ts` | 49 | The players' stashes against what this release changed on the map (2026-10-23, the owner: |
 | `stash-list.ts` | 19 | Where every stash kept on the map lies, told to the owner alone by /stashes (server/admin.ts), so that a release that changes the map can be checked against them first (scripts/stash-guard.ts; the owner, 2026-10-23: |
@@ -122,7 +122,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `one-draw.ts` | 133 | See-through things seen from both sides, drawn in one go and not two. |
 | `pad-layout.ts` | 137 | A controller's buttons: what each does (the player's to change, as the keyboard's keys are: the owner, 2026-10-26, "controllers have asked for key remapping and rebinding options like we have for pc so they can make... |
 | `perf.ts` | 202 | Frame profiler + F3 overlay. |
-| `physics.ts` | 195 | Rapier (Rust, compiled to WASM) physics. |
+| `physics.ts` | 200 | Rapier (Rust, compiled to WASM) physics. |
 | `renderer.ts` | 1080 |  |
 | `settings.ts` | 162 | Graphics and sound options (Esc menu, Settings tab). |
 | `strips.ts` | 161 |  |
@@ -241,13 +241,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 310 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 2257 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 2259 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
 | file | lines | what it is |
 |---|---:|---|
-| `drops.ts` | 623 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
+| `drops.ts` | 626 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 797 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 807 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 505 | The game: attachments and magazines. |
@@ -276,7 +276,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `infected-kinds.ts` | 115 | The twelve kinds of the infected, and which one each is (the owner, 2026-10-25: |
 | `infected-look.ts` | 172 | Each of the infected dressed as no other of its kind is (2026-10-25, from the owner's AAA bar: |
 | `infected-moves.ts` | 78 | How the infected move: motion capture from Higgsfield's library (the owner, 2026-10-25: |
-| `infected.ts` | 1398 | The infected, as this game draws and (for the ones near its own player) moves them. |
+| `infected.ts` | 1412 | The infected, as this game draws and (for the ones near its own player) moves them. |
 | `key-hints.ts` | 168 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 414 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lift.ts` | 112 | The goods lift between Bunker 17's first two levels (the owner, 2026-10-31: a real cab, not a bar and a blink). |
@@ -298,7 +298,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `remote.ts` | 777 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
 | `riders.ts` | 67 | The dead who ride on (2026-10-14). |
 | `rig.ts` | 561 | A weapon pack in the hands of whoever holds the gun: the pack's own arms and its own gun, moved by its own animation. |
-| `sites.ts` | 292 | The way down's stops as this game has them (the rules are src/sim/sites.ts, and the server runs them: server/sites.ts): the prompts at readers, gates and rides, the strong room's lock and the plant on Level 2. |
+| `sites.ts` | 287 | The way down's stops as this game has them (the rules are src/sim/sites.ts, and the server runs them: server/sites.ts): the prompts at readers, gates and rides, the strong room's lock and the plant on Level 2. |
 | `survivors.ts` | 629 | The survivors a player can be, and what they wear over their own skin (the owner, 2026-10-24: |
 | `throwing.ts` | 162 | G, in the game: a tap puts what is in the hands down at the feet; held, a throw winds up, the bar filling with how long it is held, and letting go throws it along the way the player looks, as hard as the bar says... |
 | `toys.ts` | 96 | What is left in the air by the small wins of 2026-10-31: a smoke grenade's smoke, and a flare hanging under its parachute. |
@@ -333,7 +333,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `hook-trap.ts` | 80 | three.js hands every scene and renderer it makes to window.__THREE_DEVTOOLS__ when a page has one (its inspector's hook): a script that sets it before the game loads is given the whole world, and can draw everybody... |
 | `orders.ts` | 239 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 849 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 848 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -377,9 +377,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `bunker-deep.ts` | 543 | Levels 2 and 3, built by hand (the owner, 2026-11-01: |
+| `bunker-deep.ts` | 559 | Levels 2 and 3, built by hand (the owner, 2026-11-01: |
+| `bunker-unclip.ts` | 120 | Nothing in the bunker's rooms stands in anything else (the owner, 2026-11-01: |
 | `bunker-wings.ts` | 136 | Level 1's wings (the owner, 2026-11-01: |
-| `bunker.ts` | 1115 | The bunker: a place under the ground on the far side of the map from the Chemical Works. |
+| `bunker.ts` | 1128 | The bunker: a place under the ground on the far side of the map from the Chemical Works. |
 | `camp-place.ts` | 20 | Where the traders stand (the owner, 2026-10-25: |
 | `camp.ts` | 238 | The trader camp (progression v3, the owner's yes 2026-10-25: |
 | `castle-post.ts` | 477 | ORLINOYE, "the Eagle's Nest": the fort on the mountain as the army's signals and observation post, above ground. |
@@ -468,7 +469,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `langs.ts` | 19 | The languages the game speaks (2026-10-30, the owner: |
 | `lipki.ts` | 114 | Lipki, the woodcutters' hamlet in the birch woods (2026-10-16, reworked): where its houses and what lies about them stand. |
 | `load.ts` | 70 | What a load does to whoever carries it (2026-10-13: |
-| `mine.ts` | 82 | The Old Mine: the way through the canyon wall at z 540, the one crossing of it but for the Pass. |
+| `mine.ts` | 110 | The Old Mine: the way through the canyon wall at z 540, the one crossing of it but for the Pass. |
 | `mokroye.ts` | 190 | Mokroye, the flooded hamlet in the swamp (2026-10-16, new): where its houses, boardwalks and what the water left stand. |
 | `news.ts` | 202 | Hearts and comments on the entries of the changelog (2026-10-12: |
 | `outposts.ts` | 325 | The small places of the open country (2026-10-23, the owner: |
@@ -486,7 +487,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ruins.ts` | 1303 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
 | `save.ts` | 58 | Local persistence for the single-player slice. |
 | `sickness.ts` | 47 | Food poisoning (2026-10-23, with the animals; DayZ's). |
-| `sites.ts` | 194 | The way down's stops out in the world (the owner, 2026-10-31: |
+| `sites.ts` | 184 | The way down's stops out in the world (the owner, 2026-10-31: |
 | `slopes.ts` | 236 | Steep ground: what legs can do on it. |
 | `stash.ts` | 36 | Where a stash can be put under the ground (2026-10-12): out in the country, and nowhere else. |
 | `storage.ts` | 107 | What can be searched, in one place: every model that holds things (a crate, a locker, a cabinet, a desk...), what it is called, how big its grid is, and where what is in it comes from. |
@@ -658,7 +659,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `bridge.ts` | 679 | The road bridge as it is built (see src/sim/bridge.ts for what a bridge is, in figures, and src/world/worldgen.ts for where one stands): a reinforced-concrete road bridge of the kind the country it stands in built by... |
 | `buildings.ts` | 3838 | Procedural buildings: walls with door/window cut-outs (two material layers), floors, ceilings, gable / shed / flat roofs, window frames + glass, hinged doors, hand-authored interior layouts with Poly Haven furniture,... |
 | `bunker-deep.ts` | 693 | Levels 2 and 3 as they are built and as they move (src/sim/bunker-deep.ts says where everything is). |
-| `bunker.ts` | 1214 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
+| `bunker.ts` | 1226 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
 | `canyon-beds.ts` | 46 | THE CANYON'S BEDS as a chunk of shader (the terrain's, src/world/terrain.ts, and any other rock of the canyon: the carved rock round the caves' mouths, rock-blend's face), so that where a piece meets the wall its... |
 | `castle-post-shape.ts` | 439 | The signals post on the fort (src/sim/castle-post.ts): the shapes of what is made by hand, as plain numbers. |
 | `castle-post.ts` | 289 | The signals post on the fort (src/sim/castle-post.ts), as it is drawn and as it stops a body: what the game has no model for and is made here by hand. |
@@ -697,7 +698,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `kupol.ts` | 176 | Inside the Kupol's dome (the plan: |
 | `load-world.ts` | 33 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `macro.ts` | 45 | THE GROUND'S LARGE NOISE: a tileable picture of slow noise (three of its places fbm at three sizes, the fourth a smoother noise that deals out the ground pictures' copies), read by the terrain, the grass and whatever... |
-| `mine.ts` | 277 | The Old Mine as it is built (src/sim/mine.ts for what and where): rough rock round its incline, its drift, its galleries and its hoist room, one mesh for all of it, with plain boxes behind that surface to stop a... |
+| `mine.ts` | 269 | The Old Mine as it is built (src/sim/mine.ts for what and where): rough rock round its incline, its drift, its galleries and its hoist room, one mesh for all of it, with plain boxes behind that surface to stop a... |
 | `mokroye-plans.ts` | 30 | Mokroye, the flooded hamlet in the swamp (2026-10-16): its houses as the water has them. |
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
 | `ocean.ts` | 533 | THE SEA off the west coast (2026-10-16: |
