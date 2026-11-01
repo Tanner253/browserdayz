@@ -18,7 +18,7 @@ import { type SerializedInventory, Container, keepHotHeld } from '../src/sim/inv
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { PLAN, inPlay, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
-import { racked, CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
+import { racked, CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, VAULT_KIND, stepNear, type Keeps } from '../src/sim/crates';
 import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
 import { News } from '../src/sim/news';
@@ -53,7 +53,7 @@ import { regrowing } from './gather';
 import { keepBases, restoreBases, sighting } from './build';
 import { charges } from './raid';
 import { trapSight, trapsTick } from './traps';
-import { bunkerLocal, inCellar, levelAt } from '../src/sim/bunker';
+import { bunkerLocal, inCellar, inVault, levelAt } from '../src/sim/bunker';
 import { sitesReady, sitesTick } from './sites';
 import { upkeep } from './claims';
 import { ROT } from '../src/sim/build/upkeep';
@@ -374,7 +374,7 @@ function loadWorld() {
     // (the steel locker with two doors likewise: a constable's in a police building; in the hospital, where it is the
     // staff's own, a clinic's cabinet and not a hospital's; anywhere else what it is by itself, a soldier's)
     const kind = c.kind !== 'med_cabinet' && c.kind !== 'steel_locker' ? c.kind : stands('police', 17) ? 'police_locker' : stands('hospital', 22) ? (c.kind === 'steel_locker' ? 'med_cabinet' : 'hospital_cabinet') : c.kind;
-    boxes.set(c.cid, { cid: c.cid, kind: 'crate', w: spec.w, h: spec.h, items: [], x: c.x, y: c.y, z: c.z, rot: 0, crate: kind, emptiedAt: -1 });
+    boxes.set(c.cid, { cid: c.cid, kind: 'crate', w: spec.w, h: spec.h, items: [], x: c.x, y: c.y, z: c.z, rot: 0, crate: (inVault(world.bunker, c.x, c.y + 0.5, c.z) && VAULT_KIND[kind]) || kind, emptiedAt: -1 });
   }
   let saved: {
     rev: number;
@@ -399,7 +399,8 @@ function loadWorld() {
     for (const b of saved.boxes) {
       if (b.kind === 'crate') {
         const cur = boxes.get(b.cid);
-        if (cur) Object.assign(cur, { items: b.items, emptiedAt: b.emptiedAt });
+        // (one that has since become another kind of thing is filled as what it is now)
+        if (cur?.crate === b.crate) Object.assign(cur!, { items: b.items, emptiedAt: b.emptiedAt });
       } else if (b.kind === 'furniture') {
         const cur = boxes.get(b.cid);
         if (cur?.kind === 'furniture') Object.assign(cur, { items: b.items, layout: b.layout ?? {} });
@@ -411,6 +412,8 @@ function loadWorld() {
         else if (!economy.loot.has(b.cid)) economy.drop(stashItem(b), b.x, b.y, b.z, b.rot).keptAt = b.touchedAt ?? Date.now();
       }
     }
+    // (and what the save does not know of is filled now, not a restock's time from now: a release's new carts and racks)
+    for (const b of boxes.values()) if (b.kind === 'crate' && !b.items.length && b.emptiedAt < 0) fillBox(b);
     for (const [i, open, swing] of saved.doors ?? []) doors.set(i, [open, swing]);
     economy.tick(0, []);
     log(`restored world: ${economy.loot.size} loot, ${[...boxes.values()].filter((b) => b.kind === 'stash').length} stashes`);
@@ -826,7 +829,7 @@ setInterval(() => {
         const own = b.filled, leftOnly = !!own && b.items.every((it) => own.includes(it.uid));
         if (b.pickedAt !== undefined && economy.time - b.pickedAt > CRATE_RESTOCK * 3 && quiet && leftOnly) fillBox(b);
       } else if (b.emptiedAt < 0) b.emptiedAt = economy.time;
-      else if (economy.time - b.emptiedAt > CRATE_RESTOCK && quiet) fillBox(b);
+      else if (economy.time - b.emptiedAt > (CRATE_SPECS[b.crate ?? '']?.again ?? CRATE_RESTOCK) && quiet) fillBox(b);
     } else if (b.kind === 'corpse' && economy.time > (b.expires ?? 0) && !locks.has(b.cid)) {
       boxes.delete(b.cid);
       broadcast({ t: 'corpse-', uid: b.cid });

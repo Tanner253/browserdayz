@@ -76,6 +76,33 @@ function bore(from: number, to: number): THREE.BufferGeometry {
   return g;
 }
 
+/** the stone the track lies in, from wall to wall, the sleepers half in it (the bore itself is an arch, open underneath). Each half is lit from its own wall's foot, and they meet under the rails */
+function bed(from: number, to: number): THREE.BufferGeometry {
+  const pos: number[] = [], nor: number[] = [], uv: number[] = [], lit: number[] = [], idx: number[] = [], Y = -0.17;
+  let rows = 0;
+  for (let s = from; ; s = Math.min(to, s + 3)) {
+    for (const [x, v] of [[-HALF, 0.04], [0, 0.04], [0, 0.96], [HALF, 0.96]]) {
+      place(s, x, Y, pos);
+      nor.push(0, 1, 0);
+      uv.push(x / 2.5, s / 2.5);
+      lit.push(s / (LAMP_EVERY * 2), v);
+    }
+    rows++;
+    if (s >= to) break;
+  }
+  for (let j = 0; j + 1 < rows; j++) for (const i of [0, 2]) {
+    const a = j * 4 + i, b = a + 1, d = a + 4, e = d + 1;
+    idx.push(a, b, d, b, e, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('uv1', new THREE.Float32BufferAttribute(lit, 2));
+  g.setIndex(idx);
+  return g;
+}
+
 /** a bar along the line, of a section given as points round it, between two distances: a rail, or the cable run */
 function bar(from: number, to: number, section: [number, number][], color: THREE.Color): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], idx: number[] = [], N = section.length;
@@ -116,7 +143,7 @@ function sleepers(from: number, to: number, timber: THREE.Material): THREE.Insta
 }
 
 interface Piece { from: number; to: number; mesh: THREE.Group | null; x: number; y: number; z: number }
-interface Stuff { wall: THREE.Material; iron: THREE.Material; timber: THREE.Material; bulb: THREE.Material }
+interface Stuff { wall: THREE.Material; bed: THREE.Material; iron: THREE.Material; timber: THREE.Material; bulb: THREE.Material }
 
 export class Tunnel {
   private pieces: Piece[] = [];
@@ -166,8 +193,9 @@ export class Tunnel {
       }
     }, 1, true);
     glow.channel = 1;
-    const concrete = assets.pbr('dirty_concrete');
+    const concrete = assets.pbr('dirty_concrete'), stone = assets.pbr('rocks_ground_02');
     return {
+      bed: atmo.register(new THREE.MeshStandardMaterial({ map: stone.map, normalMap: stone.normalMap, roughnessMap: stone.armMap, roughness: 1, metalness: 0, side: THREE.DoubleSide, lightMap: glow, lightMapIntensity: 2.6 })),
       wall: atmo.register(new THREE.MeshStandardMaterial({ map: concrete.map, normalMap: concrete.normalMap, roughnessMap: concrete.armMap, roughness: 1, metalness: 0, lightMap: glow, lightMapIntensity: 2.6 })),
       iron: atmo.register(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25, side: THREE.DoubleSide })),
       timber: atmo.register(new THREE.MeshStandardMaterial({ color: TIMBER, roughness: 0.9 })),
@@ -179,6 +207,12 @@ export class Tunnel {
     const u = (this.stuff ??= this.paints()), s = p.from, end = p.to, piece = new THREE.Group();
     const from = Math.max(s, BORE.from), to = Math.min(end, BORE.to), shell = to > from ? new THREE.Mesh(bore(from, to), u.wall) : null;
     if (shell) shell.matrixAutoUpdate = false;
+    const floor = to > from ? new THREE.Mesh(bed(from, to), u.bed) : null;
+    if (floor) {
+      floor.matrixAutoUpdate = false;
+      floor.receiveShadow = true;
+      piece.add(floor);
+    }
     const rail = (x: number): [number, number][] => [[x - 0.04, 0], [x - 0.04, 0.15], [x + 0.04, 0.15], [x + 0.04, 0]];
     const steel = mergeGeometries([
       bar(s, end, rail(-GAUGE), STEEL), bar(s, end, rail(GAUGE), STEEL),

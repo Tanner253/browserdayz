@@ -38,6 +38,12 @@ export interface CrateSpec {
   with?: Tier[];
   /** what it holds and nothing else, by weight: a list of its own, for what the rules of the map cannot say */
   list?: Table;
+  /** a pile in it is a whole one */
+  full?: true;
+  /** how many of a thing make a pile in it, where that is not the thing's own rule */
+  piles?: Record<string, [number, number]>;
+  /** seconds it stays empty, where that is not CRATE_RESTOCK */
+  again?: number;
   /** of the guns, only the long ones */
   long?: true;
 }
@@ -82,11 +88,17 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   crate_big: { label: 'Large Crate', w: 8, h: 4, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
   bunker_desk: { label: 'Desk', w: 6, h: 3, count: [0, 2], usage: ['Bunker'], tier: 5 },
   // (a minecart, wherever one stands, the owner, 2026-11-01: "Pickaxe common and scrap and frags spawn there". Six down, as a pickaxe is long)
-  ore_cart: { label: 'Minecart', w: 8, h: 6, count: [2, 3], usage: ['Industrial'], tier: 1, list: [['pickaxe', 4], ['scrap', 5], ['metal_frags', 5]] },
+  ore_cart: { label: 'Minecart', w: 8, h: 6, count: [2, 3], usage: ['Industrial'], tier: 1, list: [['pickaxe', 4], ['scrap', 5], ['metal_frags', 5]], piles: { metal_frags: [25, 80], scrap: [3, 10] } },
+  // The vault, the end of the way down (the owner, 2026-11-01: "i expected tons of 50 bmg and tappers and stuff"; 2026-10-31: "the only place you can find tappers and the best loot in the
+  // game"). Its racks and crates stand as any do (VAULT_KIND, by where they are) and hold this instead, and the forty minutes a heavy sniper takes to come back (see guns.ts).
+  vault_rack: { label: 'Weapon Rack', w: 10, h: 20, count: [4, 6], usage: ['Bunker'], tier: 5, full: true, again: 2400, list: [['barrett', 2], ['sniper50', 2], ['vssk', 2], ['ammo_50bmg', 7], ['ammo_127x55', 3], ['mag_barrett', 2], ['mag_sniper50', 2], ['scope_50', 1], ['scope_barrett', 1]] },
+  vault_case: { label: 'Vault Case', w: 8, h: 4, count: [4, 7], usage: ['Bunker'], tier: 5, full: true, again: 2400, list: [['ammo_50bmg', 10], ['ammo_127x55', 4], ['mag_barrett', 2], ['mag_sniper50', 2], ['night_vision', 0.6], ['life_vest', 0.8]] },
 };
+/** what one of these holds when it stands in the vault */
+export const VAULT_KIND: Record<string, string> = { gun_rack: 'vault_rack', weapons_case: 'vault_case', old_military_crate: 'vault_case' };
 /** a gun rack: what stands in it is seen from outside it, by everybody (the owner, 2026-10-17: "renders guns on the 3d
  * model that are in its inventory"); how many of its guns stand in its cups; and which of what it holds those are */
-export const RACKS = new Set(['gun_rack']);
+export const RACKS = new Set(['gun_rack', 'vault_rack']);
 export const RACK_SHOWN = 6;
 /** the step of the map a thing stands on: its nearest place for loot's, within thirty metres (a rack's building's) */
 export function stepNear(points: readonly { x: number; z: number; tier?: Tier }[], x: number, z: number): Tier | undefined {
@@ -102,7 +114,7 @@ export const rackShows = (items: readonly { id: string; y: number }[]) => Array.
 /** a rack just filled: its guns in its bays and nowhere else (the owner, 2026-10-25: "guns spawn in the slots, never in the grid") */
 export const racked = (c: Container) => void (c.items = c.items.filter((p) => !ITEMS[p.item.id]?.weapon || bayOf(p.y) >= 0));
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
-const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
+const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk', 'vault_rack', 'vault_case']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
 const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker', 'steel_locker', 'ore_cart']);
 
@@ -209,8 +221,9 @@ export function fillCrate(c: Container, kind: string, rnd: () => number = Math.r
     const def = ITEMS[id];
     // (a pile as its rule says where it says, DayZ's quantmin and quantmax: scrap a few, planks a handful, never a share of a
     // stack made big for a claim's store; else a fifth to two thirds of a stack)
-    const q = typeRule(def)?.qty ?? [0.2, 0.65];
-    const item = makeItem(id, def.stack ? Math.max(1, Math.round(def.stack * (q[0] + rnd() * (q[1] - q[0])))) : 1);
+    const q = spec.full ? [1, 1] : typeRule(def)?.qty ?? [0.2, 0.65];
+    const p = spec.piles?.[id];
+    const item = makeItem(id, p ? p[0] + Math.floor(rnd() * (p[1] - p[0] + 1)) : def.stack ? Math.max(1, Math.round(def.stack * (q[0] + rnd() * (q[1] - q[0])))) : 1);
     if (def.weapon) {
       fitAtRandom(item, rnd);
       if (t < 5) plainMag(item);

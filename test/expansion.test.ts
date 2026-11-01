@@ -326,8 +326,8 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   const forts = castleHomes(world.castle!).reduce((a, h) => a + h.n, 0);
   // (and the west's, its own as the fort's are, 2026-10-19: about its places and in the pass's caves)
   const west = world.pois.reduce((a, q) => a + (WEST_HOMES[q.name]?.[0] ?? 0), 0) + IN_CAVES;
-  // (and the way down's, its own too, 2026-10-31: asleep on Levels 2 and 3 and in the Old Mine)
-  const deep = 9 + 12 + mineSpots().length;
+  // (and the way down's, its own too, 2026-10-31: asleep on Levels 2 and 3, in Level 1's wings and in the Old Mine)
+  const deep = 14 + 15 + 16 + mineSpots().length;
   assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max + forts + west + deep);
   // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
   // (the bunker's: the fort on the mountain has a dark of its own under its terrace, counted further down)

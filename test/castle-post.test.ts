@@ -88,8 +88,9 @@ ok('it is what was asked for: every room has its job, and what is off the shelf 
   // the mast and its guys and its light; sandbags, nets, a tarpaulin, tents, duckboards, cables, the flagpole, floodlights, the generator
   const mast = made.find((m) => m.t === 'mast');
   assert.ok(mast && mast.t === 'mast' && mast.guys.length >= 3 && mast.at[1] === K.roof && mast.h === POST.mast.h);
-  for (const [t, room] of [['bags', 'gate'], ['bags', 'roof'], ['sheet', 'dump'], ['sheet', 'roof'], ['sheet', 'terrace'], ['boards', 'terrace'], ['table', 'terrace'], ['cable', 'store'], ['pole', 'gate'], ['flood', 'terrace'], ['generator', 'store'], ['scope', 'roof'], ['map', 'command post'], ['grave', 'village'], ['bedroll', 'bunk room'], ['table', "sniper's nest"], ['set', 'signals tower']] as [string, Room][]) assert.ok(has(t, room), `no ${t} in the ${room}`);
+  for (const [t, room] of [['bags', 'gate'], ['bags', 'roof'], ['sheet', 'dump'], ['sheet', 'roof'], ['sheet', 'terrace'], ['boards', 'terrace'], ['table', 'terrace'], ['cable', 'store'], ['pole', 'gate'], ['flood', 'terrace'], ['scope', 'roof'], ['map', 'command post'], ['grave', 'village'], ['bedroll', 'bunk room'], ['table', "sniper's nest"], ['set', 'signals tower']] as [string, Room][]) assert.ok(has(t, room), `no ${t} in the ${room}`);
   assert.equal(made.filter((m) => m.t === 'sheet' && m.stuff === 'net').length, 3);
+  assert.ok(postModels().some((m) => m.name === 'generator' && m.room === 'store' && m.model === 'portable_generator'), 'no generator in the store');
   // no tents on the terrace any more (2026-10-14, the owner: "that army tent is SO small its a joke ... maybe just remove it"): their groundsheets stay
   assert.equal(postModels().filter((m) => m.room === 'terrace').length, 0);
   // three drums of fuel in the store, which blow; the stove in the mess; the set on the desk

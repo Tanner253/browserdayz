@@ -305,6 +305,12 @@ export const bunkerVault = () => {
   const q = LEVEL3.areas.find((a) => a.name === 'The vault')!;
   return { room: middle(q), breaker: [0, 15.5] as [number, number], clear: [[0, 10], [0, 15.4]] as [[number, number], [number, number]], floor: HALL3.floor };
 };
+/** is a spot in the vault? (Vault control is over it, on the same plan.) */
+export function inVault(p: Place | null, x: number, y: number, z: number) {
+  if (!p) return false;
+  const q = LEVEL3.areas.find((a) => a.name === 'The vault')!, [r, f, h] = bunkerLocal(p, x, y, z);
+  return r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1 && h < levelY(3) + q.top!;
+}
 export { ESCAPE, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, inDeep };
 
 function layOut(seed: number, level = 1, shape: Shape | null = null): Plan {

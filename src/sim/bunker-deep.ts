@@ -342,8 +342,9 @@ export const LEVEL3: Deep = {
     { id: 'weapons_case', r: 4.6, f: -3.2, rot: 1.5, y: -3.8 + 0.1 },
     // vault control
     { id: 'breaker_box', r: 0, f: 15.5, rot: -Q }, { id: 'bunker_terminal', r: 0.2, f: 11.1, rot: Math.PI, solid: true }, { id: 'bunker_terminal', r: 3.6, f: 11.1, rot: Math.PI, solid: true }, { id: 'SchoolChair_01', r: 1.8, f: 12.3, rot: 0.3 }, { id: 'metal_office_desk', r: 5, f: 15, rot: -Q, on: TOP },
-    // the vault: racks down both sides, the cases on a table up the middle
-    ...[8.5, 11, 13.5, 16].flatMap((f) => [{ id: 'gun_rack', r: -5.55, f, rot: Q } as Things, { id: 'rack_wide', r: 5.55, f, rot: -Q, y: 0, solid: true } as Things]).map((t) => ({ ...t, y: HALL3.floor })),
+    // the vault: gun racks down both sides, crates of ammunition up the aisles, the cases on a table up the middle (what is in them is the vault's own: `vault_rack` in src/sim/crates.ts)
+    ...[8.5, 11, 13.5, 16].flatMap((f) => [{ id: 'gun_rack', r: -5.55, f, rot: Q } as Things, { id: 'gun_rack', r: 5.55, f, rot: -Q } as Things]).map((t) => ({ ...t, y: HALL3.floor })),
+    ...[9.2, 12.4, 15.2].flatMap((f) => [-3.2, 3.2].flatMap((r, k) => [{ id: 'old_military_crate', r, f, rot: Q + (k ? 0.08 : -0.06), y: HALL3.floor } as Things, { id: 'weapons_case', r, f: f + 0.1, rot: Q + (k ? -0.1 : 0.14), y: HALL3.floor + 0.3 } as Things])),
     { id: 'steel_table', r: 0, f: 13, rot: 0, y: HALL3.floor, on: [0.79], solid: true }, { id: 'weapons_case', r: 0, f: 16.8, rot: 0, y: HALL3.floor }, { id: 'weapons_case', r: -1.6, f: 16.8, rot: 0.2, y: HALL3.floor }, { id: 'weapons_case', r: 1.6, f: 16.8, rot: -0.2, y: HALL3.floor },
     // the sump, and the hollow under the landing
     { id: 'weapons_case', r: -15.6, f: -7.4, rot: 0.1, y: -7.6 }, { id: 'Shelf_01', r: -16.6, f: -4, rot: Q, y: -7.6, on: SHELF }, { id: 'wooden_crate_01', r: -15, f: -2, rot: 0.8, y: -7.6 },

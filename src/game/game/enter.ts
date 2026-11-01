@@ -12,7 +12,7 @@ import { heightAt, inPlay } from '../../world/worldgen';
 import { basementUnder } from '../../sim/basements';
 import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, ZONA_VOID, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
-import { racked, fillCrate, RACKS, stepNear, type Keeps } from '../../sim/crates';
+import { racked, fillCrate, RACKS, VAULT_KIND, stepNear, type Keeps } from '../../sim/crates';
 import { inCave } from '../../world/caves-carved';
 import type { Economy } from '../../sim/economy';
 
@@ -30,7 +30,7 @@ import { BotCheck } from '../botcheck';
 import { addCashedTag, walletAddress, REWARDS_UI } from '../../ui/rewards';
 import { EMBED } from '../../core/embed';
 import { underGas } from '../../sim/gas';
-import { inBunker } from '../../sim/bunker';
+import { inBunker, inVault } from '../../sim/bunker';
 import { LOOT_REV, type Game } from '../game';
 import { playedAd } from '../../ui/ads';
 import { adBreak } from '../../ui/adsense';
@@ -374,7 +374,7 @@ export const enterMethods = {
     }
     const e = this.economy, keeps = keepsOf.get(e) ?? keepsOf.set(e, (id, t) => e.written(id, t)).get(e)!;
     c.container.rack = RACKS.has(c.kind);
-    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z) || inCave(c.x, c.y + 0.5, c.z), keeps, RACKS.has(c.kind) ? stepNear(e.points, c.x, c.z) : undefined, !inPlay(c.x, c.z));
+    fillCrate(c.container, (inVault(this.bunker.place, c.x, c.y + 0.5, c.z) && VAULT_KIND[c.kind]) || c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z) || inCave(c.x, c.y + 0.5, c.z), keeps, RACKS.has(c.kind) ? stepNear(e.points, c.x, c.z) : undefined, !inPlay(c.x, c.z));
     if (c.container.rack) racked(c.container);
   },
 

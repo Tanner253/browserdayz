@@ -429,7 +429,7 @@ export function infectedHomes(world: World): Home[] {
   for (const h of fort) homes.push(h);
   // (and the levels under the first: asleep in their rooms, and more of them the deeper it goes)
   if (world.towns) homes.push({ x: MINE.hall.x, z: MINE.z, r: 120, n: mineSpots().length, inside: mineSpots(), still: true });
-  if (bunker) for (const [level, n] of [[2, 14], [3, 18]]) homes.push({ x: bunker.x, z: bunker.z, r: 30, n, inside: bunkerSpots(world, true, level), bunker: true, still: true });
+  if (bunker) for (const [level, n] of [[2, 14], [3, 15]]) homes.push({ x: bunker.x, z: bunker.z, r: 30, n, inside: bunkerSpots(world, true, level), bunker: true, still: true });
   // (and Level 1's wings: in their own rooms, and put back only with the door shut, as the rest of the bunker's are)
   if (bunker && wingSpots(world).length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: 16, inside: wingSpots(world), bunker: true, still: true });
   return homes.filter((h) => h.n > 0);

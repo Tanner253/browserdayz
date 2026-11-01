@@ -73,10 +73,10 @@ const ok = (what: string) => { checks++; console.log(`  ok  ${what}`); };
 
 // --- the east half of today's map as it was (prints taken 2026-10-16 off f1d0ca0, the last tree with the square alone)
 // (but for the trees shrunk to nothing from the Kupol's yard and its siding, 2026-10-31: src/world/worldgen/generate.ts, they keep their numbers; and the
-// Kupol's own things and buildings, which were added to the end of each list. Its ground, paint and grass are to the byte what they were)
+// Kupol's own things and buildings, which were added to the end of each list; and its siding's track and wagon, gone with the rides, 2026-11-01. Its ground, paint and grass are to the byte what they were)
 const WAS = {
   heights: 'e84eb63aae84e4a6', surface: '2d94c0e4a0819aa7', splat: 'cb750f3f74b54a53', grass: '2fca3323401c0679', trees: '9fbaeed794168a1f', rocks: 'd9d17dfd2558a623',
-  props: 'aba54b3f492a4992', buildings: 'f60e4e0fc630285c', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: '098dc706427e6dcd',
+  props: '2acb3c86a3b814ef', buildings: 'f60e4e0fc630285c', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: '098dc706427e6dcd',
 };
 for (const [k, v] of Object.entries(WAS)) assert.equal(prints[k as keyof typeof prints], v, `the east's ${k} are not what they were`);
 ok(`the east of today's map as it was, to the byte (but within ${KEEP} m of where the bunker was): its ground, paint and grass, ${world.trees.filter(east).length} trees, ${world.rocks.filter(east).length} rocks, ${world.props.filter(east).length} props, ${world.buildings.filter(east).length} buildings, the roads, the fort, Kamenka (made in ${made.toFixed(0)} ms)`);
@@ -310,7 +310,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
     // (but in a hollow: Mokroye's barn stands sunk to the waist, as it was drawn up)
     for (const b of ids) {
       const dx = b.x - town.x, dz = b.z - town.z;
-      assert.ok(b.floorY >= padY + Math.min(0, moundAt(town, dx * c - dz * s, dx * s + dz * c)) - 0.5, `${b.id} sunk under its town's pad`);
+      assert.ok(b.floorY >= padY + Math.min(0, moundAt(town, dx * c - dz * s, dx * s + dz * c)) - 0.5 - (b.under ?? 0), `${b.id} sunk under its town's pad`);
     }
   }
   const K = world.kalat!, top = heightAt(H, K.x, K.z);
