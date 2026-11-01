@@ -89,6 +89,9 @@ interface Doorway {
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 const turnTo = (a: number, b: number, max: number) => a + THREE.MathUtils.clamp(Math.atan2(Math.sin(b - a), Math.cos(b - a)), -max, max);
 
+/** seconds one takes to come up out of the swamp */
+const RISE = 2.4;
+
 export class Infected implements Damageable {
   readonly name = 'Infected';
   readonly avatar = new Avatar();
@@ -194,6 +197,7 @@ export class Infected implements Damageable {
     this.after = info.s[5];
     this.fallTo = y;
     this.still = info.w === 1;
+    this.rising = info.w === 2;
     // (the still ones live on the bunker's floor, whatever height they were found at: on the deep levels, which have many floors, the one they were stood on)
     if (this.still && this.horde.byBunker(this.home) && !this.horde.deep(this.home)) this.home.y = this.horde.floorOf(y) ?? y;
     // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
@@ -503,6 +507,8 @@ export class Infected implements Damageable {
     return true;
   }
   private fallTo = 0;
+  /** stood under the ground by a wave at Bolotnaya, and yet to come up out of it */
+  private rising = false;
 
   /**
    * Toward a point, by the doors if a wall is in the way: when the point is in a building
@@ -641,6 +647,14 @@ export class Infected implements Damageable {
       this.thinkT = 0.13;
       this.think(now);
     }
+    if (this.rising) {
+      // (out of the swamp, the owner's word, 2026-11-01: an arm first, and the mud heard as it comes)
+      this.rising = false;
+      this.fallTo = this.home.y = this.floor(this.pos.x, this.pos.z, this.pos.y + 2.6);
+      this.stopT = RISE;
+      this.avatar.claw();
+      audio.impact('dirt', this.pos, this.pos.distanceTo(this.horde.eye));
+    }
     const quarry = this.after ? this.horde.person(this.after) : null;
     // (whatever it does not walk this frame, it loses pace)
     if (!this.stepped) this.gait = Math.max(0, this.gait - 8 * dt);
@@ -649,6 +663,10 @@ export class Infected implements Damageable {
       // stopped: it does nothing until it has its feet again (but it can still fall)
       this.stopT -= dt;
       if (this.pos.y > this.fallTo + 0.02) this.pos.y = Math.max(this.fallTo, this.pos.y - 7 * dt);
+      else if (this.pos.y < this.fallTo - 0.02) {
+        this.pos.y = Math.min(this.fallTo, this.pos.y + (dt * 2.1) / RISE);
+        this.dirty = true;
+      }
       return;
     }
     switch (this.mode) {

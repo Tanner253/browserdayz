@@ -104,9 +104,9 @@ function wave(s: Site, r: Run, now: number) {
     // (on the place's own level: one put under a cliff never gets up it)
     let [x, z] = waveSpot(s, k, n, Math.random);
     for (let t = 0; t < 12 && Math.abs(world.groundAt(x, z) - level) > 2.5; t++) [x, z] = waveSpot(s, k, n, Math.random);
-    const b = horde.place(x, world.groundAt(x, z), z, now);
+    const b = horde.place(x, world.groundAt(x, z) - (s.wave.rise ?? 0), z, now);
     r.stood.add(b.i);
-    broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
+    broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(s.wave.rise ? { w: 2 } : {}) } });
   }
 }
 

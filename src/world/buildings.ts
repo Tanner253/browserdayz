@@ -517,6 +517,8 @@ export interface Blueprint {
 }
 
 const T = 0.2; // wall thickness
+/** a door's `leaf` when it is steel, where a container's is 0 or 1 */
+const PLATED = 2;
 /** how thick the floor between two storeys is */
 const SLAB = 0.2;
 
@@ -2584,7 +2586,7 @@ export class Buildings {
             this.collider((o.b - o.a) / 2, (o.top - o.bottom) / 2, 0.04, F.clone().multiply(c), 'metal', GLASS_GROUPS);
           } else if (o.kind === 'door') {
             const hinge = F.clone().multiply(new THREE.Matrix4().makeTranslation(o.a + fw, 0, 0));
-            this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: wd.still ? false : rng.chance(0.35), swing: wd.still ? 1 : rng.chance(0.5) ? 1 : -1 });
+            this.doorSpecs.push({ ...(plot.type === 'blockhouse' ? { leaf: PLATED } : {}), m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: wd.still ? false : rng.chance(0.35), swing: wd.still ? 1 : rng.chance(0.5) ? 1 : -1 });
           }
           // (a barn's open front has the same lip as a door)
           if (o.kind !== 'window' && o.kind !== 'grille' && wd.side !== 'inner' && y0 === 0 && !o.join) {
@@ -3589,8 +3591,25 @@ export class Buildings {
       lod.addLevel(new THREE.Object3D(), 345);
       return lod;
     };
+    // (a strong room's door is steel: a base's metal door, stretched to its frame, the owner's word on the blockhouse)
+    const plated = (w: number, h: number) => {
+      const g = new THREE.Group();
+      void assets.model('bb_door_metal').then((root) => {
+        const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3());
+        root.scale.set(w / size.x, h / size.y, 0.07 / size.z);
+        root.position.set(-box.min.x * root.scale.x, -box.min.y * root.scale.y, (-(box.min.z + box.max.z) / 2) * root.scale.z);
+        root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          m.castShadow = m.receiveShadow = true;
+          this.atmo.register(m.material as THREE.Material);
+        });
+        g.add(root);
+      }).catch(() => {});
+      return g;
+    };
     for (const s of this.doorSpecs) {
-      const d = new Door(s.m, s.w, s.h, doorMat, handleMat, s.id, s.leaf === undefined ? undefined : { mesh: hang(s.leaf), surface: 'metal' });
+      const d = new Door(s.m, s.w, s.h, doorMat, handleMat, s.id, s.leaf === undefined ? undefined : { mesh: s.leaf === PLATED ? plated(s.w, s.h) : hang(s.leaf), surface: 'metal' });
       if (s.open) d.setOpen(true, s.swing);
       // (a hinge that holds nothing is kept out of the world: see the Door's constructor)
       if (d.pivot.children.length) scene.add(d.pivot);

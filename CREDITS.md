@@ -372,6 +372,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Made at its true size; textures capped at 2048; geometry compressed.
 - "Radar dish" made for ZONA with Higgsfield (GPT Image and Tripo image-to-3D), 2026-11-01, for commercial use under the plan.
   Changes made: Made at its true size; textures capped at 2048; geometry compressed.
+- "Diesel generator set" made for ZONA with Higgsfield (image to 3D).
+  Changes made: Made at its true size; textures capped at 2048; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -630,6 +632,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Red Brick Plaster Patch 02](https://polyhaven.com/a/red_brick_plaster_patch_02) | Rob Tuytel |
 | texture | [Ribbed Concrete Wall](https://polyhaven.com/a/ribbed_concrete_wall) | Charlotte Baglioni |
 | texture | [Rock Face 03](https://polyhaven.com/a/rock_face_03) | Dario Barresi, Rico Cilliers |
+| texture | [Rock Wall 10](https://polyhaven.com/a/rock_wall_10) | Amal Kumar |
 | texture | [Rocks Ground 02](https://polyhaven.com/a/rocks_ground_02) | Rob Tuytel |
 | texture | [Rocky Trail](https://polyhaven.com/a/rocky_trail) | Amal Kumar |
 | texture | [Roots](https://polyhaven.com/a/roots) | Dario Barresi, Dimitrios Savva |

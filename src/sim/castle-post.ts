@@ -86,7 +86,6 @@ export type Made = Piece & (
   /** a floodlight: where its head is, which way it looks (degrees: 0 toward the gate, 90 toward the steep side), and whether it stands on legs of its own from the floor at `foot` */
   | { t: 'flood'; at: V3; aim: number; foot?: number }
   /** the generator: the middle of its foot, and how it is turned */
-  | { t: 'generator'; at: V3; yaw: number }
   /** a spotting scope on its stand */
   | { t: 'scope'; at: V3; aim: number }
   /** a table or a bench of boards: the middle of its foot, its top's width and depth, and its height */
@@ -240,8 +239,9 @@ function lay(loose: Loose[]): Plan {
   // ------------------------------------------------------------------ the store: the generator and its fuel
   const gen: V3 = [-1.3, 0, 0.55], door: V3 = [K.x1 + 0.08, 0.03, 0.42];
   {
-    made.push({ t: 'generator', room: 'store', name: 'generator', at: gen, yaw: 0 });
-    solids.push({ c: [gen[0], b(0.36), gen[2]], h: bh([0.52, 0.36, 0.3]), yaw: 0, surface: 'metal', name: 'generator', room: 'store' });
+    // (the real model, the owner, 2026-11-01: "a low poly generator object in the castle ... needs removal and replacing")
+    put('store', 'portable_generator', gen[0], gen[2], 0, 0);
+    solids.push({ c: [gen[0], b(0.29), gen[2]], h: bh([0.41, 0.29, 0.28]), yaw: 0, surface: 'metal', name: 'generator', room: 'store' });
     // its fuel: three drums in the corner over the foot of the stair down (a grenade down that stair is a decision), and jerrycans by it
     put('store', 'Barrel_01', 1.8, -3.05, 0, 0);
     put('store', 'Barrel_01', 2.45, -3.05, 0, Math.PI / 2);

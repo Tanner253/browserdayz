@@ -41,7 +41,7 @@ function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vec
     const bump = rockBehind(p) * edge;
     p.addScaledVector(n, -Math.max(0, bump));
     pos.push(p.x, p.y, p.z);
-    uv.push((i / nw) * w * 0.25, (j / nh) * h * 0.25);
+    uv.push((i / nw) * w * 0.34, (j / nh) * h * 0.34);
   }
   for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
     const q = i + j * (nw + 1), r = q + 1, s = q + nw + 1, t = s + 1;
@@ -298,7 +298,7 @@ export class MineSite {
     }
     if (!this.dressed && this.rock) {
       this.dressed = true;
-      const t = assets.pbr('rocks_ground_02');
+      const t = assets.pbr('rock_wall_10');
       this.rock.map = t.map;
       this.rock.normalMap = t.normalMap;
       this.rock.roughnessMap = t.armMap;

@@ -302,23 +302,6 @@ export function postShape(made: Made[], g: (x: number, z: number) => number = ca
         hard.tube(hub, [m.at[0], m.at[1] - 0.24, m.at[2]], 0.02, 0.018, 5, PAINT.steel);
         for (let k = 0; k < 3; k++) hard.tube([m.at[0] + Math.cos(k * 2.094 + 0.4) * 0.5, m.foot, m.at[2] + Math.sin(k * 2.094 + 0.4) * 0.5], hub, 0.016, 0.016, 4, PAINT.steel);
       }
-    } else if (m.t === 'generator') {
-      // an engine and its dynamo in a frame of tube, a tank over them, a panel at one end, on two skids
-      const d = along(m.yaw), w = across(m.yaw), P = (lx: number, y: number, lz: number): V3 => add(m.at, add(add(mul(d, lx), mul(w, lz)), [0, y, 0]));
-      for (const sz of [-1, 1]) {
-        hard.beam(P(-0.52, 0.03, sz * 0.24), P(0.52, 0.03, sz * 0.24), 0.07, 0.06, PAINT.iron);
-        for (const sx of [-1, 1]) hard.tube(P(sx * 0.48, 0.06, sz * 0.27), P(sx * 0.48, 0.7, sz * 0.27), 0.018, 0.018, 4, PAINT.ochre);
-        hard.tube(P(-0.48, 0.7, sz * 0.27), P(0.48, 0.7, sz * 0.27), 0.018, 0.018, 4, PAINT.ochre);
-      }
-      for (const sx of [-1, 1]) hard.tube(P(sx * 0.48, 0.7, -0.27), P(sx * 0.48, 0.7, 0.27), 0.018, 0.018, 4, PAINT.ochre);
-      hard.box(P(-0.14, 0.3, 0), d, UP, w, [0.24, 0.2, 0.17], PAINT.drab);
-      hard.box(P(-0.14, 0.53, 0.02), d, UP, w, [0.12, 0.05, 0.1], PAINT.iron);
-      hard.tube(P(0.12, 0.28, 0), P(0.44, 0.28, 0), 0.14, 0.14, 8, mul(PAINT.steel, 0.7));
-      hard.disc(P(0.44, 0.28, 0), d, 0.14, 8, mul(PAINT.steel, 0.6));
-      hard.box(P(-0.05, 0.63, 0), d, UP, w, [0.3, 0.055, 0.19], PAINT.red);
-      hard.tube(P(-0.05, 0.68, 0.08), P(-0.05, 0.72, 0.08), 0.03, 0.03, 6, PAINT.iron);
-      hard.box(P(0.47, 0.5, 0), d, UP, w, [0.03, 0.12, 0.16], mul(PAINT.steel, 0.55));
-      hard.tube(P(-0.36, 0.42, -0.1), P(-0.36, 0.86, -0.1), 0.022, 0.022, 5, PAINT.iron);
     } else if (m.t === 'scope') {
       const yaw = (-m.aim * Math.PI) / 180, f0 = along(yaw), f: V3 = unit([f0[0], -0.14, f0[2]]), hub: V3 = [m.at[0], m.at[1] + 1.18, m.at[2]];
       for (let k = 0; k < 3; k++) hard.tube([m.at[0] + Math.cos(k * 2.094 + 1) * 0.42, m.at[1], m.at[2] + Math.sin(k * 2.094 + 1) * 0.42], hub, 0.014, 0.014, 4, PAINT.timber);

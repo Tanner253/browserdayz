@@ -947,12 +947,18 @@ export function ruinGround(piece: Piece, x: number, z: number): Ground {
  * What lies at the foot of a wall at a spot beside it: the highest floor of the piece there that is under a
  * height, or the ground the piece is built for (null: neither, the ground is dug away there under a floor).
  */
-export function ruinBase(piece: Piece, x: number, z: number, under: number): number | null {
+/** the highest floor of a piece over a spot, of those no higher than `under` */
+export function ruinFloor(piece: Piece, x: number, z: number, under: number): number | null {
   let best: number | null = null;
   for (const p of ruinParts(piece)) {
     if (p.t !== 'floor' || p.hidden || p.under || p.y > under) continue;
     if (inside(x, z, p.pts) && !(p.holes ?? []).some((h) => inside(x, z, h)) && (best === null || p.y > best)) best = p.y;
   }
+  return best;
+}
+
+export function ruinBase(piece: Piece, x: number, z: number, under: number): number | null {
+  const best = ruinFloor(piece, x, z, under);
   if (best !== null) return best;
   const g = ruinGround(piece, x, z);
   return g.kind === 'dug' ? null : g.y;

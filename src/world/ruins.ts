@@ -17,8 +17,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { GLASS_GROUPS, physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
-import { hash, ruinAt, ruinFoot, type Paint, type Piece, type Place, type V3 } from '../sim/ruins';
-import { BRIGHT, PAINTS, ruinShapeInTurns, ruinSolids, type Solid, type Stuff } from './ruins-shape';
+import { hash, ruinAt, ruinFloor, ruinFoot, type Paint, type Piece, type Place, type V3 } from '../sim/ruins';
+import { BRIGHT, PAINTS, ruinShapeInTurns, ruinSolids, type Seat, type Solid, type Stuff } from './ruins-shape';
 
 /** how near the eye comes to any of it before its pictures are asked for and its real shape made; how far it goes before the far one is drawn again; and how far off a piece's small things and timber are drawn. Metres, from the edge of a piece. */
 export const COME = 380, GO = 440, NEAR = 110;
@@ -69,7 +69,7 @@ export class Ruins {
   state: 'far' | 'coming' | 'near' | 'away' = 'far';
   private far: THREE.Mesh;
   private full: THREE.Group | null = null;
-  private pieces: { piece: Piece; place: Place; mid: THREE.Vector3; reach: number; detail: THREE.Object3D[] }[] = [];
+  private pieces: { piece: Piece; place: Place; seat?: Seat; key: string; mid: THREE.Vector3; reach: number; detail: THREE.Object3D[] }[] = [];
   /** how much of it there is: what stops a body, the triangles and the bytes of it from far off and in full, the bytes of its pictures, how many things there are to draw in full, and how long it took to get ready, ms */
   readonly count = { solids: 0, farTriangles: 0, farBytes: 0, triangles: 0, bytes: 0, pictures: 0, meshes: 0, made: 0 };
 
@@ -77,17 +77,24 @@ export class Ruins {
    * @param plan each piece and where it stands (`ruinsPlan` for the town as it stood)
    * @param ready how a thing is got ready off the picture before it is shown (left out: it is shown as it is, and its first frame pays for it)
    */
-  constructor(private atmo: Atmosphere, scene: THREE.Scene, plan: Stood[], private ready: Ready = async () => {}) {
+  constructor(private atmo: Atmosphere, scene: THREE.Scene, plan: Stood[], private ready: Ready = async () => {}, ground?: (x: number, z: number) => number) {
     this.group.name = 'ruins';
     const pos: number[] = [], nor: number[] = [], col: number[] = [];
     for (const { piece, place } of plan) {
-      const solids = ruinSolids(piece), foot = ruinFoot(piece);
+      // (each stands on the map's ground as it lies under it, so what lies about one is laid for that one: a floor of its own holds what is on it, and over nothing it comes down to the ground)
+      const seat: Seat | undefined = ground && ((x, z, y) => {
+        if (Math.abs((ruinFloor(piece, x, z, y + 0.7) ?? Infinity) - y) < 0.7) return y;
+        const [wx, , wz] = ruinAt(place, x, z), g = ground(wx, wz) - place.y;
+        return g < y - 0.12 ? g : y;
+      });
+      const key = `${piece}@${place.x},${place.z}`;
+      const solids = ruinSolids(piece, seat, key), foot = ruinFoot(piece);
       for (const s of solids) this.solid(s, place);
       this.count.solids += solids.length;
       // (what is drawn of it from far off: not the houses nor the remnants of the bank's wall, which are a metre high)
       if (piece !== 'honeycomb' && !piece.startsWith('stu')) for (const s of solids) if (s.far) this.farShape(s, place, pos, nor, col);
       const mx = foot.reduce((a, q) => a + q[0], 0) / foot.length, mz = foot.reduce((a, q) => a + q[1], 0) / foot.length;
-      this.pieces.push({ piece, place, mid: new THREE.Vector3(...ruinAt(place, mx, mz)), reach: Math.max(...foot.map((q) => Math.hypot(q[0] - mx, q[1] - mz))), detail: [] });
+      this.pieces.push({ piece, place, seat, key, mid: new THREE.Vector3(...ruinAt(place, mx, mz)), reach: Math.max(...foot.map((q) => Math.hypot(q[0] - mx, q[1] - mz))), detail: [] });
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -187,7 +194,7 @@ export class Ruins {
       return m;
     };
     for (const q of this.pieces) {
-      const shape = await ruinShapeInTurns(q.piece, pause), turn = new THREE.Matrix4().makeRotationY(q.place.rot).setPosition(q.place.x, q.place.y, q.place.z);
+      const shape = await ruinShapeInTurns(q.piece, pause, 5, q.seat, q.key), turn = new THREE.Matrix4().makeRotationY(q.place.rot).setPosition(q.place.x, q.place.y, q.place.z);
       if (q.piece.startsWith('stu')) {
         // (the remnants of the bank's wall are a few hundred triangles each: all of them, wherever they stand, are one thing to draw)
         for (const d of shape.drawn) small[d.near ? 1 : 0].push(d.geometry.clone().applyMatrix4(turn));

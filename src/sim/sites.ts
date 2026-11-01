@@ -44,7 +44,8 @@ export interface Site {
   /** what is to be turned first, in the town's frame: the strong room opens when the last is done. Time up with one left, and the place is spent for nothing. */
   steps?: { at: [number, number][]; name: string; use: string; doing: string; secs: number };
   /** how often the infected come, seconds; how many each time; the most on their feet at once; and how far out they start, metres */
-  wave: { every: number; n: number; most: number; from: [number, number] };
+  /** @param rise how far under the ground they are stood, to come up out of it (Bolotnaya's, out of the swamp) */
+  wave: { every: number; n: number; most: number; from: [number, number]; rise?: number };
 }
 
 export const SITES: Record<string, Site> = {
@@ -60,7 +61,7 @@ SITES.bolotnaya = {
   town: BOLOTNAYA, name: 'Bolotnaya', card: 'card_yellow', gives: 'card_red',
   room: [14, -14], reader: [12, -10.6], crate: [15, -13.6],
   hold: 360, again: 1800, heard: 100,
-  wave: { every: 24, n: 8, most: 30, from: [20, 38] },
+  wave: { every: 24, n: 8, most: 30, from: [20, 38], rise: 1.8 },
   steps: { at: [[-24, 8], [8, 16], [0, -24]], name: 'valves', use: 'Turn the valve', doing: 'Turning the valve', secs: 4 },
 };
 SITES.kupol = {

@@ -74,6 +74,8 @@ export function mineProps(): { kind: string; x: number; y: number; z: number; ro
   const F = M.fall;
   for (const [dx, dz, k, rot] of [[-3.1, -1.3, 'boulder_01', 0.4], [3.1, 1.3, 'boulder_01', 2.1], [-3.4, 1.35, 'boulder_01', 1.2], [3.4, -1.35, 'boulder_01', 0.2]] as [number, number, string, number][]) out.push({ kind: k, x: F.x + dx, y: M.y, z: M.z + dz, rot });
   for (const g of M.galleries) out.push({ kind: g.side > 0 ? 'wooden_military_crate' : 'ore_cart', x: g.x + 0.6, y: M.y, z: M.z + g.side * (M.half + g.long - 1.2), rot: 0.3 });
+  // (left along a wall of the drift, one side and then the other, between its sets: two hundred metres dead straight is no place to be caught without one)
+  for (const [x, s] of [[M.x0 + 45.5, 1], [M.x0 + 115.5, -1], [M.x0 + 160.5, 1]]) out.push({ kind: 'ore_cart', x, y: M.y, z: M.z + s * 1.3, rot: 0 });
   // (a cart left part way down each gallery that has none at its end: what the sleepers there guard)
   for (const g of M.galleries) if (g.side > 0) out.push({ kind: 'ore_cart', x: g.x - 0.72, y: M.y, z: M.z + g.side * (M.half + g.long - 3.7), rot: Math.PI / 2 });
   return out;

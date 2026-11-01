@@ -10,7 +10,8 @@ const HELD = new Set<Category>(['weapon', 'magazine', 'attachment', 'melee', 'to
 /** the places walked up to and used, and what is set down in a base without being one of its pieces' own models: the
  * traders' stalls, the recyclers, a forge, a research table, a sleeping bag, a torch (the owner: "the trader stalls are too
  * low quality ... it should be 1024"; "the workbench quality needs to be bumped up to 1024"; the bb_ models are a base's, below) */
-const USED = ['trader_stall', 'recycler', 'forge_hf', 'research_table', 'sleeping_bag', 'torch'];
+// (and the way down's set pieces, the owner, 2026-11-01: "those textures are too low")
+const USED = ['trader_stall', 'recycler', 'forge_hf', 'research_table', 'sleeping_bag', 'torch', 'radar_dome', 'radar_dish', 'diesel_genset', 'ore_cart', 'mine_timber', 'vault_door', 'card_reader', 'valve_stand', 'breaker_box', 'bb_wall_torch'];
 
 /** every body (survivors, their clothes, the infected) is under here */
 const BODIES = 'assets/characters/';

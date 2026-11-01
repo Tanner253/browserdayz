@@ -435,10 +435,19 @@ function flightShape(f: Flight, B: Bufs, solids: Solid[]) {
   if (body !== 'none') solids.push({ k: 'hull', pts: pts.flat(), body, ground: GROUND[paint] });
 }
 
-function heapShape(piece: Piece, h: Heap, B: Bufs, solids: Solid[]) {
+/**
+ * What a thing of a piece lying at `y` at a spot really lies on, where the piece stands: the ground of the map, where that falls away from the ground the piece was built for
+ * (the owner, 2026-11-01: "a lot of floating bricks and stuff around the perimeter"). All in the piece's own measure.
+ */
+export type Seat = (x: number, z: number, y: number) => number;
+
+function heapShape(piece: Piece, h: Heap, B: Bufs, solids: Solid[], seat?: Seat) {
   const buf = B.get(h.paint ?? 'earth', h.near), SECT = 16, RINGS = [0, 0.16, 0.36, 0.58, 0.8, 1], c = Math.cos(h.yaw ?? 0), s = Math.sin(h.yaw ?? 0);
   /** what the heap lies on at a spot: a floor of the piece or the ground it is built for. On a slope a heap goes down it: it does not hang in the air on the low side. */
-  const under = (x: number, z: number) => ruinBase(piece, x, z, h.y + 0.7) ?? h.y, top = h.y + h.h, rise = top - under(h.x, h.z);
+  const under = (x: number, z: number) => {
+      const b = ruinBase(piece, x, z, h.y + 0.7) ?? h.y;
+      return seat ? seat(x, z, b) : b;
+    }, top = h.y + h.h, rise = top - under(h.x, h.z);
   /** how much of its height the heap has at a share of the way out from its middle, a given way round: sure near the top, where it is walked over; shoulders and hollows lower down */
   const share = (r: number, k: number, ring: number) => (1 - r ** 1.45) * (ring <= 2 ? 0.94 + 0.1 * hash(k, ring + 9, h.seed) : 0.74 + 0.42 * hash(k, ring + 9, h.seed));
   const at = (ring: number, k: number): V3 => {
@@ -502,32 +511,33 @@ function railShape(r: Rail, B: Bufs, solids: Solid[]) {
   solids.push({ k: 'box', x: (r.a[0] + r.b[0]) / 2, y: (r.a[1] + r.b[1]) / 2 + 0.5, z: (r.a[2] + r.b[2]) / 2, hx: flat / 2, hy: 0.5 + Math.abs(r.b[1] - r.a[1]) / 2, hz: 0.04, yaw: Math.atan2(-(r.b[2] - r.a[2]), r.b[0] - r.a[0]), body: 'feet', ground: 'wood' });
 }
 
-function partShape(piece: Piece, p: Part, B: Bufs, solids: Solid[]) {
+function partShape(piece: Piece, p: Part, B: Bufs, solids: Solid[], seat?: Seat) {
   if (p.t === 'wall') wallShape(piece, p, B, solids);
   else if (p.t === 'floor') floorShape(p, B, solids);
   else if (p.t === 'slab') slabShape(p, B, solids);
   else if (p.t === 'flight') flightShape(p, B, solids);
-  else if (p.t === 'heap') heapShape(piece, p, B, solids);
-  else if (p.t === 'lump') lumpShape(p, B, solids);
+  else if (p.t === 'heap') heapShape(piece, seat ? { ...p, y: seat(p.x, p.z, p.y) } : p, B, solids, seat);
+  // (a fallen block's middle stands three quarters of its half height over what it lies on: see `strewn`)
+  else if (p.t === 'lump') lumpShape(seat ? { ...p, y: seat(p.x, p.z, p.y - p.ry * 0.75) + p.ry * 0.75 } : p, B, solids);
   else if (p.t === 'beam') beamShape(p, B, solids);
   else railShape(p, B, solids);
 }
 
-const shapes = new Map<Piece, Shape>(), stops = new Map<Piece, Solid[]>();
+const shapes = new Map<string, Shape>(), stops = new Map<string, Solid[]>();
 /** A piece's shape worked out a little at a time: so many milliseconds of it, then whatever `rest` waits for (a frame of the game), and so on. For a piece that is first wanted while the game is played. */
-export async function ruinShapeInTurns(piece: Piece, rest: () => Promise<void>, ms = 5): Promise<Shape> {
-  let s = shapes.get(piece);
+export async function ruinShapeInTurns(piece: Piece, rest: () => Promise<void>, ms = 5, seat?: Seat, key: string = piece): Promise<Shape> {
+  let s = shapes.get(key);
   if (s) return s;
   const B = new Bufs(), solids: Solid[] = [];
   let t = performance.now();
   for (const p of ruinParts(piece)) {
-    partShape(piece, p, B, solids);
+    partShape(piece, p, B, solids, seat);
     if (performance.now() - t < ms) continue;
     await rest();
     t = performance.now();
   }
   await rest();
-  shapes.set(piece, (s = { drawn: B.drawn(), solids }));
+  shapes.set(key, (s = { drawn: B.drawn(), solids }));
   return s;
 }
 /** A piece's shape, in the piece's own measure: what is drawn of it (by what it is drawn with, and by whether it is seen only from near) and what stops a body. (Worked out once.) */
@@ -541,13 +551,13 @@ export function ruinShape(piece: Piece): Shape {
   return s;
 }
 /** Only what stops a body in a piece: for when the piece is not yet near enough to be drawn in full (and for a server, which draws nothing). */
-export function ruinSolids(piece: Piece): Solid[] {
-  let s = shapes.get(piece)?.solids ?? stops.get(piece);
+export function ruinSolids(piece: Piece, seat?: Seat, key: string = piece): Solid[] {
+  let s = shapes.get(key)?.solids ?? stops.get(key);
   if (!s) {
     const B = new Bufs(true);
     s = [];
-    for (const p of ruinParts(piece)) partShape(piece, p, B, s);
-    stops.set(piece, s);
+    for (const p of ruinParts(piece)) partShape(piece, p, B, s, seat);
+    stops.set(key, s);
   }
   return s;
 }

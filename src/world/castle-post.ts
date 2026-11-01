@@ -1,6 +1,6 @@
 // The signals post on the fort (src/sim/castle-post.ts), as it is drawn and as it stops a body: what the game has
 // no model for and is made here by hand. The lattice mast on the keep with its guys and its red light, sandbags,
-// camouflage nets, tarpaulins and tents, duckboards, cables, the flagpole, floodlights, the generator, benches,
+// camouflage nets, tarpaulins and tents, duckboards, cables, the flagpole, floodlights, the generator's model, benches,
 // bedrolls, a scope on its stand, graves. (What is off the shelf is the world's to draw: `postProps`.)
 //
 // WHAT IT COSTS, AND WHEN. From further off than POST.reach it is the mast alone: a plain banded pole of a few

@@ -201,7 +201,7 @@ export interface InfectedInfo {
   /** where it lives: it turned up there, and goes back there when it has nobody to be after */
   h: [number, number];
   /** 1: one of the bunker's still ones (see `IN_ROOMS`): deaf, it stands where it is until it sees somebody or they come near */
-  w?: 1;
+  w?: 1 | 2;
 }
 
 /**

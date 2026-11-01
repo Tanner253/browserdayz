@@ -371,6 +371,9 @@ const WAKE = 7;
 /** how near its hut the eye must be, metres, to see down its stair (or be under the ground itself) for what is buried to be drawn */
 const OPEN_FROM = 30;
 
+/** the generator set's model, metres: its length, height and depth */
+const GENSET = { long: 3.6, high: 2.05, deep: 1.24 };
+
 export class BunkerSite {
   /** where it stands: null in a world that has none (and then this does nothing) */
   readonly place: Place | null;
@@ -595,8 +598,24 @@ export class BunkerSite {
     /** shapes waiting to be drawn, by what they are made of: all of one stuff is one thing to draw */
     const heap = new Map<THREE.Material, THREE.BufferGeometry[]>();
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
+    /** the generators of a floor, each a line of one list to draw */
+    const gensets: THREE.Matrix4[] = [];
+    const standGensets = (list: THREE.Matrix4[], group: THREE.Object3D) => void assets.model('diesel_genset').then((root) => {
+      root.updateMatrixWorld(true);
+      root.traverse((o) => {
+        const src = o as THREE.Mesh;
+        if (!src.isMesh) return;
+        const paint = atmo.register(Object.assign((src.material as THREE.MeshStandardMaterial).clone(), { metalness: 0.25 })) as THREE.MeshStandardMaterial;
+        const many = new THREE.InstancedMesh(src.geometry, paint, list.length), at = new THREE.Matrix4();
+        list.forEach((m, i) => many.setMatrixAt(i, at.multiplyMatrices(m, src.matrixWorld)));
+        many.receiveShadow = true;
+        many.frustumCulled = false;
+        group.add(many);
+      });
+    }).catch(() => {});
     const furnish = (plan: Plan, Y: number) => {
     heap.clear();
+    gensets.length = 0;
     for (const m of plan.made) {
       const base = new THREE.Matrix4().compose(new THREE.Vector3(m.r, Y + (m.y ?? 0), m.f), Q.setFromAxisAngle(UP, m.rot), ONE);
       /** a piece of it: a shape, set down in the thing's own measure (x across, y up from its foot, z to its front) */
@@ -626,16 +645,11 @@ export class BunkerSite {
           break;
         }
         case 'generator': {
-          slab(dark, w, 0.18, d, 0, 0, 0);
-          slab(olive, w * 0.62, h - 0.4, d * 0.86, -w * 0.17, 0.18, 0);
-          slab(grey, w * 0.3, h - 0.62, d * 0.7, w * 0.32, 0.18, 0);
-          slab(hazard, w * 0.62 + 0.01, 0.08, d * 0.86 + 0.01, -w * 0.17, h - 0.45, 0);
-          // the exhaust, up to the ceiling; a filler cap; the panel it is worked from
-          part(new THREE.CylinderGeometry(0.09, 0.09, B.tall - h + 0.25, 10), dark, -w * 0.38, h - 0.22 + (B.tall - h + 0.25) / 2, -d * 0.2);
-          part(new THREE.CylinderGeometry(0.07, 0.07, 0.08, 10), grey, -w * 0.05, h - 0.18, d * 0.2);
-          slab(dark, w * 0.24, 0.3, 0.03, w * 0.32, h - 0.82, d * 0.35 + 0.012);
-          part(new THREE.PlaneGeometry(w * 0.2, 0.22), screen, w * 0.32, h - 0.67, d * 0.35 + 0.03);
-          solid('metal', w, h - 0.2, d);
+          // (the real thing, the owner's word, 2026-11-01, at the length its place gives it; and its exhaust, up to the ceiling)
+          const k = w / GENSET.long, top = GENSET.high * k;
+          gensets.push(new THREE.Matrix4().multiplyMatrices(base, new THREE.Matrix4().makeScale(k, k, k)));
+          part(new THREE.CylinderGeometry(0.09, 0.09, B.tall - top + 0.25, 10), dark, -w * 0.38, top - 0.22 + (B.tall - top + 0.25) / 2, 0);
+          solid('metal', w, top, GENSET.deep * k);
           break;
         }
         case 'tank': {
@@ -764,6 +778,7 @@ export class BunkerSite {
       mesh.matrixAutoUpdate = false;
       into.add(mesh);
     }
+    if (gensets.length) standGensets(gensets.slice(), into);
     };
     furnish(plan, Y);
 

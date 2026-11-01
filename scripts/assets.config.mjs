@@ -34,6 +34,8 @@ export const TEXTURES = {
   brown_mud_leaves_01: { res: '2k', tex: 1024 },
   aerial_rocks_02: { res: '2k', tex: 1024 },
   rocks_ground_02: { res: '2k', tex: 1024 },
+  // (the mine's walls: real rock faces, at the most a new model is given, the owner, 2026-11-01: 'those textures are too low')
+  rock_wall_10: { res: '2k', tex: 2048 },
   // architecture
   worn_mossy_plasterwall: { res: '2k', tex: 1024 },
   red_brick_plaster_patch_02: { res: '2k', tex: 1024 },
@@ -1101,6 +1103,11 @@ export const LOCAL_MODELS = {
     dir: '../incoming/higgsfield/toys', file: 'breaker_box_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
     credit: { name: 'Breaker cabinet', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Breaker cabinet" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
+  },
+  diesel_genset: {
+    dir: '../incoming/higgsfield/toys', file: 'diesel_genset_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Diesel generator set', author: 'ZONA (Higgsfield, image to 3D)', url: 'https://higgsfield.ai', line: '"Diesel generator set" made for ZONA with Higgsfield (image to 3D).' },
   },
   radar_dome: {
     dir: '../incoming/higgsfield/toys', file: 'radar_dome_sized.glb', scale: 1, tex: 2048, tags: ['prop'],

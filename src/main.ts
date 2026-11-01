@@ -246,7 +246,7 @@ async function boot() {
   const westTowns = world.towns?.length ? new Towns(atmo, r.scene, world.towns, buildings, ready, world.buildings) : null;
   void westTowns?.build();
   const kalat = world.kalat ? ruinsPlan(world.kalat) : [];
-  const kalatRuins = kalat.length ? new Ruins(atmo, r.scene, kalat, ready) : null;
+  const kalatRuins = kalat.length ? new Ruins(atmo, r.scene, kalat, ready, ground) : null;
   for (const { piece, place } of kalat) if (piece !== 'keep') buildings.lootPoints.push(...ruinLoot(piece, place, ground));
   // (the pass's caves, carved where the world was made (World.caves), dressed with the coast kit's rock; their places
   // for things after Kalat's, as the server lays them)

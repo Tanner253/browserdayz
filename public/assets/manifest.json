@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-01T06:03:17.622Z",
+ "generated": "2026-11-01T09:16:36.583Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -410,6 +410,11 @@
    "diff": "assets/tex/anti_slip_concrete_diff.webp",
    "nor": "assets/tex/anti_slip_concrete_nor.webp",
    "arm": "assets/tex/anti_slip_concrete_arm.webp"
+  },
+  "rock_wall_10": {
+   "diff": "assets/tex/rock_wall_10_diff.webp",
+   "nor": "assets/tex/rock_wall_10_nor.webp",
+   "arm": "assets/tex/rock_wall_10_arm.webp"
   }
  },
  "models": {
@@ -15004,9 +15009,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 199584,
-   "srcTris": 7015,
-   "tris": 7015,
+   "bytes": 199300,
+   "srcTris": 6974,
+   "tris": 6974,
    "min": [
     -7.3378,
     0,
@@ -15019,7 +15024,7 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/radar_dome.glb",
-   "hiBytes": 612396,
+   "hiBytes": 612112,
    "hiCard": 64
   },
   "boxcar": {
@@ -15198,6 +15203,29 @@
    "lods": [],
    "hi": "assets/models/hi/radar_dish.glb",
    "hiBytes": 1996552,
+   "hiCard": 21
+  },
+  "diesel_genset": {
+   "url": "assets/models/diesel_genset.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1141820,
+   "srcTris": 28392,
+   "tris": 28392,
+   "min": [
+    -1.8,
+    0,
+    -0.6206
+   ],
+   "max": [
+    1.8,
+    2.0537,
+    0.6206
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/diesel_genset.glb",
+   "hiBytes": 1977088,
    "hiCard": 21
   }
  }
