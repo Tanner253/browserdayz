@@ -288,7 +288,7 @@ const STEP_DOWN = 0.6;
 /** what is big enough, and plain enough, for its picture to be seen coming round again */
 const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado', 'lime_brick', 'church_ochre']);
 /** a slow change of tone by where in the world a thing is (see `material`) */
-const macroTone = (shader: { vertexShader: string; fragmentShader: string }) => {
+export const macroTone = (shader: { vertexShader: string; fragmentShader: string }) => {
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vMacroW;')
     // (where in the world a point is: of a thing drawn as one line of a list, that is through its own line of it)

@@ -11,6 +11,24 @@ export const HDRI = { id: 'kloofendal_48d_partly_cloudy_puresky', res: '4k', env
 
 // PBR texture sets: diffuse, OpenGL normal, AO/rough/metal.
 export const TEXTURES = {
+  // the deep levels of the bunker: a look to each level and to its great rooms (src/world/bunker-deep.ts)
+  long_white_tiles: { res: '2k', tex: 1024 },
+  square_tiled_wall: { res: '2k', tex: 1024 },
+  worn_tile_floor: { res: '2k', tex: 1024 },
+  dirty_tiles: { res: '2k', tex: 1024 },
+  terrazzo_tiles: { res: '2k', tex: 1024 },
+  peeling_painted_wall: { res: '2k', tex: 1024 },
+  painted_concrete_02: { res: '2k', tex: 1024 },
+  wood_textured_concrete: { res: '2k', tex: 1024 },
+  ribbed_concrete_wall: { res: '2k', tex: 1024 },
+  dark_paneled_wood: { res: '2k', tex: 1024 },
+  white_rough_plaster: { res: '2k', tex: 1024 },
+  rusty_painted_metal: { res: '2k', tex: 1024 },
+  hangar_concrete_floor: { res: '2k', tex: 1024 },
+  concrete_floor_painted: { res: '2k', tex: 1024 },
+  damaged_concrete_floor: { res: '2k', tex: 1024 },
+  concrete_block_wall: { res: '2k', tex: 1024 },
+  anti_slip_concrete: { res: '2k', tex: 1024 },
   // terrain layers
   leafy_grass: { res: '2k', tex: 1024 },
   brown_mud_leaves_01: { res: '2k', tex: 1024 },

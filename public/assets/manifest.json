@@ -325,6 +325,91 @@
    "diff": "assets/tex/metal_plate_02_diff.webp",
    "nor": "assets/tex/metal_plate_02_nor.webp",
    "arm": "assets/tex/metal_plate_02_arm.webp"
+  },
+  "long_white_tiles": {
+   "diff": "assets/tex/long_white_tiles_diff.webp",
+   "nor": "assets/tex/long_white_tiles_nor.webp",
+   "arm": "assets/tex/long_white_tiles_arm.webp"
+  },
+  "square_tiled_wall": {
+   "diff": "assets/tex/square_tiled_wall_diff.webp",
+   "nor": "assets/tex/square_tiled_wall_nor.webp",
+   "arm": "assets/tex/square_tiled_wall_arm.webp"
+  },
+  "worn_tile_floor": {
+   "diff": "assets/tex/worn_tile_floor_diff.webp",
+   "nor": "assets/tex/worn_tile_floor_nor.webp",
+   "arm": "assets/tex/worn_tile_floor_arm.webp"
+  },
+  "dirty_tiles": {
+   "diff": "assets/tex/dirty_tiles_diff.webp",
+   "nor": "assets/tex/dirty_tiles_nor.webp",
+   "arm": "assets/tex/dirty_tiles_arm.webp"
+  },
+  "terrazzo_tiles": {
+   "diff": "assets/tex/terrazzo_tiles_diff.webp",
+   "nor": "assets/tex/terrazzo_tiles_nor.webp",
+   "arm": "assets/tex/terrazzo_tiles_arm.webp"
+  },
+  "peeling_painted_wall": {
+   "diff": "assets/tex/peeling_painted_wall_diff.webp",
+   "nor": "assets/tex/peeling_painted_wall_nor.webp",
+   "arm": "assets/tex/peeling_painted_wall_arm.webp"
+  },
+  "painted_concrete_02": {
+   "diff": "assets/tex/painted_concrete_02_diff.webp",
+   "nor": "assets/tex/painted_concrete_02_nor.webp",
+   "arm": "assets/tex/painted_concrete_02_arm.webp"
+  },
+  "wood_textured_concrete": {
+   "diff": "assets/tex/wood_textured_concrete_diff.webp",
+   "nor": "assets/tex/wood_textured_concrete_nor.webp",
+   "arm": "assets/tex/wood_textured_concrete_arm.webp"
+  },
+  "ribbed_concrete_wall": {
+   "diff": "assets/tex/ribbed_concrete_wall_diff.webp",
+   "nor": "assets/tex/ribbed_concrete_wall_nor.webp",
+   "arm": "assets/tex/ribbed_concrete_wall_arm.webp"
+  },
+  "dark_paneled_wood": {
+   "diff": "assets/tex/dark_paneled_wood_diff.webp",
+   "nor": "assets/tex/dark_paneled_wood_nor.webp",
+   "arm": "assets/tex/dark_paneled_wood_arm.webp"
+  },
+  "white_rough_plaster": {
+   "diff": "assets/tex/white_rough_plaster_diff.webp",
+   "nor": "assets/tex/white_rough_plaster_nor.webp",
+   "arm": "assets/tex/white_rough_plaster_arm.webp"
+  },
+  "rusty_painted_metal": {
+   "diff": "assets/tex/rusty_painted_metal_diff.webp",
+   "nor": "assets/tex/rusty_painted_metal_nor.webp",
+   "arm": "assets/tex/rusty_painted_metal_arm.webp"
+  },
+  "hangar_concrete_floor": {
+   "diff": "assets/tex/hangar_concrete_floor_diff.webp",
+   "nor": "assets/tex/hangar_concrete_floor_nor.webp",
+   "arm": "assets/tex/hangar_concrete_floor_arm.webp"
+  },
+  "concrete_floor_painted": {
+   "diff": "assets/tex/concrete_floor_painted_diff.webp",
+   "nor": "assets/tex/concrete_floor_painted_nor.webp",
+   "arm": "assets/tex/concrete_floor_painted_arm.webp"
+  },
+  "damaged_concrete_floor": {
+   "diff": "assets/tex/damaged_concrete_floor_diff.webp",
+   "nor": "assets/tex/damaged_concrete_floor_nor.webp",
+   "arm": "assets/tex/damaged_concrete_floor_arm.webp"
+  },
+  "concrete_block_wall": {
+   "diff": "assets/tex/concrete_block_wall_diff.webp",
+   "nor": "assets/tex/concrete_block_wall_nor.webp",
+   "arm": "assets/tex/concrete_block_wall_arm.webp"
+  },
+  "anti_slip_concrete": {
+   "diff": "assets/tex/anti_slip_concrete_diff.webp",
+   "nor": "assets/tex/anti_slip_concrete_nor.webp",
+   "arm": "assets/tex/anti_slip_concrete_arm.webp"
   }
  },
  "models": {

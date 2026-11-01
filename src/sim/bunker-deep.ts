@@ -360,11 +360,13 @@ export const DEEP: Record<number, Deep> = { 2: LEVEL2, 3: LEVEL3 };
 
 /** how much light a great space has all through it, from a level and a spot in it: its halls have, its rooms keep what their lamps give */
 export function deepFill(level: number, r: number, f: number, power: boolean) {
+  // (Level 1, wherever it is lit at all: what is asked of it comes with being inside it)
+  if (level === 1) return 0.12;
   if (level !== 2 && level !== 3) return 0;
   const a = DEEP[level].areas[deepAreaAt(level, r, f)];
-  if (level === 3) return a?.hall === 'H' ? 0.3 : a?.name === 'Vault control' ? 0.15 : 0;
+  if (level === 3) return a?.hall === 'H' ? 0.36 : 0.14;
   if (!power) return 0;
-  return a?.name === 'Tank hall' ? 0.3 : a?.name === 'Anatomy theatre' ? 0.22 : a?.name === 'Observation' || a?.name === 'Plant' ? 0.18 : 0;
+  return a?.name === 'Tank hall' ? 0.3 : a?.name === 'Anatomy theatre' ? 0.26 : 0.17;
 }
 
 /** rooms that are their own secret: nothing is stood in them to wake */

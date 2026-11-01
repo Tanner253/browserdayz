@@ -15,6 +15,7 @@ import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, bunkerWings, inBunker, inWin
 import { BOLT, ESCAPE_HOLE, HALL_DEEP, WALKWAY, WING_AREAS, type Area } from '../sim/bunker-wings';
 import { bothLevels, deepFill, deepLevelAt, ESCAPE } from '../sim/bunker-deep';
 import { DeepWorks } from './bunker-deep';
+import { macroTone } from './buildings';
 
 /** how much of the world the wings' sheet of painted light covers, metres, and where it starts */
 const WING_SPAN = 128, WING_F0 = -40;
@@ -552,11 +553,6 @@ export class BunkerSite {
     const L = B.hall, T = Y + B.tall, plan = bunkerPlan();
     const shell = (plan: Plan, Y: number) => {
       const T = Y + B.tall, deep = !!plan.areas, front = deep ? L.back : L.back - 0.5;
-      if (!deep) {
-        block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, Y - 0.3, Y, floor);
-        block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, T, T + 0.3, inside);
-        for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), T, inside);
-      }
       // (the goods lift's cab behind the door at the passage's far end: the same on every level)
       // (between the first two levels it is a shaft, open from one to the other, and the lift's own floor runs in it: src/game/lift.ts)
       const upper = plan === bunkerPlan(1), lower = plan === bunkerPlan(2), foot = upper ? Y - (LEVELS.step - B.tall) : Y;
@@ -850,7 +846,7 @@ export class BunkerSite {
       this.deep.set(level, deep);
       const plan = bunkerPlan(level), Y = levelY(level);
       shell(plan, Y);
-      (this.works ??= new DeepWorks(P, { inside, floor, steel, grey, dark, hazard, outside, mat })).build(level, deep);
+      (this.works ??= new DeepWorks(P, { toned: (m) => atmo.register(m, macroTone, 'macro') as THREE.MeshStandardMaterial, inside, floor, steel, grey, dark, hazard, outside, mat })).build(level, deep);
       furnish(plan, Y);
       hang(plan, level);
     }
@@ -873,10 +869,11 @@ export class BunkerSite {
       for (const a of WING_AREAS) {
         const low = Y + (a.y ?? 0), top = Y + (a.top ?? B.tall);
         // (the hatch is in the cellar's floor and comes out through the drift's roof; the well from the barracks comes in through the cellar's; Level 3's way out, through the hall's floor)
-        slab(a, low - 0.3, low, floor, a.name === 'Cellar' ? BOLT.hatch : a.bare ? ESCAPE_HOLE : null);
-        slab(a, top, top + 0.3, inside, a.under ? BOLT.hatch : a.name === 'Cellar' ? BOLT.trap : null);
+        const skin = this.works!.skinOf(a);
+        slab(a, low - 0.3, low, skin.floor, a.name === 'Cellar' ? BOLT.hatch : a.bare ? ESCAPE_HOLE : null);
+        slab(a, top, top + 0.3, skin.roof, a.under ? BOLT.hatch : a.name === 'Cellar' ? BOLT.trap : null);
       }
-      for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), Y + (w.y1 ?? B.tall), inside);
+      this.works!.wings(plan.walls, Y, wings);
       // (the wells: from the cellar's floor to the drift's roof, and from the cellar's roof up to the barracks' floor)
       for (const [H, foot, head] of [[BOLT.hatch, Y - 1.2, Y], [BOLT.trap, Y + B.tall, Y + BOLT.trap.high - 0.14]] as const) {
         for (const s of [-1, 1]) {
@@ -894,6 +891,9 @@ export class BunkerSite {
       hang(plan, 1);
     }
     into = group;
+    // ---- the old block's floors, roofs and walls, room by room: the same finishes as all that was built round it
+    this.works!.oldBlock(plan.rooms, plan.walls, Y, plan.cross, group);
+    block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.back, Y - 0.3, Y, floor);
     // The fittings themselves are a model (a caged lamp out of the bunker pack), hung from the
     // ceiling upside down as it was made to stand; the boxes above are what is there until it has
     // come, and if it never does. Its glass is each lamp's own glow; the rest of it is one stuff.
@@ -1164,6 +1164,7 @@ export class BunkerSite {
     }
     if (this.all) {
       const near = Math.hypot(eye.x - P.x, eye.z - P.z);
+      if (near < 130) this.works?.loadLooks();
       const [wr, wf] = bunkerLocal(P, eye.x, eye.y, eye.z);
       this.all.visible = near < SEEN_FROM || inWings(wr, wf, 16);
       if (this.all.visible) this.buried(this.all, P, eye, near);
@@ -1187,7 +1188,7 @@ export class BunkerSite {
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
     this.works?.update(dt, eye, on, gate, this.power, alarm);
-    const want = deepFill(on, here[0], here[1], this.power);
+    const want = on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;
     this.fill.intensity += (want - this.fill.intensity) * Math.min(1, dt * 3);
     this.fixtures.forEach((x, k) => {
       if (x.level !== on && x.level !== also) return;

@@ -570,6 +570,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Wooden Table 01](https://polyhaven.com/a/WoodenTable_01) | Ethan Place |
 | texture | [Aerial Beach 01](https://polyhaven.com/a/aerial_beach_01) | Rob Tuytel |
 | texture | [Aerial Rocks 02](https://polyhaven.com/a/aerial_rocks_02) | Rob Tuytel |
+| texture | [Anti Slip Concrete](https://polyhaven.com/a/anti_slip_concrete) | Charlotte Baglioni |
 | texture | [Asphalt 02](https://polyhaven.com/a/asphalt_02) | Rob Tuytel |
 | texture | [Bark Brown 02](https://polyhaven.com/a/bark_brown_02) | Rob Tuytel |
 | texture | [Beige Wall 001](https://polyhaven.com/a/beige_wall_001) | Dimitrios Savva, Rico Cilliers |
@@ -581,14 +582,19 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Cliff Side](https://polyhaven.com/a/cliff_side) | James Ray Cock, Jenelle van Heerden, Dario Barresi |
 | texture | [Coast Sand 01](https://polyhaven.com/a/coast_sand_01) | Rob Tuytel |
 | texture | [Concrete Block Wall 02](https://polyhaven.com/a/concrete_block_wall_02) | Charlotte Baglioni |
+| texture | [Concrete Block Wall](https://polyhaven.com/a/concrete_block_wall) | Charlotte Baglioni |
+| texture | [Concrete Floor Painted](https://polyhaven.com/a/concrete_floor_painted) | Rob Tuytel |
 | texture | [Concrete Floor Worn 001](https://polyhaven.com/a/concrete_floor_worn_001) | Dimitrios Savva, Rico Cilliers |
 | texture | [Concrete Panels](https://polyhaven.com/a/concrete_panels) | Amal Kumar |
 | texture | [Concrete Tiles 02](https://polyhaven.com/a/concrete_tiles_02) | Charlotte Baglioni |
 | texture | [Corrugated Iron](https://polyhaven.com/a/corrugated_iron) | Jenelle van Heerden, Dimitrios Savva |
+| texture | [Damaged Concrete Floor](https://polyhaven.com/a/damaged_concrete_floor) | Rob Tuytel |
 | texture | [Damaged Plaster](https://polyhaven.com/a/damaged_plaster) | Amal Kumar |
 | texture | [Damp Beach Sand](https://polyhaven.com/a/damp_beach_sand) | Dimitrios Savva |
+| texture | [Dark Paneled Wood](https://polyhaven.com/a/dark_paneled_wood) | Dimitrios Savva |
 | texture | [Defense Wall](https://polyhaven.com/a/defense_wall) | Rob Tuytel |
 | texture | [Dirty Concrete](https://polyhaven.com/a/dirty_concrete) | Rob Tuytel |
+| texture | [Dirty Tiles](https://polyhaven.com/a/dirty_tiles) | Matterfield, Jenelle van Heerden |
 | texture | [Distressed Painted Planks](https://polyhaven.com/a/distressed_painted_planks) | Rob Tuytel |
 | texture | [Dry Decay Leaves](https://polyhaven.com/a/dry_decay_leaves) | Amal Kumar |
 | texture | [Dry Mud Field 001](https://polyhaven.com/a/dry_mud_field_001) | Rob Tuytel, Rico Cilliers |
@@ -602,8 +608,10 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Green Rough Planks](https://polyhaven.com/a/green_rough_planks) | Rob Tuytel |
 | texture | [Grey Plaster 02](https://polyhaven.com/a/grey_plaster_02) | Rob Tuytel |
 | texture | [Grey Roof Tiles 02](https://polyhaven.com/a/grey_roof_tiles_02) | Rob Tuytel |
+| texture | [Hangar Concrete Floor](https://polyhaven.com/a/hangar_concrete_floor) | Dimitrios Savva |
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
 | texture | [Leaves Forest Ground](https://polyhaven.com/a/leaves_forest_ground) | Dario Barresi, Dimitrios Savva |
+| texture | [Long White Tiles](https://polyhaven.com/a/long_white_tiles) | Jenelle van Heerden, Sergej Majboroda |
 | texture | [Medieval Blocks 06](https://polyhaven.com/a/medieval_blocks_06) | Rob Tuytel |
 | texture | [Metal Plate 02](https://polyhaven.com/a/metal_plate_02) | Rob Tuytel |
 | texture | [Mossy Rock](https://polyhaven.com/a/mossy_rock) | Rob Tuytel |
@@ -611,24 +619,33 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Mud Forest](https://polyhaven.com/a/mud_forest) | eye-candy.xyz |
 | texture | [Old Linoleum Flooring 01](https://polyhaven.com/a/old_linoleum_flooring_01) | Charlotte Baglioni |
 | texture | [Painted Brick](https://polyhaven.com/a/painted_brick) | Amal Kumar |
+| texture | [Painted Concrete 02](https://polyhaven.com/a/painted_concrete_02) | Rob Tuytel |
 | texture | [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | Amal Kumar |
+| texture | [Peeling Painted Wall](https://polyhaven.com/a/peeling_painted_wall) | Dimitrios Savva |
 | texture | [Pine Bark](https://polyhaven.com/a/pine_bark) | Dimitrios Savva |
 | texture | [Plaster Brick 01](https://polyhaven.com/a/plaster_brick_01) | Rob Tuytel |
 | texture | [Red Brick 03](https://polyhaven.com/a/red_brick_03) | Rob Tuytel |
 | texture | [Red Brick Plaster Patch 02](https://polyhaven.com/a/red_brick_plaster_patch_02) | Rob Tuytel |
+| texture | [Ribbed Concrete Wall](https://polyhaven.com/a/ribbed_concrete_wall) | Charlotte Baglioni |
 | texture | [Rock Face 03](https://polyhaven.com/a/rock_face_03) | Dario Barresi, Rico Cilliers |
 | texture | [Rocks Ground 02](https://polyhaven.com/a/rocks_ground_02) | Rob Tuytel |
 | texture | [Rocky Trail](https://polyhaven.com/a/rocky_trail) | Amal Kumar |
 | texture | [Roots](https://polyhaven.com/a/roots) | Dario Barresi, Dimitrios Savva |
 | texture | [Rough Plaster Brick 02](https://polyhaven.com/a/rough_plaster_brick_02) | Rob Tuytel |
 | texture | [Rusty Corrugated Iron](https://polyhaven.com/a/rusty_corrugated_iron) | Charlotte Baglioni |
+| texture | [Rusty Painted Metal](https://polyhaven.com/a/rusty_painted_metal) | Amal Kumar |
 | texture | [Sand 01](https://polyhaven.com/a/sand_01) | Rob Tuytel |
 | texture | [Sandy Gravel 02](https://polyhaven.com/a/sandy_gravel_02) | Dario Barresi |
 | texture | [Snow 02](https://polyhaven.com/a/snow_02) | Rob Tuytel |
 | texture | [Sparse Grass](https://polyhaven.com/a/sparse_grass) | Amal Kumar |
+| texture | [Square Tiled Wall](https://polyhaven.com/a/square_tiled_wall) | Charlotte Baglioni |
+| texture | [Terrazzo Tiles](https://polyhaven.com/a/terrazzo_tiles) | Amal Kumar |
 | texture | [Weathered Plank Siding](https://polyhaven.com/a/weathered_plank_siding) | Dimitrios Savva |
 | texture | [Weathered Planks](https://polyhaven.com/a/weathered_planks) | Dario Barresi, Dimitrios Savva |
 | texture | [White Bricks](https://polyhaven.com/a/white_bricks) | Rob Tuytel |
+| texture | [White Rough Plaster](https://polyhaven.com/a/white_rough_plaster) | Rob Tuytel |
 | texture | [Withered Grass](https://polyhaven.com/a/withered_grass) | Charlotte Baglioni |
 | texture | [Wood Floor Worn](https://polyhaven.com/a/wood_floor_worn) | Dimitrios Savva |
+| texture | [Wood Textured Concrete](https://polyhaven.com/a/wood_textured_concrete) | Dimitrios Savva |
 | texture | [Worn Mossy Plasterwall](https://polyhaven.com/a/worn_mossy_plasterwall) | Amal Kumar |
+| texture | [Worn Tile Floor](https://polyhaven.com/a/worn_tile_floor) | Dimitrios Savva |
