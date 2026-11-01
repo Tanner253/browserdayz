@@ -8,7 +8,7 @@
 import { inMine } from '../sim/mine';
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS } from '../core/physics';
+import { physics, FreeZone, HITBOX_GROUPS, HORDE_GROUPS, INFECTED_GROUPS, SIGHT_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
@@ -239,7 +239,7 @@ export class Infected implements Damageable {
     free(R.ColliderDesc.cuboid(0.25, 0.31, 0.15), { x: 0, y: 1.18, z: -0.02 }, 'torso');
     zone(R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
     // nobody walks through one; shots are stopped only by the hit zones
-    this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
+    this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(HORDE_GROUPS), this.body);
     this.ready = true;
     this.avatar.update(0, this.pos, this.vel, this.yaw, false, false);
     if (info.s[4] === I_DEAD || info.hp <= 0) this.die(this.horde.laidAs.get(this.i) ?? 0, true);
@@ -477,7 +477,7 @@ export class Infected implements Damageable {
   private floor(x: number, z: number, y: number): number {
     const world = this.host.world(), ground = heightAt(world.heights, x, z);
     // (whatever a person's feet stand on: the slope laid over a flight of stairs is that and nothing else)
-    const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, PLAYER_GROUPS, this.blocker);
+    const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, INFECTED_GROUPS, this.blocker);
     const f = hit ? y + 1.25 - hit.toi : -1e9;
     if (f > ground + 0.04) return f;
     // (a level under the first, or the mine: all of it is under the map's ground, and what is under the feet is the floor)
@@ -494,7 +494,7 @@ export class Infected implements Damageable {
     if (this.horde.crowded(this, x, z)) return false;
     const y = this.floor(x, z, this.pos.y);
     if (y - this.pos.y > 0.6) return false;
-    if (physics.world.intersectionWithShape({ x, y: Math.max(y, this.pos.y - 0.3) + 1.02, z }, { x: 0, y: 0, z: 0, w: 1 }, this.shape, undefined, PLAYER_GROUPS, undefined, this.body, physics.through(x, z, y + 1)) !== null) return false;
+    if (physics.world.intersectionWithShape({ x, y: Math.max(y, this.pos.y - 0.3) + 1.02, z }, { x: 0, y: 0, z: 0, w: 1 }, this.shape, undefined, INFECTED_GROUPS, undefined, this.body, physics.through(x, z, y + 1)) !== null) return false;
     this.pos.x = x;
     this.pos.z = z;
     // (down a drop it falls, it is not set down)

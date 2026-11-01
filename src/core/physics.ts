@@ -13,6 +13,7 @@ export const G_TRIGGER = 0x0008;
 export const G_FOLIAGE = 0x0010; // bushes: block bullets a little, never block movement
 export const G_GLASS = 0x0020; // window panes: block players, not bullets
 export const G_HITBOX = 0x0040; // character hit zones: stop bullets and melee, never movement
+export const G_HORDE = 0x0080; // the infected's bodies: stop a player, not another of them (they keep apart by `crowded`)
 export const groups = (member: number, filter: number) => (member << 16) | filter;
 
 export const WORLD_GROUPS = groups(G_WORLD, 0xffff);
@@ -21,7 +22,10 @@ export const AJAR_GROUPS = groups(G_WORLD, 0xffff & ~G_PLAYER);
 /** finds the bodies of players (for asking whether one stands in a given place) */
 export const BODY_QUERY = groups(0xffff, G_PLAYER);
 export const GLASS_GROUPS = groups(G_GLASS, G_PLAYER);
-export const PLAYER_GROUPS = groups(G_PLAYER, G_WORLD | G_ITEM | G_GLASS);
+export const PLAYER_GROUPS = groups(G_PLAYER, G_WORLD | G_ITEM | G_GLASS | G_HORDE);
+/** what stops one of the infected: all that stops a player, but for another of them. (Two stood in one place each held the other there for good: neither could take a step.) */
+export const INFECTED_GROUPS = groups(G_PLAYER, G_WORLD | G_ITEM | G_GLASS);
+export const HORDE_GROUPS = groups(G_HORDE, G_PLAYER);
 export const ITEM_GROUPS = groups(G_ITEM, G_WORLD | G_ITEM);
 /** what bullets can hit */
 export const SHOT_GROUPS = groups(0xffff, G_WORLD | G_ITEM | G_FOLIAGE | G_HITBOX);

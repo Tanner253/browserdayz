@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { NEED, stage } from '../sim/wells';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { G_GLASS, groups, physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physics';
+import { G_GLASS, G_HORDE, groups, physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physics';
 import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
@@ -41,7 +41,7 @@ const EYE_PRONE = 0.36;
 /** the gap the character controller keeps from whatever it stands on or touches */
 const SKIN = 0.03;
 /** finds what stops only a body: the others' bodies, and glass (see Player.apart) */
-const BODIES = groups(0xffff, G_GLASS);
+const BODIES = groups(0xffff, G_GLASS | G_HORDE);
 const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 /** how hard the body is held to the ground, m/s: a fall starts from this too */
 const PRESS = 1.5;
