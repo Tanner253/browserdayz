@@ -331,13 +331,38 @@ class LodSet {
 
   /** take one of them out of the world, or put it back */
   show(i: number, on: boolean) {
+    if (on) this.taken.delete(i);
+    else this.taken.add(i);
     this.far[i] = on ? this.instances[i].far ?? Infinity : -1;
     // (and gone through again on the next frame, however still the eye: see Vegetation.update)
     stale = true;
     this.invalidate();
   }
 
+  private taken = new Set<number>();
+  /** which of them stand on a floor of the bunker, found the first time it is asked */
+  private onFloors: number[] | null = null;
+  /** nothing of this set is drawn: the eye is shut in under the ground (see Vegetation.under) */
+  dark = false;
+
+  /** only what stands on a floor in sight is drawn (null: all of it) */
+  floors(seen: ((floor: number) => boolean) | null) {
+    this.onFloors ??= this.instances.flatMap((it, i) => (it.floor ? [i] : []));
+    for (const i of this.onFloors) {
+      if (this.taken.has(i)) continue;
+      this.far[i] = !seen || seen(this.instances[i].floor!) ? this.instances[i].far ?? Infinity : -1;
+    }
+    if (this.onFloors.length) {
+      stale = true;
+      this.invalidate();
+    }
+  }
+
   update(cam: THREE.Vector3, frustum: THREE.Frustum) {
+    if (this.dark) {
+      for (const l of this.levels) for (const m of l.meshes) m.visible = false;
+      return;
+    }
     const { cullRadius, shadowRadius } = this.opts;
     const { order, dist, masks, levels, cells } = this;
     let m = 0;
@@ -709,7 +734,15 @@ class Impostors {
     (this.material.uniforms.uFade.value as THREE.Vector2).set(from, full);
   }
 
+  private isShut = false;
+  /** none of them drawn: see Vegetation.under */
+  shut(on: boolean) {
+    this.isShut = on;
+    this.mesh.visible = !on;
+  }
+
   update(cam: THREE.Vector3, frustum: THREE.Frustum, near: number) {
+    if (this.isShut) return;
     let n = 0, m = 0;
     let sig = 0;
     const { all, cells, order, packPos, packVar } = this;
@@ -1259,6 +1292,21 @@ export class Vegetation {
     }
     this.impostors.reach(HANDOVER[0] * r, HANDOVER[1] * r);
   }
+
+  /**
+   * Down the bunker: no tree or rock of the surface is drawn, nor the far cards of them, and of what stands down there only what is on a floor in sight.
+   * @param seen is a floor in sight (null: the eye is not down there, and all of it is drawn as it was)
+   */
+  under(seen: ((floor: number) => boolean) | null) {
+    this.outdoors ??= new Set([...this.world.trees, ...this.world.rocks].map((t) => t.kind));
+    for (const s of this.sets) {
+      s.dark = !!seen && this.outdoors.has(s.instances[0]?.kind ?? '');
+      s.floors(seen);
+    }
+    this.impostors.shut(!!seen);
+    stale = true;
+  }
+  private outdoors: Set<string> | null = null;
 
   update(dt: number, camera: THREE.Camera) {
     wind.uTime.value += dt;

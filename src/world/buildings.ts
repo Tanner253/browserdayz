@@ -1671,7 +1671,7 @@ export class Buildings {
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
         // (a container down here stands where it is told, not on the ground over it)
-        this.world.props.push({ kind: st.id, x, y, z, rot: st.rot + at.rot, scale: st.scale ?? 1, far: 46, ...(st.id.startsWith(CONTAINER.id) ? { lean: [0, 0, y] as [number, number, number] } : {}) });
+        this.world.props.push({ kind: st.id, x, y, z, rot: st.rot + at.rot, scale: st.scale ?? 1, far: 46, floor: wing ? 1 : level, ...(st.id.startsWith(CONTAINER.id) ? { lean: [0, 0, y] as [number, number, number] } : {}) });
         const e = assets.manifest.models[st.id];
         if (!st.on || !e || CRATE_KINDS.has(st.id)) continue;
         // where things are kept on it: on its top, or on each of its boards; two side by side where it is long enough

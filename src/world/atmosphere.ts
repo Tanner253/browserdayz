@@ -264,6 +264,10 @@ export class Atmosphere {
   envMap!: THREE.Texture;
   background!: THREE.Texture;
   csm!: CSM;
+  /** whether the sun's three shadow maps are drawn afresh: not for an eye shut in under the ground (src/game/underground.ts) */
+  sunShadows(on: boolean) {
+    this.csm.lights.forEach((l) => (l.shadow.autoUpdate = on));
+  }
   private registered = new WeakSet<THREE.Material>();
   private frame = 0;
   /** the shape of the view the cascades were last cut for (width over height) */

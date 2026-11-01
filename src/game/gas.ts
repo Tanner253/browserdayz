@@ -277,7 +277,8 @@ export class Gas {
     // --- the wisps of it near the eye
     const m = this.mesh;
     if (m) {
-      m.visible = cloudEdge(zones, eye.x, eye.z) < WISP.far;
+      // (none under the ground: they lie on the surface, over the roof, and were drawn all the same)
+      m.visible = faint < 0.5 && cloudEdge(zones, eye.x, eye.z) < WISP.far;
       if (m.visible) {
         const span = WISP.far * 2;
         for (let i = 0; i < this.seeds.length; i++) {

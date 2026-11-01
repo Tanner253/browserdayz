@@ -109,6 +109,16 @@ export function bunkerDark(p: Place | null, x: number, y: number, z: number): nu
   return Math.min(1, Math.max(0, (-h - 0.2) / 2.5));
 }
 
+/** how far the world goes for an eye shut in under the ground, metres: the longest thing to be seen down there */
+export const BUNKER_FAR = 170;
+
+/** Is a spot down the bunker and out of sight of everything above it? Not by the door at the stair's foot, which looks up the stair, nor in the cellar under the barracks' trapdoor. */
+export function bunkerSealed(p: Place | null, x: number, y: number, z: number) {
+  if (!p || bunkerDark(p, x, y, z) < 1) return false;
+  const [r, f] = bunkerLocal(p, x, y, z);
+  return !(Math.abs(r) < 5 && f > -8) && !inCellar(r, f);
+}
+
 /**
  * Where somebody is set who is not to be left in the bunker (come back into the world down there after leaving it or a
  * restart, or found in it with its door shut): on the ground before its house, outside the walled yard by its open

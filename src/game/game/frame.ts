@@ -648,9 +648,12 @@ export const frameMethods = {
       this.wasNight = hour.night;
     }
     atmo.update();
+    if (this.started) this.underground.update(cam.position);
     veg.update(dt, cam);
-    this.s.terrain.update(cam);
-    grass.update(cam, interp);
+    if (!this.underground.shut) {
+      this.s.terrain.update(cam);
+      grass.update(cam, interp);
+    }
 
     // audio
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
@@ -762,7 +765,7 @@ export const frameMethods = {
     // way to it closing in haze (see the fog in atmosphere.ts). The owner, 2026-10-18: "when i have my render distance at
     // 600m how come the entire map contonies to load past that? why not stop it like minecraft rander distance". The
     // menu's view keeps the whole of it.)
-    const far = this.started && !(import.meta.env.DEV && (globalThis as { __fullFar?: boolean }).__fullFar) ? Math.max(200, this.gfx.draw) : 1800;
+    const far = this.underground.shut ? this.underground.far : this.started && !(import.meta.env.DEV && (globalThis as { __fullFar?: boolean }).__fullFar) ? Math.max(200, this.gfx.draw) : 1800;
     if (r.camera.far !== far) {
       r.camera.far = far;
       r.camera.updateProjectionMatrix();

@@ -839,7 +839,8 @@ export class Infected implements Damageable {
       this.after = b.s[5];
     }
     const off = this.pos.distanceToSquared(eye);
-    const far = off > DRAWN * DRAWN;
+    // (nor one on a floor of the bunker the eye cannot see: there is no posing and drawing it through the rock)
+    const far = off > DRAWN * DRAWN || this.horde.offFloor(this.pos.y);
     this.avatar.root.visible = !far;
     // (a band of four metres between the two, so that one standing at the line is not drawn now near and now far)
     const lens = this.horde.lens, farNow = off > ((FAR_FROM + (this.drawnFar ? -2 : 2)) * lens) ** 2;
@@ -1107,6 +1108,15 @@ export class Horde {
     const [x, , z] = bunkerAt(P, way.r + nr * k, way.f + nf * k);
     const [dx, , dz] = bunkerAt(P, way.r, way.f);
     return { x, z, shut: shut && off < 0.7 && along > -1.6, dx, dz };
+  }
+  /** the floors of the bunker in sight of the eye (null: it is not down there) */
+  floors: [number, number] | null = null;
+  /** is a height on a floor of the bunker that is out of the eye's sight? */
+  offFloor(y: number) {
+    const f = this.floors;
+    if (!f || !this.bunker) return false;
+    const n = levelAt(y + 1 - this.bunker.y);
+    return n !== f[0] && n !== f[1];
   }
   /** where this game's player is listening and looking from */
   readonly eye = new THREE.Vector3();

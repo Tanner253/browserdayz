@@ -1065,6 +1065,12 @@ export class BunkerSite {
    * Which levels a spot in the bunker's measure sees: the one it is on, and the other where the two look into each other (through the glass floor, on the stair between them, up the
    * well of Level 3's way out). The tank hall and the theatre go down past the height that would say Level 3, and the stair goes up past the one that would say Level 2.
    */
+  /** the floors in sight of an eye */
+  floorsAt(eye: THREE.Vector3): [number, number] {
+    const P = this.place;
+    return P ? this.levels(bunkerLocal(P, eye.x, eye.y, eye.z)) : [1, 0];
+  }
+
   private levels(here: [number, number, number]): [number, number] {
     const [r, f, h] = here, deep = deepLevelAt(r, f, h, levelY(2), levelY(3));
     if (Math.hypot(r - ESCAPE.r, f - ESCAPE.f) < 2.5 && h > levelY(3)) return h > levelY(3) + 3 ? [1, 3] : [3, 1];

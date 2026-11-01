@@ -32,6 +32,8 @@ export interface Instance {
   scale: number;
   /** drawn only within this many metres (furniture indoors is invisible from across the map) */
   far?: number;
+  /** on which floor of the bunker it stands: not drawn from another (src/game/underground.ts) */
+  floor?: number;
   /** how whatever draws it lays it to the ground it stands on: nose up, roll (radians), and how high its middle is then */
   lean?: [number, number, number];
   /** laid by a town laid after everything else (LATER_TOWNS): put after every other thing, so none is renumbered */
