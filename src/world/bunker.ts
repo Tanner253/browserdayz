@@ -865,7 +865,7 @@ export class BunkerSite {
         block(H.r - H.half, H.r + H.half, H.f + s * H.half - 0.1, H.f + s * H.half + 0.1, shaftFoot, shaftTop, inside);
       }
       this.hallOfWings(block, Y, steel);
-      this.cellarSteps(block, Y, floor, inside, steel, group);
+      this.cellarSteps(block, Y, floor, inside, steel);
       furnish(plan, Y);
       hang(plan, 1);
     }
@@ -997,7 +997,7 @@ export class BunkerSite {
       if (under.parent !== all) all.add(under);
       const box = new THREE.Box3();
       for (const c of [...all.children]) {
-        if (c === under || [...this.deep.values()].includes(c as THREE.Group) || box.setFromObject(c).isEmpty() || box.max.y > P.y - 0.5) continue;
+        if (c === under || c === this.wings || [...this.deep.values()].includes(c as THREE.Group) || box.setFromObject(c).isEmpty() || box.max.y > P.y - 0.5) continue;
         under.add(c);
       }
       this.pieces = all.children.length;
@@ -1006,10 +1006,10 @@ export class BunkerSite {
     // (and always from inside it: its back corners are over thirty metres from its middle, and the map's own ground is
     // cut away over it, so neither of the others held there and the whole of it went, the map seen through its walls:
     // the owner, 2026-10-20, "if you go to the back corners of the bunker it completleyd erenders")
-    const on = levelAt(eye.y - P.y);
+    const here = bunkerLocal(P, eye.x, eye.y, eye.z), on = here[2] < -1 && inWings(here[0], here[1]) ? 1 : levelAt(eye.y - P.y);
     if (this.under) this.under.visible = on === 1 && ((near < OPEN_FROM && eye.y < P.y + 4) || inBunker(P, eye.x, eye.y, eye.z, 3) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1));
     for (const [level, g] of this.deep) g.visible = level === on;
-    if (this.wings) this.wings.visible = on === 1 && !!this.under?.visible || inWings(...bunkerLocal(P, eye.x, eye.y, eye.z).slice(0, 2) as [number, number], 12);
+    if (this.wings) this.wings.visible = (on === 1 && !!this.under?.visible) || inWings(here[0], here[1], 16);
   }
 
   /**
@@ -1056,17 +1056,17 @@ export class BunkerSite {
   }
 
   /** the cellar steps of the bolt-hole, from the cellar's back to the ground beside the far barracks: roofed as far as the ground comes, then an open cut with a kerb round it */
-  private cellarSteps(block: Block, Y: number, floor: THREE.Material, inside: THREE.Material, steel: THREE.Material, top: THREE.Group) {
+  private cellarSteps(block: Block, Y: number, floor: THREE.Material, inside: THREE.Material, steel: THREE.Material) {
     const S = BOLT.steps, P = this.place!, n = 20, rise = S.high / n, run = (S.f1 - S.f0) / n, TH = 0.3, at = (f: number) => Y + ((f - S.f0) / (S.f1 - S.f0)) * S.high;
     for (let k = 0; k < n; k++) block(S.r0, S.r1, S.f0 + k * run, S.f0 + (k + 1) * run, Y + k * rise - 0.3, Y + (k + 1) * rise, floor, { solid: false });
     const c = (r: number, f: number, y: number) => bunkerAt(P, r, f, y);
     physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array([c(S.r0, S.f0, Y), c(S.r1, S.f0, Y), c(S.r0, S.f1 + 0.6, at(S.f1 + 0.6)), c(S.r1, S.f1 + 0.6, at(S.f1 + 0.6)), c(S.r0, S.f0, Y - 0.6), c(S.r1, S.f0, Y - 0.6), c(S.r0, S.f1 + 0.6, at(S.f1 + 0.6) - 0.6), c(S.r1, S.f1 + 0.6, at(S.f1 + 0.6) - 0.6)].flat()))!, 'concrete', { x: 0, y: 0, z: 0 }, 0);
     // (its walls, up past the ground at the kerb; the roof over the part still under it; the kerb stands out of the ground, and so is drawn from above as well)
-    const kerb = Y + S.high + 0.45, into = (m: THREE.Mesh) => void top.add(m);
-    for (const r of [S.r0 - TH, S.r1]) into(block(r, r + TH, S.f0, S.f1 + 0.3, Y, kerb, inside).mesh);
-    into(block(S.r0, S.r1, S.f0 + 0, S.open, Y + 2.5 + ((S.open - S.f0) / (S.f1 - S.f0)) * S.high, kerb, inside).mesh);
-    into(block(S.r0 - TH, S.r1 + TH, S.open - 0.3, S.open, Y + 2.2 + ((S.open - S.f0) / (S.f1 - S.f0)) * S.high, kerb + 0.5, inside).mesh);
-    into(block(S.r0 - 0.03, S.r1 + 0.03, S.f1 + 0.2, S.f1 + 0.3, kerb - 0.4, kerb - 0.3, steel, { solid: false }).mesh);
+    const kerb = Y + S.high + 0.45, roof = Y + 2.5 + ((S.open - S.f0) / (S.f1 - S.f0)) * S.high;
+    for (const r of [S.r0 - TH, S.r1]) block(r, r + TH, S.f0, S.f1 + 0.3, Y, kerb, inside);
+    block(S.r0, S.r1, S.f0, S.open, roof, kerb, inside);
+    block(S.r0 - TH, S.r1 + TH, S.open - 0.3, S.open, roof - 0.3, kerb + 0.5, inside);
+    block(S.r0 - 0.03, S.r1 + 0.03, S.f1 + 0.2, S.f1 + 0.3, kerb - 0.4, kerb - 0.3, steel, { solid: false });
   }
 
   /** Level 2's plant, running or stopped. */
@@ -1125,7 +1125,8 @@ export class BunkerSite {
     if (!P) return;
     if (this.all) {
       const near = Math.hypot(eye.x - P.x, eye.z - P.z);
-      this.all.visible = near < SEEN_FROM;
+      const [wr, wf] = bunkerLocal(P, eye.x, eye.y, eye.z);
+      this.all.visible = near < SEEN_FROM || inWings(wr, wf, 16);
       if (this.all.visible) this.buried(this.all, P, eye, near);
     }
     this.clock += dt;
@@ -1145,7 +1146,7 @@ export class BunkerSite {
     }
     // (the lamps are not looked at from across the map)
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
-    const on = levelAt(eye.y - P.y);
+    const here = bunkerLocal(P, eye.x, eye.y, eye.z), on = here[2] < -1 && inWings(here[0], here[1]) ? 1 : levelAt(eye.y - P.y);
     this.fixtures.forEach((x, k) => {
       if (x.level !== on) return;
       // (Level 2 waits for its plant, the lamps of its passages that burn at all showing red on their batteries)

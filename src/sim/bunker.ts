@@ -189,7 +189,7 @@ export function bunkerPlan(level = 1): Plan {
 
 /** the wings of Level 1, a plan of their own laid round it: see src/sim/bunker-wings.ts */
 let winged: Plan | null = null;
-export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, true), 4), 4, 72));
+export const bunkerWings = (): Plan => (winged ??= inPatches(apart(layOut(BUNKER.seed ^ 0x51c, 1, true), 4), 4, 85));
 
 /** the two outer walls of the first level cut where the passage across it comes to them, and on to the ring round it */
 function letOut(plan: Plan) {
@@ -213,7 +213,7 @@ function inPatches(plan: Plan, level: number, lit = 50) {
   };
   plan.lamps = plan.lamps.map(([r, f, y]) => {
     const q = plan.rooms.find((x) => r > x.r0 && r < x.r1 && f > x.f0 && f < x.f1);
-    if (q?.bare) return [r, f, y, 1];
+    if (q?.bare || (level > LEVELS.last && q?.kind === 'mess')) return [r, f, y, 1];
     if (q) return [r, f, y, roll(q.r0, q.f0) < lit ? 1 : roll(r, f) < 25 ? 0.35 : 0];
     return [r, f, y, roll(Math.floor(r / 12), Math.floor(f / 12)) < lit + 5 ? 1 : 0];
   });
@@ -235,7 +235,7 @@ function hallOfWings(stood: Stood[], made: Made[], spots: Spot[], lamps: Plan['l
   // (the ladder out of the bolt-hole, flat to the far wall of its shaft)
   stood.push({ id: 'bunker_ladder', r: BOLT.hatch.r, f: BOLT.hatch.f + BOLT.hatch.half - 0.1, rot: Math.PI, y: dy });
   for (const [r, f] of [[35, 14], [40, 14], [46, 14.5], [29.5, 10]]) spots.push({ r, f, y: low, floor: true });
-  for (const [r, f] of [[28, 7.5], [37.5, 13.8], [47, 7.5], [37.5, 20]]) lamps.push([r, f, Y + BUNKER.tall - 0.25, 1]);
+  for (const r of [27, 34, 41, 48]) for (const f of [7.5, 13.5, 19.5]) lamps.push([r, f, Y + BUNKER.tall - 0.25, 1]);
   void q;
 }
 
@@ -845,6 +845,11 @@ function layOut(seed: number, level = 1, wings = false): Plan {
 
   if (wings) {
     hallOfWings(stood, builtList, spots, lamps, Y);
+    // (a big room is not lit by a lamp in its middle: a lamp every so far across its ceiling)
+    for (const q of rooms) {
+      if (q.bare || (q.r1 - q.r0) * (q.f1 - q.f0) < 110) continue;
+      for (let r = q.r0 + 4; r < q.r1 - 2; r += 8) for (let f = q.f0 + 4; f < q.f1 - 2; f += 8) lamps.push([r, f, Y + B.tall - 0.25, 0]);
+    }
     // (the passages: a lamp every so far, and now and then something left against a wall, or something to find)
     const clear = (r: number, f: number) => !WING_DOORS.some(([a, b]) => Math.hypot(a - r, b - f) < 2.2);
     for (const a of WING_AREAS) {
