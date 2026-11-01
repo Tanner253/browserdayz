@@ -11,7 +11,7 @@
       "port": 5173
     },
     {
-      "name": "zona-stage",
+      "name": "zona-sandbox",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
         "vite",
@@ -51,6 +51,19 @@
         "arena/server.ts"
       ],
       "port": 8090
+    },
+    {
+      "name": "zona-arena-film",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--env-file=tools/br-film/film.env",
+        "--import",
+        "tsx",
+        "--import",
+        "./tools/br-film/vclock.mjs",
+        "arena/server.ts"
+      ],
+      "port": 8095
     }
   ]
 }
