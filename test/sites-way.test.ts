@@ -1,5 +1,6 @@
 // The rest of the way down on the real server (server/sites.ts): what is turned at Bolotnaya, the time running out on it, the red pass and the
-// goods lift, the jerrycan and the plant on Level 2, and the carriage into Level 3. A port of its own.   npx tsx test/sites-way.test.ts
+// goods lift, the jerrycan and the plant on Level 2, and the door to the train. A port of its own.   npx tsx test/sites-way.test.ts
+import { DOOR } from '../src/sim/train-line';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -156,23 +157,17 @@ try {
   await ann.until('the plant ran out, and its locker opened', () => ann.all('drop+').filter((m) => m.d.site?.includes('Level 2')).length >= 2, 9000);
   ok('fed, the plant runs and Level 2 gives up its black pass');
 
-  // ---- the carriage
-  const [sx, , sz] = spotAt(RIDES.train.from, P);
-  await ann.go(sx, 205, sz);
-  ann.send({ t: 'ride', w: 'train' });
+  // ---- the door to the train, at the foot of the Kupol's stair
+  const [rx, ry, rz] = DOOR.reader;
+  await ann.go(rx, ry + 0.1, rz);
+  ann.send({ t: 'gate', g: 'train' });
   await sleep(250);
-  const puts = ann.all('put').length;
-  const [rx, , rz] = spotAt(GATES.train.at, P);
-  await ann.go(rx, 205, rz);
+  assert.ok(!ann.all('gate').some((m) => m.g === 'train' && m.open), 'the door opened with no pass');
   ann.carry('card_purple');
   await sleep(200);
   ann.send({ t: 'gate', g: 'train' });
-  await ann.until('the carriage was called', () => ann.all('gate').some((m) => m.g === 'train' && m.open));
-  await ann.go(sx, 205, sz);
-  ann.send({ t: 'ride', w: 'train' });
-  await ann.until('the carriage rolled', () => ann.all('put').length === puts + 1);
-  assert.ok(Math.abs((ann.all('put').pop()!.y ?? 0) - (PAD + levelY(3))) < 0.1, 'the carriage does not go to Level 3');
-  ok('only the purple pass calls the carriage, and the carriage goes to Level 3');
+  await ann.until('the door opened', () => ann.all('gate').some((m) => m.g === 'train' && m.open));
+  ok('only the purple pass opens the door to the train');
 
   // ---- the vault, which wants no pass: only somebody at its breaker, on its own level
   const V = SITES.vault, Y3 = PAD + levelY(3), [bx, , bz] = spotAt(siteSpot(V, V.reader), P);

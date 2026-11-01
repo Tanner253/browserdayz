@@ -133,3 +133,18 @@ export function byTheTrain(x: number, y: number, z: number, t: number) {
   const w = wagonAt(t);
   return Math.hypot(x - w.x, z - w.z) < 26 && Math.abs(y - w.y) < 6 && onTheLine(x, y, z);
 }
+
+/**
+ * Where what is left on the train or in the tunnel comes to rest: on the platform of the stop it was coming to. A body shot aboard, a thing let go of there, somebody who
+ * logs out aboard: the tunnel has nothing to lie on, and nothing is lost in it. (Rust's train takes what is left on it to the end of the line as well.)
+ */
+export function platformAhead(t: number): [number, number, number] {
+  const n = trainAt(t), c = ((t % ROUND) + ROUND) % ROUND, st = STATIONS[n.stop >= 0 ? n.stop : c < ROUND / 2 ? 1 : 0], a = st.gate + 3, b = HALL.edge + 2;
+  return [st.x + st.ux * a + st.vx * b, st.y + 0.1, st.z + st.uz * a + st.vz * b];
+}
+
+/** seconds until the train next stands at a stop */
+export function untilAt(stop: number, t: number) {
+  const c = ((t % ROUND) + ROUND) % ROUND, at = stop ? RUN.dwell + RUN_TIME : 0;
+  return ((at - c) % ROUND + ROUND) % ROUND;
+}

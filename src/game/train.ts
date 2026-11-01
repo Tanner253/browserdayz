@@ -7,9 +7,10 @@
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
+import { audio, type TrainVoice } from '../core/audio';
 import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import type { OnLine } from '../sim/train';
-import { RIM, shunterAt, trainAt, wagonAt } from '../sim/train-line';
+import { RIM, ROUND, RUN, onTheLine, shunterAt, trainAt, wagonAt } from '../sim/train-line';
 
 /** the inside of the wagon, metres from its middle and its deck: half across, half along; and how far the bars over its sides reach up (nothing to see: the tunnel has no walls to stop a body) */
 export const CAR = { hw: 1.42, hl: 6.35, over: 3.6, wall: 0.14 };
@@ -84,6 +85,11 @@ export class TrainCar {
   private v = new THREE.Vector3();
   private gate;
   private loading = false;
+  private voice: TrainVoice | null = null;
+  private was = { s: 0, stop: 0, braking: false, hooted: false };
+  private clock = 0;
+  /** what the rails do to whoever rides: a slow lean, and a knock at each joint, in radians and metres */
+  readonly ride = { roll: 0, bump: 0 };
 
   /** @param now the shared clock, seconds */
   constructor(scene: THREE.Scene, private now: () => number) {
@@ -170,9 +176,49 @@ export class TrainCar {
     return { x: e[4], y: e[5], z: e[6] };
   };
 
+  /** the train as it is told to whoever is on the line */
+  line(p: { x: number; y: number; z: number }) {
+    const n = trainAt(this.t), c = ((this.t % ROUND) + ROUND) % ROUND;
+    return { stop: n.stop, left: n.left, bound: c < ROUND / 2 ? 1 : 0, t: this.t, aboard: this.aboard(p) !== null };
+  }
+
   /** where it is in its round now: standing, and how long for */
   state() {
     return trainAt(this.t);
+  }
+
+  /** What is heard of it and what it does to whoever rides it, once a frame. */
+  feel(dt: number, eye: THREE.Vector3) {
+    const now = trainAt(this.t), v = dt > 0 ? Math.min(RUN.speed, Math.abs(now.s - this.was.s) / dt) : 0, far = this.wagon.group.position.distanceTo(eye), onIt = this.aboard(eye) !== null;
+    this.was.s = now.s;
+    this.clock += dt * (v / 6);
+    const k = v / RUN.speed;
+    this.ride.roll = onIt ? (Math.sin(this.clock * 0.9) * 0.006 + Math.sin(this.clock * 2.3) * 0.002) * k : 0;
+    this.ride.bump = onIt ? Math.sin(this.clock * 5.1) * Math.sin(this.clock * 1.7) * 0.012 * k : 0;
+    const heard = onTheLine(eye.x, eye.y, eye.z) && far < 320;
+    if (!heard) {
+      this.voice?.stop();
+      this.voice = null;
+    } else {
+      this.voice ??= audio.train();
+      if (this.voice) {
+        // (nothing ahead of the eye but the bore, aboard: it comes from all round)
+        this.voice.set(onIt ? eye : this.wagon.group.position, v, onIt ? 0.5 : 0.7 / (1 + far / 16), onIt ? 5200 : Math.max(900, 5200 - far * 30), dt);
+        if (now.stop >= 0 && now.left < 3 && !this.was.hooted) {
+          this.was.hooted = true;
+          this.voice.horn();
+        }
+        const braking = now.stop < 0 && now.left < RUN.speed / RUN.accel * 0.6;
+        if (braking !== this.was.braking) {
+          this.was.braking = braking;
+          this.voice.brake(braking);
+        }
+      }
+    }
+    if (now.stop !== this.was.stop) {
+      this.was.stop = now.stop;
+      this.was.hooted = false;
+    }
   }
 
   /** Drawn between its last two steps, as a body is. */

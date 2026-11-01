@@ -1,6 +1,7 @@
 // The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill).
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
+import { inTunnel, platformAhead } from '../src/sim/train-line';
 import { Container, BODY_GRID, HOLD, layOnBody, heldIn } from '../src/sim/inventory';
 import { ZONA_VOID, type ItemInstance } from '../src/sim/items';
 import { VOICE } from '../src/sim/voice';
@@ -511,6 +512,12 @@ export function settleRiders() {
 }
 
 export function kill(c: Client, cause: string, v = 0) {
+  // (dead aboard, or in the tunnel: the body goes on to the next platform)
+  if (c.a || inTunnel(c.pose[0], c.pose[1], c.pose[2])) {
+    const [px, py, pz] = platformAhead(Date.now() / 1000);
+    c.pose = [px, py, pz, c.pose[3], c.pose[4], c.pose[5]];
+    c.a = undefined;
+  }
   if (!c.alive) return;
   c.alive = false;
   c.logoutAt = 0;

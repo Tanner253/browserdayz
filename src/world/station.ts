@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
+import { audio } from '../core/audio';
 import { WORLD_GROUPS, physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
 import { painted } from './bunker';
@@ -33,6 +34,8 @@ export class StationHall {
   /** the Kupol's door, between its platform and its stair: it rises into the wall over it */
   private door: { mesh: THREE.Group; body: ReturnType<typeof physics.world.createCollider>; up: number } | null = null;
   doorOpen = false;
+  private doorWas = false;
+  private gateWas = false;
   private buffers = false;
   get stop() {
     return this.t.stop;
@@ -313,10 +316,23 @@ export class StationHall {
 
   /** @param dt seconds @param open the train stands here, with time left to board */
   update(dt: number, eye: THREE.Vector3, on: boolean, open: boolean, lit: (pos: THREE.Vector3, burn: number) => void) {
+    // (the gate and the door are heard as they start to move)
+    const heard = (at: [number, number, number], opening: boolean) => {
+      const [x, y, z] = at, far = Math.hypot(x - eye.x, y - eye.y, z - eye.z);
+      if (far < 70) audio.blastDoor({ x, y, z }, far, opening);
+    };
+    if (open !== this.gateWas) {
+      this.gateWas = open;
+      heard(this.at(this.t.gate, HALL.edge, 1), open);
+    }
     this.shut = THREE.MathUtils.clamp(this.shut + (open ? dt : -dt) / GATE_TIME, 0, 1);
     this.gateBody.setEnabled(this.shut < 0.6);
     if (this.door) {
       const d = this.door;
+      if (this.doorOpen !== this.doorWas) {
+        this.doorWas = this.doorOpen;
+        heard(this.at(HALL.long + 0.3, 6.5, 1.7), this.doorOpen);
+      }
       d.up = THREE.MathUtils.clamp(d.up + (this.doorOpen ? dt : -dt) / DOOR_TIME, 0, 1);
       d.body.setEnabled(d.up < 0.7);
       d.mesh.position.y = this.t.y + SHAFT.tall / 2 + d.up * (SHAFT.tall - 0.1);

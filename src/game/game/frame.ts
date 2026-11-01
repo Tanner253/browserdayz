@@ -312,6 +312,7 @@ export const frameMethods = {
       buildings.update(h, this.s.r.camera.position);
     });
     this.trainCar.draw(physics.alpha, this.s.r.camera.position);
+    this.trainCar.feel(dt, this.s.r.camera.position);
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead && !this.powers.god);
     this.lightStep(dt, playing && !uiOpen && !typing);

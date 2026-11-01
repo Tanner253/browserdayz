@@ -71,6 +71,9 @@ export class CameraDirector {
     this.blend = 0;
   }
 
+  /** a lean and a knock put on the view from outside it: see TrainCar.ride */
+  ride = { roll: 0, bump: 0 };
+
   private computeTarget(dt: number) {
     if (this.third) this.third(this.proxy, Math.max(dt, 1e-4));
     else this.player.updateCamera(this.proxy, Math.max(dt, 1e-4), physics.alpha);
@@ -95,6 +98,11 @@ export class CameraDirector {
       this.cam.quaternion.copy(this.target.quat);
       this.cam.fov += (this.target.fov - this.cam.fov) * (1 - Math.exp(-14 * dt));
       this.blend = 1;
+    }
+    // (what the train does to whoever rides it)
+    if (this.ride.roll || this.ride.bump) {
+      this.cam.rotateZ(this.ride.roll);
+      this.cam.position.y += this.ride.bump;
     }
     this.cam.updateProjectionMatrix();
     this.cam.updateMatrixWorld();

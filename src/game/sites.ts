@@ -2,6 +2,7 @@
 // prompts at readers, gates and rides, the strong room's lock, the plant on Level 2, and the siren for as long as it goes. A pass is
 // scanned, not put in: see scripts/clearance-pass.mjs.
 
+import { STATIONS, stationAt, untilAt } from '../sim/train-line';
 import * as THREE from 'three';
 import { audio } from '../core/audio';
 import type { C2S, S2C } from '../net/protocol';
@@ -29,6 +30,8 @@ export interface SiteHost {
   power(on: boolean): void;
   sealed(open: boolean): void;
   stationDoor(open: boolean): void;
+  /** the train now: where it stands (-1 on the way), for how long, where it is bound, the shared clock, and whether this body is aboard */
+  line(): { stop: number; left: number; bound: number; t: number; aboard: boolean };
   /** what lies at a site, stood where it lies */
   stand(kind: string, x: number, y: number, z: number): Promise<THREE.Object3D>;
 }
@@ -135,6 +138,10 @@ export class Sites {
       if (go) this.h.work(w.doing, w.secs, '', () => this.h.send({ t: 'ride', w: id }));
       return `<kbd>F</kbd>${w.label}`;
     }
+    // (you always know when the train is: on a platform, and aboard it)
+    const me = this.h.feet(), line = this.h.line(), st = stationAt(me.x, me.y, me.z), clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    if (line.aboard) return line.stop >= 0 ? `<small>${STATIONS[line.stop].name} · leaves in ${clock(line.left)}</small>` : `<small>Next stop ${STATIONS[line.bound].name} · ${clock(line.left)}</small>`;
+    if (st) return line.stop === st.stop ? `<small>The train is in · it leaves in ${clock(line.left)}</small>` : `<small>Next train in ${clock(untilAt(st.stop, line.t))}</small>`;
     return null;
   }
 

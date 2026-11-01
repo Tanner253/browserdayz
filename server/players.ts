@@ -7,6 +7,7 @@ import { BODY_GRID, type SerializedInventory, cleanItem as cleanThing, cleanInve
 import type { ItemInstance } from '../src/sim/items';
 import { langOf, type Lang } from '../src/sim/langs';
 import { bunkerDark, bunkerOutside } from '../src/sim/bunker';
+import { inTunnel, platformAhead } from '../src/sim/train-line';
 import { phaseOf } from '../src/sim/daynight';
 import type { HitZone } from '../src/sim/combat';
 import { type Thrower, newThrower } from '../src/sim/grenades';
@@ -388,7 +389,9 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // (and whoever was kept by its lid stands on that ground as it is now: it was made again round the lid, 2026-10-19,
   // and the world's number kept, for nobody anywhere else is to be moved: the owner, "i dont want this")
   const byLid = !!resume && !!world.bunker && Math.hypot(resume.pose[0] - world.bunker.x, resume.pose[2] - world.bunker.z) < 50;
-  let sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: byLid ? world.coverAt(resume.pose[0], resume.pose[2]) : resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
+  // (and somebody who left the game aboard the train comes back on a platform: it has gone on without them)
+  const aboard = !!resume && inTunnel(resume.pose[0], resume.pose[1], resume.pose[2]) ? platformAhead(Date.now() / 1000) : null;
+  let sp = !resume || resume.afresh ? pickSpawn() : aboard ? { x: aboard[0], y: aboard[1], z: aboard[2], yaw: resume.pose[3] } : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: byLid ? world.coverAt(resume.pose[0], resume.pose[2]) : resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
   // (and nobody comes back inside a piece of a base, or shut in a base that is not theirs: set down clear of it, as
   // Rust puts out a sleeper. The owner, 2026-10-24: "cant be shot through or noclipped into somehow via relogging")
   if (resume && !resume.afresh && 'y' in sp && sp.y !== undefined) {

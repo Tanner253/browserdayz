@@ -65,7 +65,7 @@ import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './bui
 import { blow, throwCharge, stick, relight } from './raid';
 import { setTrap, takeTrap } from './traps';
 import { doorLocked, takeFuel, useGate, useRide, useSite, useStep } from './sites';
-import { byTheTrain } from '../src/sim/train-line';
+import { byTheTrain, inTunnel, platformAhead } from '../src/sim/train-line';
 import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
 import { knock, swing } from './doors';
@@ -608,6 +608,8 @@ export function handle(c: Client, m: C2S) {
       if (tags.some((t) => !holdsTag(c.key, t.uid))) return void log(`${c.name} put down a dog tag they do not hold (${tags.find((t) => !holdsTag(c.key, t.uid))!.uid.slice(0, 12)}): not let through`);
       for (const t of tags) wentFrom(c.key, t.uid, 'g');
       if (tags.length) takeOut(c.inv, new Set(tags.map((t) => t.uid)));
+      // (let go of aboard, it goes on to the next platform: see platformAhead)
+      if (c.a || inTunnel(l.x, l.y, l.z)) [l.x, l.y, l.z] = platformAhead(Date.now() / 1000);
       economy.drop(item, l.x, l.y, l.z, l.rot);
       return;
     }

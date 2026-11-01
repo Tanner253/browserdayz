@@ -159,6 +159,18 @@ export interface RotorVoice {
 }
 
 /**
+ * The train (src/game/train.ts): its diesel, the rock's roar round it and its wheels on the rail joints, as loud and as open as whoever holds it says. Nothing here is a
+ * recording: no library the game has holds one of a train.
+ */
+export interface TrainVoice {
+  /** @param v how fast it runs, m/s  @param gain how loud it is here  @param cutoff nothing of it above this many Hz */
+  set(pos: V3, v: number, gain: number, cutoff: number, dt: number): void;
+  horn(): void;
+  brake(on: boolean): void;
+  stop(): void;
+}
+
+/**
  * Recordings, played in place of sounds this file would otherwise make up (scripts/sounds.mjs
  * cuts them out of two free libraries of real guns): [name]: how many takes of it there are.
  * One take is played, any of them. Until they have arrived, and wherever one is missing, the
@@ -2372,6 +2384,115 @@ export class AudioEngine {
    * keeps as loud a thing as this from breaking the sound up.
    * @returns nothing until the sound is started and the recording has come (it is sent for when first asked): ask again
    */
+  train(): TrainVoice | null {
+    if (!this.ready) return null;
+    const ctx = this.ctx, lp = this.filter('lowpass', 6000, 0.5), out = ctx.createGain(), pan = ctx.createPanner();
+    out.gain.value = 0;
+    pan.panningModel = 'equalpower';
+    pan.distanceModel = 'inverse';
+    pan.rolloffFactor = 0;
+    lp.connect(out).connect(pan).connect(this.bus.vehicles);
+    const noise = (f: AudioNode) => {
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = this.noiseBuf;
+      src.loop = true;
+      g.gain.value = 0;
+      src.connect(f).connect(g).connect(lp);
+      src.start(0, Math.random());
+      return { src, g };
+    };
+    const rumble = noise(this.filter('lowpass', 120, 0.7)), roar = noise(this.filter('bandpass', 360, 0.5));
+    const motor = ctx.createGain(), low = this.filter('lowpass', 260, 0.8), saws = [1, 1.5].map((k) => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = 36 * k;
+      o.connect(low);
+      o.start();
+      return { o, k };
+    });
+    low.connect(motor).connect(lp);
+    motor.gain.value = 0;
+    const squeal = ctx.createGain(), wail = [2380, 3120].map((f) => {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      o.connect(squeal);
+      o.start();
+      return o;
+    });
+    squeal.gain.value = 0;
+    squeal.connect(lp);
+    let live = true, run = 0;
+    /** one wheel over one joint */
+    const joint = (t: number, loud: number) => {
+      const src = ctx.createBufferSource(), f = this.filter('bandpass', 1000, 1.1), g = ctx.createGain();
+      src.buffer = this.noiseBuf;
+      this.env(g, t, loud, 0.002, 0.05);
+      src.connect(f).connect(g).connect(lp);
+      src.start(t, Math.random());
+      src.stop(t + 0.08);
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.frequency.setValueAtTime(80, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.09);
+      this.env(og, t, loud * 1.4, 0.002, 0.11);
+      o.connect(og).connect(lp);
+      o.start(t);
+      o.stop(t + 0.14);
+    };
+    return {
+      set: (pos, v, gain, cutoff, dt) => {
+        if (!live) return;
+        const t = ctx.currentTime, k = Math.min(1, v / 34);
+        pan.positionX.value = pos.x;
+        pan.positionY.value = pos.y;
+        pan.positionZ.value = pos.z;
+        out.gain.setTargetAtTime(gain, t, 0.08);
+        lp.frequency.setTargetAtTime(cutoff, t, 0.08);
+        rumble.g.gain.setTargetAtTime(0.1 + k * 0.85, t, 0.2);
+        roar.g.gain.setTargetAtTime(k * k * 0.42, t, 0.2);
+        motor.gain.setTargetAtTime(0.1 + k * 0.1, t, 0.2);
+        for (const s of saws) s.o.frequency.setTargetAtTime((34 + k * 24) * s.k, t, 0.4);
+        run += v * dt;
+        // (a rail every twelve and a half metres, and the two bogies' four axles over each joint)
+        if (run > 12.5 && v > 1) {
+          run %= 12.5;
+          for (const at of [0, 1.8, 8.4, 10.2]) joint(t + at / v, 0.14 + k * 0.24);
+        }
+      },
+      horn: () => {
+        if (!live) return;
+        const t = ctx.currentTime, f = this.filter('bandpass', 760, 0.8), g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(1.3, t + 0.08);
+        g.gain.setValueAtTime(1.3, t + 1.5);
+        g.gain.linearRampToValueAtTime(0.0001, t + 1.75);
+        f.connect(g).connect(lp);
+        for (const hz of [311, 392]) {
+          const o = ctx.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.value = hz;
+          o.connect(f);
+          o.start(t);
+          o.stop(t + 1.8);
+        }
+      },
+      brake: (on) => {
+        if (live) squeal.gain.setTargetAtTime(on ? 0.05 : 0, ctx.currentTime, on ? 0.9 : 0.2);
+      },
+      stop: () => {
+        if (!live) return;
+        live = false;
+        out.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+        setTimeout(() => {
+          rumble.src.stop();
+          roar.src.stop();
+          for (const s of saws) s.o.stop();
+          for (const o of wail) o.stop();
+          pan.disconnect();
+        }, 600);
+      },
+    };
+  }
+
   rotor(): RotorVoice | null {
     const buf = bank.get('rotor')?.[0];
     if (this.ready && !buf) void rotorRecording();
