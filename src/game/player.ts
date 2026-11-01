@@ -733,7 +733,7 @@ export class Player {
     this.slopes(on ? Math.min(85, Math.max(CLIMB_MAX, degOf(on.rise) + 8)) : CLIMB_MAX, on ? 86 : SLIP_MIN, !on);
     // (On a deck that tilts a step is laid along it, touching nothing, and the deck carries it. Anything else asks the controller about slopes, and on a floor that is moving
     // a step uphill came to nothing at all: a body could not walk up the wagon on a grade.)
-    const tilt = this.grounded && this.vel.y < 0 ? this.moverUp?.(this.body.translation()) : null;
+    const lean = this.grounded && this.vel.y < 0 ? this.moverUp?.(this.body.translation()) : null, tilt = lean && lean.y < 0.99999 ? lean : null;
     if (tilt) desired.y = -(tilt.x * pace.x + tilt.z * pace.z) / tilt.y;
     const laid = !tilt && this.grounded && this.vel.y < 0 ? (on ? this.alongSteep(desired, h, on) : this.alongGround(desired, h)) : 0;
     this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);

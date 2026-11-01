@@ -28,6 +28,8 @@ export class StationHall {
   private lamps: THREE.Vector3[] = [];
   private gateMesh = new THREE.Group();
   private gateBody;
+  private plateBody;
+  private plate = new THREE.Group();
   private shut = 0;
   private held = new THREE.Vector3();
   private top = new THREE.Vector3();
@@ -89,6 +91,10 @@ export class StationHall {
     this.fence();
     this.gateBody = physics.world.createCollider(physics.R.ColliderDesc.cuboid(GATE_HALF, FENCE_UP / 2, 0.06).setTranslation(...this.at(t.gate, E + 0.08, FENCE_UP / 2)).setRotation(this.turn()).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS));
     physics.tag(this.gateBody, { surface: 'metal' });
+    // (and the gangway the gate lets out: a plate over the gap to the wagon's side, in which a round foot stuck fast)
+    this.plateBody = physics.world.createCollider(physics.R.ColliderDesc.cuboid(GATE_HALF, 0.03, 0.26).setTranslation(...this.at(t.gate, E - 0.1, -0.02)).setRotation(this.turn()).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS));
+    physics.tag(this.plateBody, { surface: 'metal' });
+    this.plateBody.setEnabled(false);
 
     const c = assets.pbr('dirty_concrete'), f = assets.pbr('concrete_floor_worn_001');
     const tile = painted(512, 512, (g, rnd) => {
@@ -255,6 +261,9 @@ export class StationHall {
     this.gateMesh.rotation.y = this.yaw;
     this.gateMesh.position.set(...this.at(this.t.gate, HALL.edge + 0.16, 0));
     this.group.add(this.gateMesh);
+    this.plate.add(new THREE.Mesh(new THREE.BoxGeometry(GATE_HALF * 2, 0.06, 0.52), steel));
+    this.plate.rotation.y = this.yaw;
+    this.group.add(this.plate);
   }
 
   /** the door at the foot of the stair: a plate of steel banded in yellow, shut until the purple pass is shown to the reader beside it */
@@ -327,6 +336,7 @@ export class StationHall {
     }
     this.shut = THREE.MathUtils.clamp(this.shut + (open ? dt : -dt) / GATE_TIME, 0, 1);
     this.gateBody.setEnabled(this.shut < 0.6);
+    this.plateBody.setEnabled(this.shut > 0.6);
     if (this.door) {
       const d = this.door;
       if (this.doorOpen !== this.doorWas) {
@@ -361,6 +371,7 @@ export class StationHall {
       });
     }
     this.gateMesh.position.set(...this.at(this.t.gate + this.shut * GATE_HALF * 1.9, HALL.edge + 0.16, 0));
+    this.plate.position.set(...this.at(this.t.gate, HALL.edge - 0.1 + (1 - this.shut) * 0.6, -0.02));
     for (const l of this.lamps) if (l.distanceToSquared(eye) < 26 * 26) lit(this.held.copy(l), 1);
   }
 }
