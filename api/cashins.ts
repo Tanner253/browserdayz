@@ -13,6 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
+import { EVENT, eventOn } from './_lib/event.js';
 import { cached, dueOf, earnedOf, editBook, freshBook, glanceBook, paidTo, refOf, snapshot, sol, walletRate, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -447,6 +448,7 @@ function page(book: Book, s: Snapshot, now: number): string {
       <p class="under">all of ZONA PvP, the Zone and the Arena together: the Arena's matches are played for nothing so far</p>
       <p class="lead">Take another player's dog tag, stay alive with it for thirty minutes, and it is cashed in. This page is the whole account of what is paid for that: nothing is paid that is not listed here, and every payment listed here is a transaction on Solana that anybody can look up. ${esc(state[2])}</p>
       ${book.claimNote ? `<div class="note"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
+      ${eventOn(Date.now()) ? `<div class="note"><b>Halloween</b>Every tag cashed in before ${new Date(EVENT.to).toISOString().slice(11, 16)} UTC pays ${EVENT.pay} SOL, whatever its wallet holds. The limits below stand as they are.</div>` : ''}
     </div>
     <div class="tiles">
       ${holdersNow ? tile(`${amount(s.tiers[0].perTag)}–${amount(topTier.perTag)} SOL`, 'a tag pays, by $ZONA held', `<a href="#tiers">${esc(s.tiers[0].name)} ${amount(s.tiers[0].perTag)} up to ${esc(topTier.name)} ${amount(topTier.perTag)}: see the tiers</a>${N > 1 ? `. Paid when a wallet has ${N} due` : ''}`) : tile(s.tagPays === null ? '?' : `${amount(s.tagPays)} SOL`, 'a tag pays right now', s.fives ? `flat, whatever the treasury holds${N > 1 ? `: paid when a wallet has ${N} due` : ''}` : `${pct}% of the treasury, ${amount(s.floor)} at least`)}

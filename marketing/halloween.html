@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: Halloween</title>
+<!-- A community card, 1600x900 (2026-11-01). Rendered to marketing/zona-halloween.png by: node scripts/card.mjs halloween 1600 900
+     The picture is Pokrov at dusk from the game (assets-src/_wf/me/halloween-shot.js), with the crowd and the moon put in by Higgsfield.
+     Every figure is api/_lib/event.ts: 0.025 SOL a tag, twice the infected, four hours; the small print is what the payouts page says. -->
+<style>
+  :root { --hot: #ff8a1f; --ink: #f6efe2; --dim: #d8ccb6; --dark: #0b0a09; --line: rgba(246, 239, 226, 0.22); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .shot { position: absolute; inset: 0; background: url('src-halloween.png') no-repeat center / cover; }
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(90deg, rgba(8, 7, 6, 0.95) 0%, rgba(8, 7, 6, 0.8) 34%, rgba(8, 7, 6, 0.12) 58%, rgba(8, 7, 6, 0) 100%),
+    linear-gradient(180deg, rgba(8, 7, 6, 0.28) 0%, rgba(8, 7, 6, 0) 24%, rgba(8, 7, 6, 0) 72%, rgba(8, 7, 6, 0.82) 100%); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .logo { position: absolute; left: 64px; top: 54px; font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8); }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .head { position: absolute; left: 64px; top: 158px; width: 760px; }
+  .head i { display: inline-block; padding: 7px 16px; font-style: normal; font-size: 20px; font-weight: 700; letter-spacing: 0.24em; color: #170d04; background: var(--hot); }
+  .head h1 { margin-top: 18px; font-size: 118px; font-weight: 700; line-height: 0.9; letter-spacing: 0.02em; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.75); }
+  .head h1 em { font-style: normal; color: var(--hot); }
+  .pay { margin-top: 30px; display: flex; flex-direction: column; gap: 14px; }
+  .pay div { padding-left: 18px; border-left: 5px solid var(--hot); }
+  .pay b { display: block; font-size: 60px; font-weight: 700; line-height: 1; letter-spacing: 0.01em; white-space: nowrap; }
+  .pay span { display: block; margin-top: 4px; font-size: 24px; font-weight: 500; letter-spacing: 0.06em; color: var(--dim); white-space: nowrap; }
+  .when { position: absolute; right: 64px; top: 56px; padding: 12px 20px; font-size: 32px; font-weight: 700; letter-spacing: 0.1em; color: var(--hot); background: rgba(8, 7, 6, 0.72); border: 2px solid var(--hot); }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 44px; display: flex; justify-content: space-between; align-items: flex-end; gap: 48px; }
+  .foot p { max-width: 1050px; font-size: 20px; font-weight: 500; line-height: 1.3; letter-spacing: 0.02em; text-transform: none; color: var(--dim); }
+  .foot a { font-size: 34px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink); text-decoration: none; text-transform: lowercase; }
+</style>
+</head>
+<body>
+  <div class="shot"></div>
+  <div class="shade"></div>
+  <div class="frame"></div>
+  <div class="logo">ZONA<small>Keep what you kill</small></div>
+  <div class="when">Next 4 hours</div>
+  <div class="head">
+    <i>Halloween event</i>
+    <h1>Twice<br>the <em>dead</em></h1>
+    <div class="pay">
+      <div><b>2× infected</b><span>across the whole map</span></div>
+      <div><b>0.025 SOL a tag</b><span>for everyone, up from 0.01</span></div>
+    </div>
+  </div>
+  <div class="foot">
+    <p>For dog tags cashed in during the event. The usual limits stand: 5 tags a wallet a day, and past your first 10 paid tags a wallet must hold 350,000 $ZONA.</p>
+    <a>zonapvp.fun</a>
+  </div>
+</body>
+</html>
