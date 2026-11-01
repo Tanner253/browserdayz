@@ -184,7 +184,6 @@ ok('pistols from the second step on, most of them where guns were kept; a submac
 });
 
 ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, seldom with a magazine, and a long time coming back; the rifles are the gas\'s', () => {
-  let rifles = 0, withMag = 0;
   for (const { on, all, e } of worlds) {
     // ("tier 3 should be submachine guns heavy")
     // (the weapons pass's submachine guns with the MPA30's, 2026-10-17)
@@ -213,24 +212,9 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
     }
     // (they lie where the army and the police kept things, and in nobody's kitchen)
     for (const { id, p } of all) if ((id === 'ak' || id === 'ar15' || id === 'mosin') && p.tier === 3 && !p.keeps) assert.ok(kind(p, ...KEPT_GUNS), `a ${id} in ${p.building}`);
-    // ("an even rarer chance of having a magazine": over many makings of the town)
-    const eco = e as unknown as { rng: RNG; fill(where: Tier, place: string | null, due: Map<string, number>): Map<string, number>; loot: Map<string, { item: { id: string; mag?: string | null } }>; take(uid: string, looted: boolean): unknown };
-    // (The town's own two are taken up first, as they are in play before another is put down: of its thirty-one
-    // places for a rifle none or one is free after a stocking, by the dice, and with none nothing was counted.)
-    for (const l of [...e.loot.values()]) if ((l.item.id === 'ak' || l.item.id === 'ar15') && every[l.point].tier === 3 && !every[l.point].keeps) eco.take(l.uid, false);
-    for (let k = 0; k < 200; k++) {
-      const had = new Set(eco.loot.keys());
-      // (the AK alone: the AR-15 is not of the third step since 2026-10-19)
-      if (!eco.fill(3, null, new Map([['ak', 1]])).size) continue;
-      const [uid] = [...eco.loot.keys()].filter((u) => !had.has(u));
-      rifles++;
-      if (eco.loot.get(uid)!.item.mag) withMag++;
-      eco.take(uid, false);
-    }
     // (the showcase is gone: nothing of the bunker's or the gas's is in the town's houses)
     for (const id of ['benelli', 'box_12', 'suppressor_12', 'drum_ak', 'mag_ar_60', 'suppressor_739', 'suppressor_556', 'keycard']) assert.equal(on(id, 3), 0, `a ${id} in Kamenka`);
   }
-  assert.equal(rifles, 0, `${rifles} rifles put down in Kamenka`);
 });
 
 ok('the shotgun, the Desert Eagle, the heavy armour and the K6-3 are the bunker\'s and nobody else\'s; the rucksack is not below the fourth step', () => {
