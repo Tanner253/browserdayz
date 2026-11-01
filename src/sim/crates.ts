@@ -36,6 +36,8 @@ export interface CrateSpec {
   also?: [string, number][];
   /** other steps whose things it holds as well (the bunker's racks: the gas's long guns too) */
   with?: Tier[];
+  /** what it holds and nothing else, by weight: a list of its own, for what the rules of the map cannot say */
+  list?: Table;
   /** of the guns, only the long ones */
   long?: true;
 }
@@ -79,6 +81,8 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   cardboard_box_01: { label: 'Cardboard Box', w: 4, h: 3, count: [0, 2], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
   crate_big: { label: 'Large Crate', w: 8, h: 4, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
   bunker_desk: { label: 'Desk', w: 6, h: 3, count: [0, 2], usage: ['Bunker'], tier: 5 },
+  // (a minecart, wherever one stands, the owner, 2026-11-01: "Pickaxe common and scrap and frags spawn there". Six down, as a pickaxe is long)
+  ore_cart: { label: 'Minecart', w: 8, h: 6, count: [2, 3], usage: ['Industrial'], tier: 1, list: [['pickaxe', 4], ['scrap', 5], ['metal_frags', 5]] },
 };
 /** a gun rack: what stands in it is seen from outside it, by everybody (the owner, 2026-10-17: "renders guns on the 3d
  * model that are in its inventory"); how many of its guns stand in its cups; and which of what it holds those are */
@@ -100,7 +104,7 @@ export const racked = (c: Container) => void (c.items = c.items.filter((p) => !I
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
-const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker', 'steel_locker']);
+const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker', 'steel_locker', 'ore_cart']);
 
 /** how many of a sort a step keeps: its rule's count, or the economy's as written (which knows what a sort kept by a rate comes to on the map; not cut to a step's places, which a crate is none of) */
 export type Keeps = (id: string, t: Tier) => number;
@@ -191,14 +195,14 @@ export function fillCrate(c: Container, kind: string, rnd: () => number = Math.r
   const t0: Tier = RACKS.has(kind) && rich !== 'bunker' && at ? at : own || !rich ? spec.tier : rich === 'bunker' ? 5 : 4;
   const t = (west ? Math.min(t0, 3) : t0) as Tier;
   // (one that stands under the gas or down the bunker, not of its own kind, holds what is kept there, as any crate there does)
-  const main = !own && rich ? table(PLAIN, 'plain', t, keeps) : table(spec, kind, t, keeps);
+  const main = spec.list ?? (!own && rich ? table(PLAIN, 'plain', t, keeps) : table(spec, kind, t, keeps));
   const up = spec.up && !rich && t < (west ? 3 : 5) ? table(spec, kind, (t + 1) as Tier, keeps, true) : null;
   const [lo, hi] = spec.countOn?.[t] ?? spec.count;
   const n = lo + Math.floor(rnd() * (hi - lo + 1)) + (rich && !own ? 1 : 0);
   const ids: string[] = [];
   for (let i = 0; i < n; i++) {
     const id = up && rnd() < spec.up! ? pick(up, rnd) : pick(main, rnd);
-    if (id && !(west && eastOnly(ITEMS[id]))) ids.push(id);
+    if (id && (spec.list || !(west && eastOnly(ITEMS[id])))) ids.push(id);
   }
   for (const [id, chance] of rich ? [] : (spec.also ?? [])) if (ITEMS[id] && !(west && eastOnly(ITEMS[id])) && rnd() < chance) ids.push(id);
   for (const id of ids) {

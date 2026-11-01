@@ -48,7 +48,7 @@ export const FURNITURE: Record<string, StorageDef> = {
 export const economyCargo = (kind: string) => FURNITURE[kind]?.cargo === 'economy';
 
 /** props that are searched as crates (loot is inside, never lying on top): their tables in crates.ts */
-export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case']);
+export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case', 'ore_cart']);
 /**
  * Furniture that is searched as a crate is, filled from a table by where it stands (2026-10-12: "the metal lockers found
  * in the police station and the medical station should be lootable and have inventories"): the steel cabinet with two

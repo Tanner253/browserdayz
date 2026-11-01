@@ -601,7 +601,8 @@ export class Infected implements Damageable {
     // less than a survivor's pace as its own is less on the level. So nobody loses one by taking to a bank it
     // would walk straight up, and nobody is run down by one on a face they could only scramble up themselves.
     const ground = heightAt(this.host.world().heights, this.pos.x, this.pos.z);
-    if (Math.abs(this.pos.y - ground) < 0.4) {
+    // (Not under the ground: where the slope of the bunker's pit passes the height of a hall's floor it took that for a face to climb, and crawled.)
+    if (Math.abs(this.pos.y - ground) < 0.4 && !this.horde.below(this.pos)) {
       const rise = heightAt(this.host.world().heights, this.pos.x + dx / d, this.pos.z + dz / d) - ground, most = paceUp(rise);
       // (a pace along the way up, as a survivor's is: over the ground it is that much less)
       if (most < Infinity) speed = Math.min(speed, (most * (INFECTED.chase / 4)) / Math.hypot(1, rise));
