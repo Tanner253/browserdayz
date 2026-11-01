@@ -10,7 +10,7 @@ import type { Atmosphere } from './atmosphere';
 import { concretePaint, painted } from './bunker';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
-import { MINE, inMine, mineFloor } from '../sim/mine';
+import { MINE, inMine, mineSets, mineWay } from '../sim/mine';
 
 /** how far the rock lies out from the plan at most, metres; the cell of its surface; and how often a lamp hangs */
 const ROUGH = 0.5, CELL = 0.9, LAMP_EVERY = 13;
@@ -18,11 +18,13 @@ const ROUGH = 0.5, CELL = 0.9, LAMP_EVERY = 13;
 const POOL = 9, GLOW = 2.4;
 
 /** a stretch of rock, from one corner to the other, its inside to `n` (bumped away from it) */
-function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vector3): THREE.BufferGeometry {
+function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vector3, d?: THREE.Vector3): THREE.BufferGeometry {
   const w = a.distanceTo(b), h = a.distanceTo(c), nw = Math.max(1, Math.round(w / CELL)), nh = Math.max(1, Math.round(h / CELL));
   const pos: number[] = [], uv: number[] = [], idx: number[] = [], p = new THREE.Vector3();
   for (let j = 0; j <= nh; j++) for (let i = 0; i <= nw; i++) {
-    p.copy(a).lerp(b, i / nw).addScaledVector(c.clone().sub(a), j / nh);
+    // (with a fourth corner it need not be square: where a way turns its two sides are of two lengths)
+    if (d) p.copy(a).lerp(b, i / nw).lerp(new THREE.Vector3().copy(c).lerp(d, i / nw), j / nh);
+    else p.copy(a).lerp(b, i / nw).addScaledVector(c.clone().sub(a), j / nh);
     // (nothing at its edges: there it meets the next face, and a seam there let the sky in)
     const edge = Math.min(1, Math.min(i, nw - i, j, nh - j) / 2);
     const bump = (noise3(p.x * 0.33, p.y * 0.33, p.z * 0.33) * 0.7 + noise3(p.x * 0.9, p.y * 0.9, p.z * 0.9) * 0.3 + 0.5) * ROUGH * edge;
@@ -45,7 +47,7 @@ function face(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, n: THREE.Vec
 export class MineSite {
   private all = new THREE.Group();
   private lamps: { pos: THREE.Vector3; k: number }[] = [];
-  private gates: { hinge: THREE.Group; way: number; body: ReturnType<typeof physics.addStatic>; at: THREE.Vector3; swing: number; wide: boolean }[] = [];
+  private gates: { hinge: THREE.Group; turn: number; way: number; body: ReturnType<typeof physics.addStatic>; at: THREE.Vector3; swing: number; wide: boolean }[] = [];
   private gated = new THREE.Group();
   private clock = 0;
 
@@ -92,7 +94,7 @@ export class MineSite {
     room(M.x0, f0, z0, z1, M.tall, { n: cut(M.x0, f0, -1), s: cut(M.x0, f0, 1) });
     room(f0, f1, z0, z1, Fall.tall, { n: [[f0, f1]], s: [[f0, f1]] });
     room(f1, h0, z0, z1, M.tall, { n: cut(f1, h0, -1), s: cut(f1, h0, 1) });
-    room(h1, M.east.x, z0, z1, M.tall, { n: cut(h1, M.east.x, -1), s: cut(h1, M.east.x, 1) });
+    room(h1, M.x1, z0, z1, M.tall, { n: cut(h1, M.x1, -1), s: cut(h1, M.x1, 1) });
     room(h0, h1, Z - H.hz, Z + H.hz, M.tall + 1.4, { n: [[h0, h1]], s: [[h0, h1]] });
     // (the fall's two faces, from the top of the way under it to the drift's roof)
     for (const [x, n] of [[f0, -1], [f1, 1]] as const) {
@@ -105,23 +107,31 @@ export class MineSite {
       const a0 = g.side > 0 ? z1 : z0 - g.long, a1 = g.side > 0 ? z1 + g.long : z0, end = g.side > 0 ? { s: [[g.x - g.half, g.x + g.half]] as [number, number][] } : { n: [[g.x - g.half, g.x + g.half]] as [number, number][] };
       room(g.x - g.half, g.x + g.half, a0, a1, M.tall, { ...end, w: true, e: true });
     }
-    // (the sill before each portal, out over where the ground is opened for it)
-    for (const [a, b, y] of [[M.west.x - 2.6, M.west.x, M.west.y], [M.east.x, M.east.x + 1.4, M.y]] as const) {
-      parts.push(face(v(a, y, z0), v(b, y, z0), v(a, y, z1), v(0, 1, 0)));
-      box(a, b, y - 1, y, z0 - 0.4, z1 + 0.4);
-    }
-    // (the incline, from the west portal up to the drift: four long faces, and what stops a body on each)
-    {
-      const x0 = M.west.x, x1 = M.x0, y0 = M.west.y, y1 = M.y, t = M.tall, c = (x: number, y: number, z: number) => [x, y, z];
-      parts.push(face(v(x0, y0, z0), v(x1, y1, z0), v(x0, y0, z1), v(0, 1, 0)), face(v(x0, y0 + t, z1), v(x1, y1 + t, z1), v(x0, y0 + t, z0), v(0, -1, 0)));
-      parts.push(face(v(x1, y1, z0), v(x0, y0, z0), v(x1, y1 + t, z0), v(0, 0, 1)), face(v(x0, y0, z1), v(x1, y1, z1), v(x0, y0 + t, z1), v(0, 0, -1)));
-      for (const lift of [0, t]) {
-        const low = lift ? 0 : -0.8, high = lift ? 0.8 : 0;
-        const hull = [c(x0, y0 + lift + low, z0 - 1), c(x0, y0 + lift + low, z1 + 1), c(x1, y1 + lift + low, z0 - 1), c(x1, y1 + lift + low, z1 + 1), c(x0, y0 + lift + high, z0 - 1), c(x0, y0 + lift + high, z1 + 1), c(x1, y1 + lift + high, z0 - 1), c(x1, y1 + lift + high, z1 + 1)];
-        physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array(hull.flat()))!, lift ? 'rock' : 'rock', { x: 0, y: 0, z: 0 }, 0);
+    // (the ways in: each straight in from its portal, square to the face, then round for the drift, the west's climbing all the way)
+    for (const side of [-1, 1] as const) {
+      const w = mineWay(side), t = M.tall, hw = M.half, p = side < 0 ? M.west : M.east;
+      const dir = (a: number[], b: number[]) => {
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        return [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+      };
+      const d0 = dir(w[0], w[1]), d1 = dir(w[1], w[2]), n0 = [-d0[1], d0[0]], n1 = [-d1[1], d1[0]], m = [n0[0] + n1[0], n0[1] + n1[1]], k = (m[0] * m[0] + m[1] * m[1]) / 2;
+      // (across the way at each of its three points: the turn cut on the mitre; at the drift, square to the drift)
+      const across = [n0, [m[0] / k, m[1] / k], [0, side < 0 ? 1 : -1]];
+      const L = w.map((q, i) => v(q[0] + across[i][0] * hw, q[2], q[1] + across[i][1] * hw)), R = w.map((q, i) => v(q[0] - across[i][0] * hw, q[2], q[1] - across[i][1] * hw)), up = (q: THREE.Vector3, y = t) => q.clone().setY(q.y + y);
+      const hull = (pts: THREE.Vector3[], surface: 'rock' = 'rock') => physics.addStatic(physics.R.ColliderDesc.convexHull(new Float32Array(pts.flatMap((q) => [q.x, q.y, q.z])))!, surface, { x: 0, y: 0, z: 0 }, 0);
+      for (const i of [0, 1]) {
+        const n = i ? n1 : n0, side3 = v(n[0], 0, n[1]), out = (q: THREE.Vector3, s: number) => q.clone().addScaledVector(side3, s * 0.9);
+        parts.push(face(R[i], R[i + 1], L[i], v(0, 1, 0), L[i + 1]), face(up(L[i]), up(L[i + 1]), up(R[i]), v(0, -1, 0), up(R[i + 1])));
+        parts.push(face(L[i], L[i + 1], up(L[i]), v(-n[0], 0, -n[1]), up(L[i + 1])), face(R[i + 1], R[i], up(R[i + 1]), v(n[0], 0, n[1]), up(R[i])));
+        hull([R[i], R[i + 1], L[i], L[i + 1], up(R[i], -0.8), up(R[i + 1], -0.8), up(L[i], -0.8), up(L[i + 1], -0.8)]);
+        hull([up(R[i]), up(R[i + 1]), up(L[i]), up(L[i + 1]), up(R[i], t + 0.8), up(R[i + 1], t + 0.8), up(L[i], t + 0.8), up(L[i + 1], t + 0.8)]);
+        hull([L[i], L[i + 1], up(L[i]), up(L[i + 1]), out(L[i], 1), out(L[i + 1], 1), out(up(L[i]), 1), out(up(L[i + 1]), 1)]);
+        hull([R[i], R[i + 1], up(R[i]), up(R[i + 1]), out(R[i], -1), out(R[i + 1], -1), out(up(R[i]), -1), out(up(R[i + 1]), -1)]);
       }
-      box(x0, x1, y0 - 1, y1 + t + 1, z0 - 1, z0);
-      box(x0, x1, y0 - 1, y1 + t + 1, z1, z1 + 1);
+      // (the sill before the portal, out over where the ground is opened for it)
+      const o = v(Math.cos(p.rot), 0, -Math.sin(p.rot)), Ra = R[0].clone().addScaledVector(o, 1.2), La = L[0].clone().addScaledVector(o, 1.2);
+      parts.push(face(Ra, R[0], La, v(0, 1, 0), L[0]));
+      hull([Ra, R[0], La, L[0], up(Ra, -0.8), up(R[0], -0.8), up(La, -0.8), up(L[0], -0.8)]);
     }
     // (the hoist room's two end walls, either side of the drift's mouth, and the lip over each mouth)
     for (const [x, side] of [[h0, 1], [h1, -1]] as const) {
@@ -135,11 +145,19 @@ export class MineSite {
     // (lamps down the drift on a wire, one in the hoist room: each a bulb, and its pool of light painted once on a plan of the mine and laid over
     // the rock, as the bunker's is: only the few lamps nearest the eye are real lights, and those light what stands in the drift)
     const lamps: [number, number, number][] = [];
-    for (let x = M.west.x + 6, k = 0; x < M.east.x - 2; x += LAMP_EVERY, k++) {
+    for (let x = M.x0 + 4, k = 0; x < M.x1 - 2; x += LAMP_EVERY, k++) {
       if (Math.abs(x - Fall.x) < Fall.half + 0.6) continue;
-      const y = mineFloor(x) + M.tall - 0.35 + (Math.abs(x - H.x) < H.hx ? 1.2 : 0);
+      const y = M.y + M.tall - 0.35 + (Math.abs(x - H.x) < H.hx ? 1.2 : 0);
       lamps.push([x, y, Z]);
       this.lamps.push({ pos: new THREE.Vector3(x, y, Z), k });
+    }
+    for (const side of [-1, 1] as const) {
+      const w = mineWay(side), a = w[1], b = w[2], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / LAMP_EVERY));
+      for (let i = 0; i < n; i++) {
+        const t = i / n, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t, y = a[2] + (b[2] - a[2]) * t + M.tall - 0.35;
+        lamps.push([x, y, z]);
+        this.lamps.push({ pos: new THREE.Vector3(x, y, z), k: this.lamps.length });
+      }
     }
     for (const g of M.galleries) {
       const z = Z + g.side * (M.half + g.long - 5);
@@ -181,42 +199,23 @@ export class MineSite {
     this.all.add(walls);
 
     // (the posts of the timber sets stop a body; the cap over them is out of reach)
-    for (let x = M.west.x + 4; x < M.east.x - 2; x += M.sets) {
-      if (Math.abs(x - H.x) < H.hx + 1 || Math.abs(x - Fall.x) < Fall.half + 1.2) continue;
-      for (const s of [-1, 1]) physics.addStatic(physics.R.ColliderDesc.cuboid(0.16, 1.6, 0.16), 'wood', { x, y: mineFloor(x) + 1.6, z: Z + s * 1.48 }, 0);
-    }
+    for (const q of mineSets()) for (const s of [-1, 1]) physics.addStatic(physics.R.ColliderDesc.cuboid(0.16, 1.6, 0.16), 'wood', { x: q.x + Math.sin(q.rot) * s * 1.48, y: q.y + 1.6, z: q.z + Math.cos(q.rot) * s * 1.48 }, q.rot);
     // (the gates: two leaves of bars on hinges in each portal)
     const steel = atmo.register(new THREE.MeshStandardMaterial({ color: 0x3c3a36, roughness: 0.6, metalness: 0.5 })) as THREE.MeshStandardMaterial;
-    for (const [x, side] of [[M.west.x + 0.2, 1], [M.east.x - 0.2, -1]] as const) {
-      const y = mineFloor(x), at = new THREE.Vector3(x, y + 1.2, Z);
+    for (const p of [M.west, M.east]) {
+      const ix = -Math.cos(p.rot), iz = Math.sin(p.rot), x = p.x + ix * 0.5, z = p.z + iz * 0.5, y = p.y, at = new THREE.Vector3(x, y + 1.2, z), sn = Math.sin(p.rot), cs = Math.cos(p.rot);
       for (const s of [-1, 1]) {
         const hinge = new THREE.Group(), w = M.half - 0.02, h = M.tall - 0.1, bars: THREE.BufferGeometry[] = [];
-        hinge.position.set(x, y, Z + s * M.half);
+        hinge.position.set(x + sn * s * M.half, y, z + cs * s * M.half);
         for (let k = 0.14; k < w; k += 0.2) bars.push(new THREE.CylinderGeometry(0.018, 0.018, h, 6).translate(0, h / 2, -s * k));
         for (const b of [0.2, 1.3, h - 0.2]) bars.push(new THREE.BoxGeometry(0.05, 0.07, w).translate(0, b, (-s * w) / 2));
         for (const q of [-s * 0.04, -s * (w - 0.04)]) bars.push(new THREE.BoxGeometry(0.05, h, 0.06).translate(0, h / 2, q));
         hinge.add(new THREE.Mesh(mergeGeometries(bars.map((g) => (g.index ? g.toNonIndexed() : g)), false), steel));
-        this.gates.push({ hinge, way: s * side, body: physics.addStatic(physics.R.ColliderDesc.cuboid(0.05, h / 2, w / 2), 'metal', { x, y: y + h / 2, z: Z + s * (M.half - w / 2) }, 0), at, swing: 0, wide: false });
+        hinge.rotation.y = p.rot;
+        const m = M.half - w / 2;
+        this.gates.push({ hinge, turn: p.rot, way: s, body: physics.addStatic(physics.R.ColliderDesc.cuboid(0.05, h / 2, w / 2), 'metal', { x: x + sn * s * m, y: y + h / 2, z: z + cs * s * m }, p.rot), at, swing: 0, wide: false });
         this.gated.add(hinge);
       }
-    }
-    // (a collar of rock round each portal: the ground is opened for the way in, and what is seen past the lintel is this, not the sky)
-    this.collar = atmo.register(new THREE.MeshStandardMaterial({ color: 0x9a8a78, roughness: 0.95 })) as THREE.MeshStandardMaterial;
-    for (const [x0, x1, y] of [[M.west.x - 2.4, M.west.x + 0.4, M.west.y], [M.east.x - 0.4, M.east.x + 1.2, M.y]] as const) {
-      const cx = (x0 + x1) / 2, w = x1 - x0, wall = (z0a: number, z1a: number, y0: number, y1: number) => {
-        const g = new THREE.BoxGeometry(w, y1 - y0, z1a - z0a).translate(cx, (y0 + y1) / 2, (z0a + z1a) / 2), uv = g.getAttribute('uv'), p = g.getAttribute('position'), nor = g.getAttribute('normal');
-        for (let i = 0; i < uv.count; i++) {
-          const across = Math.abs(nor.getX(i)) > 0.5 ? p.getZ(i) : p.getX(i), up = Math.abs(nor.getY(i)) > 0.5 ? p.getZ(i) : p.getY(i);
-          uv.setXY(i, across * 0.25, up * 0.25);
-        }
-        const mesh = new THREE.Mesh(g, this.collar!);
-        mesh.receiveShadow = true;
-        this.gated.add(mesh);
-        physics.addStatic(physics.R.ColliderDesc.cuboid(w / 2, (y1 - y0) / 2, (z1a - z0a) / 2), 'rock', { x: cx, y: (y0 + y1) / 2, z: (z0a + z1a) / 2 }, 0);
-      };
-      wall(Z - 3.6, Z - M.half - 0.04, y - 0.4, y + 7.4);
-      wall(Z + M.half + 0.04, Z + 3.6, y - 0.4, y + 7.4);
-      wall(Z - M.half - 0.04, Z + M.half + 0.04, y + M.tall + 1.3, y + 7.4);
     }
     scene.add(this.gated);
     const bulb = atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.8, 0.5), emissiveIntensity: 3, roughness: 0.5 }));
@@ -232,7 +231,6 @@ export class MineSite {
 
   /** what is in the rock's picture, the first time anybody comes to a portal */
   private rock: THREE.MeshStandardMaterial | null = null;
-  private collar: THREE.MeshStandardMaterial | null = null;
   private dressed = false;
   private fill = new THREE.AmbientLight(0xffdcb0, 0);
 
@@ -250,12 +248,6 @@ export class MineSite {
       this.rock.normalMap = t.normalMap;
       this.rock.roughnessMap = t.armMap;
       this.rock.needsUpdate = true;
-      if (this.collar) {
-        this.collar.color.setRGB(1.25, 0.72, 0.5);
-        this.collar.map = t.map;
-        this.collar.normalMap = t.normalMap;
-        this.collar.needsUpdate = true;
-      }
     }
     // (from inside, a bar: nobody is shut in)
     for (const [k, g] of this.gates.entries()) {
@@ -267,7 +259,7 @@ export class MineSite {
       }
       if (g.swing === want) continue;
       g.swing = Math.min(1, Math.max(0, g.swing + (wide ? dt : -dt) / 1.5));
-      g.hinge.rotation.y = g.way * g.swing * 1.75;
+      g.hinge.rotation.y = g.turn + g.way * g.swing * 1.75;
       g.body.setEnabled(g.swing < 0.5);
     }
     this.clock += dt;

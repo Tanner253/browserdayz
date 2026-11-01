@@ -207,10 +207,10 @@ const THINGS: Record<string, TownThing[]> = {
   'Kupol Siding': [],
   'Old Mine': [
     // the portal in the rock (+x straight out of it), and the reader (+x) looking out with it, to one side
-    { kind: 'mine_portal', x: 0, z: 0, rot: 0.6116 }, { kind: 'namaqualand_boulder_04', x: 2.6, z: -3.8, rot: 0.8 }, { kind: 'namaqualand_boulder_02', x: 1.6, z: 3.6, rot: 2 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },
+    { kind: 'mine_portal', x: 0, z: 0, rot: 0 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },
   ],
   'Old Mine East': [
-    { kind: 'mine_portal', x: 0, z: 0, rot: 0.478 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'ore_cart', x: 5.2, z: 2.2, rot: 0.4 },
+    { kind: 'mine_portal', x: 0, z: 0, rot: 0 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'ore_cart', x: 5.2, z: 2.2, rot: 0.4 },
   ],
   Stolovaya: [
     // the range's instruments and what they ran on, up here for the view; concrete round the strong room's way in, and its reader

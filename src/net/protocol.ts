@@ -455,7 +455,6 @@ export type C2S =
   | { t: 'sitestep'; s: string; k: number }
   /** a pass shown to a gate, and a ride taken */
   | { t: 'gate'; g: string }
-  | { t: 'ride'; w: string }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string; /** what sprang it: the reader's stack, or the hooking code (src/net/bait.ts) */ proof?: string }

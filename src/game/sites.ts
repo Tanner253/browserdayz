@@ -8,7 +8,7 @@ import { audio } from '../core/audio';
 import type { C2S, S2C } from '../net/protocol';
 import type { Place } from '../sim/bunker';
 import { ITEMS } from '../sim/items';
-import { GATES, RIDES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, type SitePhase, PASS_FROM } from '../sim/sites';
+import { GATES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, type SitePhase, PASS_FROM } from '../sim/sites';
 
 export interface SiteHost {
   online(): boolean;
@@ -216,11 +216,6 @@ export class Sites {
         });
       }
       return `<kbd>F</kbd>Scan the ${name}`;
-    }
-    for (const [id, w] of Object.entries(RIDES)) {
-      if (!this.at(w.from, 1.8) || (w.gate && !this.gates.get(w.gate)?.open) || (w.unless && this.gates.get(w.unless)?.open)) continue;
-      if (go) this.h.work(w.doing, w.secs, '', () => this.h.send({ t: 'ride', w: id }));
-      return `<kbd>F</kbd>${w.label}`;
     }
     const bolted = this.h.bolted();
     if (bolted) return bolted;

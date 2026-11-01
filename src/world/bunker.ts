@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { assets } from '../core/assets';
+import { audio } from '../core/audio';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Atmosphere } from './atmosphere';
 import { bunkerPlace, heightAt, type World } from './worldgen';
@@ -393,6 +394,7 @@ export class BunkerSite {
   private fill = new THREE.AmbientLight(0xffe8cc, 0);
   /** what moves on the deep levels, and all that is built there */
   works: DeepWorks | null = null;
+  private liftOpen = false;
   private poweredAt = -1e6;
   private waking = 0;
   private wakeT = 0;
@@ -1115,9 +1117,8 @@ export class BunkerSite {
   setSealed(open: boolean) {
     const d = this.sealed;
     if (!d) return;
-    d.open = open;
+    this.liftOpen = open;
     d.lamp.emissive.setRGB(open ? 0.1 : 1, open ? 1 : 0.1, 0.05);
-    d.collider.setEnabled(!open);
   }
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */
@@ -1180,6 +1181,16 @@ export class BunkerSite {
       }
     }
     const q = this.sealed;
+    if (q) {
+      // (a bar on the inside of it, from the lift's cab: nobody is shut in)
+      const [cr, cf, ch] = bunkerLocal(P, eye.x, eye.y, eye.z), want = this.liftOpen || (Math.abs(cr) < 2.2 && cf < BUNKER.hall.back - 0.1 && cf > CAB.back - 1 && ch > levelY(1) && ch < levelY(1) + 3);
+      if (want !== q.open) {
+        q.open = want;
+        q.collider.setEnabled(!want);
+        const [x, y, z] = bunkerAt(P, 0, BUNKER.hall.back, levelY(1) + 1.2);
+        audio.lightGate(new THREE.Vector3(x, y, z), Math.hypot(eye.x - x, eye.y - y, eye.z - z), want);
+      }
+    }
     if (q && q.slide !== (q.open ? 1 : 0)) {
       q.slide = Math.min(1, Math.max(0, q.slide + (q.open ? dt : -dt) / 3));
       q.mesh.position.x = q.slide * (BUNKER.door.half * 2 + 0.1);

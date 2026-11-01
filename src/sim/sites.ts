@@ -4,7 +4,7 @@
 // come for as long as `hold` says, and the end of it gives the next card. Then the place is spent for a while. The rules
 // only: the server runs it (server/sites.ts), and every number is here.
 
-import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, levelY, type Place } from './bunker';
+import { BUNKER, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, levelY, type Place } from './bunker';
 import { inMine } from './mine';
 import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, STOLOVAYA } from './outposts';
 import { DOOR, SHAFT, STATIONS, stationAt } from './train-line';
@@ -116,7 +116,6 @@ export function wayStep(has: (id: string) => boolean) {
 
 /** where a thing is said to be: on a level of the bunker, at [right, forward]; or on the ground of a town, at a place in its frame */
 export type Spot = { level: number; at: [number, number]; /** only from under this height over the pad */ under?: number } | { town: Town; at: [number, number] } | { place: [number, number, number] };
-const CABIN: [number, number] = [0, (CAB.back + CAB.front) / 2];
 
 /** A way shut until a pass is shown to it. How long it stays open, seconds; `keep`: the pass is shown and not cancelled. */
 export interface Gate { name: string; card: string; at: Spot; also?: Spot; open: number; keep?: boolean; /** what is done at it, where it wants no card */ use?: string; /** it is on one circuit with the blast door, and opens that too (the owner: "both doors open together") */ blast?: boolean }
@@ -132,15 +131,6 @@ export const GATES: Record<string, Gate> = {
   stair: { name: 'the stair to Level 3', card: 'card_purple', at: { level: 2, at: STAIR_DOOR.reader }, open: 300 },
   // (out of Level 3 by the top of its ladder: on one wheel like the bolt-hole's. Its height says Level 2, by `levelAt`)
   escape: { name: 'the hatch', card: '', use: 'Turn the wheel', at: { level: 2, at: [ESCAPE.r, ESCAPE.f], under: levelY(2) - 0.4 }, open: 14, keep: true, blast: true },
-};
-
-/** A way from one place to another that a body is carried by, seconds on the way; shut with its `gate` */
-export interface Ride { label: string; doing: string; secs: number; gate?: string; /** not offered while this gate stands open: there is no need */ unless?: string; from: Spot; to: Spot }
-export const RIDES: Record<string, Ride> = {
-  // (the lift itself runs by itself: src/game/lift.ts. A bar on the inside of the door it stands behind: nobody is shut in)
-  lift_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, unless: 'lift', from: { level: 1, at: CABIN }, to: { level: 1, at: [0, BUNKER.hall.back + 1.6] } },
-  // (off the platform by a bar on the inside: nobody is shut in)
-  train_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, from: { place: DOOR.inside }, to: { place: DOOR.outside } },
 };
 
 /** where a spot is: x, z, and the height, or null where it is the ground's to say */

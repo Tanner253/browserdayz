@@ -10,27 +10,50 @@ export const MINE = {
   hall: { x: -2240, hx: 10, hz: 7 },
   /** the timber sets, metres apart */
   sets: 5,
-  /** the portal at the foot of the west face, and the height of the ground there: the incline climbs from it to the drift */
-  west: { x: -2388.2, y: 0.35 },
-  /** the portal in the east face, level with the drift */
-  east: { x: -2105.6 },
+  /** the portals, each square to its face, which runs aslant of the drift: where it stands, its floor, its turn. The west's climbs by an incline to the level, the east's is level with it */
+  west: { x: -2389, z: 540, y: 0.35, rot: 2.53 },
+  east: { x: -2104.5, z: 540, y: 18.9, rot: -0.478 },
+  /** how far in from its portal each way runs square to the face, before it turns for the drift */
+  adit: 7,
   /** the galleries off the drift: where each leaves it, which way (+z or -z), how far it goes and how wide */
   galleries: [{ x: -2296, side: 1, long: 20, half: 1.6 }, { x: -2204, side: -1, long: 17, half: 1.6 }, { x: -2184, side: 1, long: 12, half: 1.6 }],
   /** where the roof came down, its middle and half its length, and how much of the drift's height is left */
   fall: { x: -2270, half: 2.4, tall: 1.25 },
 };
 
+/** the way in from a portal to the drift's end, its three points [x, z, y]. @param side -1 the west, 1 the east */
+export function mineWay(side: -1 | 1): [number, number, number][] {
+  const M = MINE, p = side < 0 ? M.west : M.east, ix = -Math.cos(p.rot), iz = Math.sin(p.rot), ax = p.x + ix * M.adit, az = p.z + iz * M.adit, dx = side < 0 ? M.x0 : M.x1;
+  const rest = Math.hypot(dx - ax, M.z - az);
+  return [[p.x, p.z, p.y], [ax, az, p.y + ((M.y - p.y) * M.adit) / (M.adit + rest)], [dx, M.z, M.y]];
+}
+const WAYS = [mineWay(-1), mineWay(1)];
+
 /** the floor of the way through at a place along it */
 export function mineFloor(x: number) {
-  const M = MINE;
+  const M = MINE, [a, b, c] = WAYS[0];
   if (x >= M.x0) return M.y;
-  return M.west.y + (M.y - M.west.y) * Math.max(0, (x - M.west.x) / (M.x0 - M.west.x));
+  if (x <= a[0]) return a[2];
+  return x < b[0] ? a[2] + ((b[2] - a[2]) * (x - a[0])) / (b[0] - a[0]) : b[2] + ((c[2] - b[2]) * (x - b[0])) / (c[0] - b[0]);
+}
+
+/** the timber sets of the way, each where it stands and turned across it */
+export function mineSets(): { x: number; y: number; z: number; rot: number }[] {
+  const M = MINE, out: { x: number; y: number; z: number; rot: number }[] = [];
+  for (const w of WAYS) {
+    for (const [a, b] of [[w[0], w[1]], [w[1], w[2]]]) {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      for (let d = a === w[0] ? 2.4 : 2.5; d < L - 1; d += M.sets) out.push({ x: a[0] + ux * d, y: a[2] + ((b[2] - a[2]) * d) / L, z: a[1] + uz * d, rot: Math.atan2(-uz, ux) });
+    }
+  }
+  for (let x = M.x0 + 3; x < M.x1 - 1; x += M.sets) if (Math.abs(x - M.hall.x) >= M.hall.hx + 1 && Math.abs(x - M.fall.x) >= M.fall.half + 1.2) out.push({ x, y: M.y, z: M.z, rot: 0 });
+  return out;
 }
 
 /** is a point in the mine? */
 export function inMine(x: number, y: number, z: number) {
   const M = MINE;
-  if (x < M.west.x - 0.6 || x > M.east.x + 0.6 || Math.abs(z - M.z) > 24) return false;
+  if (x < M.west.x + 0.3 || x > M.east.x - 0.3 || Math.abs(z - M.z) > 24) return false;
   const low = mineFloor(x);
   return y > low - 2 && y < low + M.tall + 3;
 }
@@ -38,12 +61,11 @@ export function inMine(x: number, y: number, z: number) {
 /** what stands in it, each with where it is seen from */
 export function mineProps(): { kind: string; x: number; y: number; z: number; rot: number }[] {
   const M = MINE, out: { kind: string; x: number; y: number; z: number; rot: number }[] = [];
-  const inHall = (x: number) => Math.abs(x - M.hall.x) < M.hall.hx + 1, inFall = (x: number) => Math.abs(x - M.fall.x) < M.fall.half + 1.2;
   // (a set's posts stand across the way: the model is thin along its x, and is walked through that way)
-  for (let x = M.west.x + 4; x < M.east.x - 2; x += M.sets) if (!inHall(x) && !inFall(x)) out.push({ kind: 'mine_timber', x, y: mineFloor(x), z: M.z, rot: 0 });
+  for (const s of mineSets()) out.push({ kind: 'mine_timber', ...s });
   for (const g of M.galleries) for (let d = 3; d < g.long - 1; d += M.sets) out.push({ kind: 'mine_timber', x: g.x, y: M.y, z: M.z + g.side * (M.half + d), rot: Math.PI / 2 });
   // (the rail lies along the level, down the middle: the model's length is its x)
-  for (let x = M.x0 + 3; x < M.east.x - 3; x += 6) out.push({ kind: 'mine_rail', x, y: M.y, z: M.z, rot: 0 });
+  for (let x = M.x0 + 3; x < M.x1 - 2; x += 6) out.push({ kind: 'mine_rail', x, y: M.y, z: M.z, rot: 0 });
   // (the cart's length is its x too: it stands on the rail; and the rest of what was left)
   out.push({ kind: 'ore_cart', x: M.hall.x - 4, y: M.y + 0.12, z: M.z, rot: 0 }, { kind: 'ore_cart', x: M.x0 + 12, y: M.y + 0.12, z: M.z, rot: 0 }, { kind: 'ore_cart', x: M.hall.x - 6, y: M.y, z: M.z + 5, rot: 1.1 });
   const H = M.hall;
@@ -70,12 +92,18 @@ export function mineSpots(): [number, number, number][] {
   return out;
 }
 
-/** is a point on the line of the way in? There the ground's own surface is no floor or wall to a body: it lies over the rock of the incline, and a body is under it */
-export const onMineLine = (x: number, z: number) => Math.abs(z - MINE.z) < 3 && (x < MINE.x0 + 2 || x > MINE.x1 - 2) && x > MINE.west.x - 3 && x < MINE.east.x + 3;
+/** is a point on the line of a way in, from its portal on? There the ground's own surface is no floor or wall to a body: it lies over the rock, and a body is under it */
+export function onMineLine(x: number, z: number) {
+  for (const w of WAYS) {
+    for (let k = 0; k < 2; k++) {
+      const a = w[k], b = w[k + 1], ux = b[0] - a[0], uz = b[1] - a[1], L2 = ux * ux + uz * uz, t = ((x - a[0]) * ux + (z - a[1]) * uz) / L2;
+      if (t >= 0 && t <= 1 && Math.hypot(x - a[0] - ux * t, z - a[1] - uz * t) < 3.4) return true;
+    }
+  }
+  return false;
+}
 
 /** where each portal opens the ground, as the terrain's wells take such things */
-// (only where the face comes down across the way itself: a hole any bigger shows the sky over the lintel)
-export const MINE_MOUTHS = [
-  { cave: -1, x: MINE.west.x - 1, z: MINE.z, rot: 0, hx: 1.2, hz: 2.2, floor: 0 },
-  { cave: -1, x: MINE.east.x - 0.6, z: MINE.z, rot: 0, hx: 1.4, hz: 2.2, floor: 0 },
-];
+// (only where the face comes down across the way itself, behind the portal's frame: a hole any bigger shows the sky over the lintel)
+const mouth = (p: { x: number; z: number; rot: number }, at: number, hx: number) => ({ cave: -1, x: p.x - Math.cos(p.rot) * at, z: p.z + Math.sin(p.rot) * at, rot: p.rot, hx, hz: 2.2, floor: 0 });
+export const MINE_MOUTHS = [mouth(MINE.west, 1, 0.9), mouth(MINE.east, 2.6, 1.4)];

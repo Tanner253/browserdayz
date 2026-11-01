@@ -3,6 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import { inMine } from '../../sim/mine';
+import { DOOR } from '../../sim/train-line';
 import { inTunnel, stationAt } from '../../sim/train-line';
 import * as THREE from 'three';
 import { fullIfWanted } from '../../core/leave';
@@ -528,6 +529,8 @@ export const dropsMethods = {
     }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * (far > 8 ? 1.5 : 0.5), far), (id) => (id === 'strong' ? this.sites.spent('level2') : id === 'vault' ? this.sites.spent('vault') : this.sites.gateOpen(id)), this.sites.going('vault'));
+    // (a bar on the inside of the station's door, from the platform: nobody is shut in)
+    this.halls[0].doorOpen = this.stationGate || Math.hypot(this.player.pos.x - DOOR.inside[0], this.player.pos.y - DOOR.inside[1], this.player.pos.z - DOOR.inside[2]) < 2.8;
     this.pumps.update(dt, cam.position, this.sites.turned('bolotnaya'), this.sites.spent('bolotnaya'));
     this.kupol.update(dt, cam.position, this.sites.turned('kupol'), this.sites.spent('kupol'), (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.6, far));
     this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.1, 14), this.sites.gateOpen('mine'));

@@ -462,6 +462,8 @@ export class Game {
   tunnel!: Tunnel;
   lift: GoodsLift | null = null;
   bolt: BoltHole | null = null;
+  /** the door at the foot of the Kupol's stair, opened by the purple card */
+  stationGate = false;
   /** the hatch of Level 3's way out, in the generator hall's floor */
   escape: BoltHole | null = null;
   halls!: StationHall[];
@@ -718,7 +720,7 @@ export class Game {
         o.rotation.y = 0.5;
         this.s.r.scene.add(o);
         return o;
-      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.halls[0].doorOpen = open), bolted: () => this.bolt?.note(this.player.pos, this.bunker.open || this.sites.gateOpen('bolt')) ?? null, cab: () => this.lift?.cabFor(this.player.pos) ?? null, scene: r.scene, line: () => this.trainCar.line(this.player.pos), has: (id) => this.inv.count(id) > 0,
+      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.stationGate = open), bolted: () => this.bolt?.note(this.player.pos, this.bunker.open || this.sites.gateOpen('bolt')) ?? null, cab: () => this.lift?.cabFor(this.player.pos) ?? null, scene: r.scene, line: () => this.trainCar.line(this.player.pos), has: (id) => this.inv.count(id) > 0,
       doorAt: (i) => {
         const p = this.s.buildings.doors[i]?.pivot.position;
         return p ? [p.x, p.z] : null;
