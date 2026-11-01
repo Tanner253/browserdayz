@@ -184,7 +184,7 @@ ok('pistols from the second step on, most of them where guns were kept; a submac
 });
 
 ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, seldom with a magazine, and a long time coming back; the rifles are the gas\'s', () => {
-  for (const { on, all, e } of worlds) {
+  for (const { on, all } of worlds) {
     // ("tier 3 should be submachine guns heavy")
     // (the weapons pass's submachine guns with the MPA30's, 2026-10-17)
     const smgs = ['mpa', 'scorpion', 'dual_smg', 'dual_mac10', 'mp7a1'].reduce((n, id) => n + on(id, 3), 0);

@@ -48,6 +48,10 @@ export interface Deep {
   /** glass to walk on */
   floors: Deck[]; water: Deck[]; tanks: Tank[]; parting: Parting[];
   stood: Things[]; spots: [number, number, number][]; lamps: [number, number, number, number][];
+  /** what was written on its walls: [right, forward, which way it faces, how high its foot, how wide, what it says, 0 whitewash or 1 red] */
+  written: [number, number, number, number, number, string, number][];
+  /** blood, long dry: [right, forward, height over the level, how big] */
+  stains: [number, number, number, number][];
 }
 
 const Q = Math.PI / 2, TOP = [1], SHELF = [0.38, 0.94, 1.51];
@@ -219,6 +223,11 @@ export const LEVEL2: Deep = {
     [24, -20, 2.75, 1], [33, -20, 2.75, 0.4], [42, -20, 2.75, 1], [24, -10, 2.75, 1], [42, -10, 2.75, 0.3], [33, -5, 2.75, 1], [24, -1, 2.75, 0], [42, -1, 2.75, 1],
     [52, -14, 2.75, 0.3], [51, -2, -1.25, 0.3],
   ],
+  written: [
+    [-1.846, -22, Q, 1.1, 2.6, 'NO POWER NO LIGHT', 0], [-5, -0.156, Math.PI, 1.15, 2.8, 'FEED THE PLANT|CAN BY THE LIFT', 1], [-14.4, 3.844, Math.PI, 1.2, 2.4, 'DO NOT WAKE THEM', 1], [-43.844, -8, Q, 1.1, 1.8, 'COUNT YOUR ROUNDS', 0],
+    [-43.844, -13, Q, 1.15, 2.8, 'THE CURE WAS NEVER HERE', 1], [14.5, -7.156, Math.PI, 1.15, 2.4, 'BATCH 18 FAILED', 0], [47.844, -21, -Q, 1.1, 2.4, 'THEY ARE STILL IN THERE', 1], [-18.5, 3.844, Math.PI, 0.78, 1.5, 'GO LOW', 0],
+  ],
+  stains: [[-37, -14, 0, 2], [-40, -12, 0, 1.4], [-16.5, -3.6, 0, 1.7], [-14, 1, 0, 1.4], [-37.5, 2.6, -2.4, 1.8], [31, -5, -3.8, 2.2], [2, -22, 0, 1.3]],
 };
 
 // ---- Level 3
@@ -353,6 +362,11 @@ export const LEVEL3: Deep = {
     [0, 13, 2.75, 1], [-2.5, 9.5, -1.25, 1], [2.5, 9.5, -1.25, 1], [-2.5, 14.5, -1.25, 1], [2.5, 14.5, -1.25, 1],
     [-15.2, -4.5, -5.65, 0.3], [36, 8.25, 2.75, 0.3], [-23, 8, 2.75, 0.3], [-12, -29.2, 2.75, 1], [-7.5, -29.2, 6.6, 1],
   ],
+  written: [
+    [-6, -27.844, 0, 1.15, 2.8, 'TRAIN WONT WAIT', 1], [11, -27.844, 0, 1.15, 2.6, 'THEY KEPT THE BEST', 0], [-9.6, 5.844, Math.PI, -5, 3.4, 'VAULT 17', 0], [-16.844, -6, Q, 1.1, 2.6, 'NO LIFT DOWN HERE', 1],
+    [-11.5, 18.844, Math.PI, 1.15, 3, 'ALL OF US VOLUNTEERED', 1], [20.5, 18.844, Math.PI, 1.15, 2.2, 'LADDER EAST', 0], [-3.304, -15, -Q, -5.1, 1.5, 'UNDER HERE', 0], [-12.844, -3.4, Q, -7.1, 1.3, 'CRAWL', 0],
+  ],
+  stains: [[-9, -19, -6.2, 2.4], [6, 1, -6.2, 2], [-15, -18, 0, 1.6], [0, 4, -6.2, 1.8], [-11, 14, 0, 1.6], [11, 13, 0, 1.4], [0.8, 12.6, -6.2, 1.5]],
 };
 
 export const DEEP: Record<number, Deep> = { 2: LEVEL2, 3: LEVEL3 };
