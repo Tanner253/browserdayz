@@ -15,7 +15,7 @@
 // forward of its middle, forward being the way out (toward the middle of the map), and `y`
 // metres above the pad (the first level's floor is at -depth).
 
-import { DEEP, ESCAPE, HALL3, HIDDEN, LEVEL3, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, deepLinks, deepPartAt, deepParts, deepWalls, inDeep, middle, type Deep, type DeepArea } from './bunker-deep';
+import { DEEP, ESCAPE, HALL3, HIDDEN, LEVEL3, STAIR_DOOR, PLANT, STRONG, VAULT_DOOR, bothLevels, deepLevelAt, deepLinks, deepPartAt, deepParts, deepWalls, inDeep, middle, type Deep, type DeepArea } from './bunker-deep';
 import { BOLT, HALL_DEEP, WING_AREAS, WING_DOORS, inCellar, inWings, wingAt, wingWalls } from './bunker-wings';
 
 export { inWings, inCellar };
@@ -205,7 +205,10 @@ const deepShape = (d: Deep, level: number): Shape => ({
     for (const t of d.stood) stood.push({ id: t.id, r: t.r, f: t.f, rot: t.rot, y: t.y, on: t.on, scale: t.scale, solid: t.solid });
     for (const [r, f, y] of d.spots) spots.push({ r, f, y: Y + y, floor: true });
     for (const [r, f, y, how] of d.lamps) lamps.push([r, f, Y + y, how]);
-    if (level === 2) made.push({ kind: 'generator', r: PLANT.r, f: PLANT.f, rot: 0, w: 3.6, d: 2, h: 2.1, y: PLANT.plinth });
+    if (level === 2) {
+      made.push({ kind: 'generator', r: PLANT.r, f: PLANT.f, rot: 0, w: 3.6, d: 2, h: 2.1, y: PLANT.plinth });
+      made.push({ kind: 'sign', r: STAIR_DOOR.r, f: STAIR_DOOR.f + 0.16, rot: 0, w: 1.7, d: 0.02, h: 0.32, y: 2.3, text: 'LEVEL 3 STAIR', solid: false });
+    }
     for (const [r, f, rot, y, w, text, v] of d.written) made.push({ kind: 'scrawl', r, f, rot, w, d: 0.02, h: w / 4, y, text, v, solid: false });
     d.stains.forEach(([r, f, y, size], k) => made.push({ kind: 'stain', r, f, rot: k * 1.7, w: size, d: size, h: 0, y, v: 2 * (k % 3), solid: false }));
   },

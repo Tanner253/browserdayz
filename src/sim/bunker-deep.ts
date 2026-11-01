@@ -174,6 +174,8 @@ export const LEVEL2: Deep = {
     { r: (STRONG.r0 + STRONG.r1) / 2, f: STRONG.f0, along: 'r', half: 0.95, gate: 'strong', heavy: true },
   ],
   stood: [
+    // the reader by the stair's door, its panel looking into the room
+    { id: 'card_reader', r: STAIR_DOOR.reader[0], f: STAIR_DOOR.reader[1] - 0.1, rot: -Q },
     // decontamination: the showers it was named for
     { id: 'bunker_pipes', r: -1.68, f: -26, rot: Q }, { id: 'bunker_pipes', r: 1.68, f: -22, rot: -Q }, { id: 'bunker_pipes', r: -1.68, f: -18, rot: Q },
     { id: 'bunker_grate', r: 0, f: -22, rot: 0 }, { id: 'bunker_grate', r: 0, f: -18.5, rot: 0 },
