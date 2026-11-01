@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { audio } from '../core/audio';
 import { WORLD_GROUPS, physics } from '../core/physics';
 import { CAB, bunkerAt, bunkerLocal, levelY, liftAt, type Place } from '../sim/bunker';
+import { selfLit } from '../world/bunker';
 
 const THICK = 0.08, GATE_HIGH = 2.4;
 
@@ -86,6 +87,11 @@ export class GoodsLift {
     // ropes it hangs on. The owner, 2026-11-01: "the elevator seems low quality")
     const cab = this.cab, W = CAB.r, H = 2.5, sheet = paint(register, steelPlate(), 0.5, 0.45), frame = paint(register, null, 0.6, 0.4), mark = paint(register, hazard(), 0.7, 0.1);
     frame.color.set(0x4a4f4a);
+    // (it hangs in a dark shaft past the end of every plan, with its one lamp: its steel is seen by that lamp's own light, whatever reaches it)
+    selfLit(sheet, 0.5);
+    selfLit(mark, 0.5);
+    frame.emissive.set(0x5a605a);
+    frame.emissiveIntensity = 0.6;
     const put = (m: THREE.Material, g: THREE.BufferGeometry) => cab.add(new THREE.Mesh(g, m));
     put(sheet, new THREE.BoxGeometry(W * 2, THICK * 2, half * 2));
     put(mark, new THREE.BoxGeometry(W * 2 - 0.1, 0.012, 0.16).translate(0, THICK + 0.008, half - 0.1));

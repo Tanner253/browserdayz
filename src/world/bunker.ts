@@ -1272,7 +1272,9 @@ export class BunkerSite {
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) return;
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
     this.works?.update(dt, eye, on, also, gate, this.power, alarm, crowd);
-    const want = on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;
+    // (the lift's cab and its shaft lie past the end of the plan, and were lit by nothing at all: the owner, 2026-11-01, "the elevator seems low quality")
+    const inCab = Math.abs(here[0]) < CAB.r + 0.4 && here[1] < BUNKER.hall.back && here[1] > CAB.back - 0.5 && here[2] < -1;
+    const want = inCab ? 0.34 : on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;
     this.fill.intensity += (want - this.fill.intensity) * Math.min(1, dt * 3);
     this.fixtures.forEach((x, k) => {
       if (x.level !== on && x.level !== also) return;

@@ -536,6 +536,8 @@ export const dropsMethods = {
       const { x, y, z } = this.player.pos, far = (q: readonly number[]) => Math.hypot(x - q[0], y - q[1], z - q[2]);
       this.halls[0].doorOpen = this.stationGate || (far(DOOR.inside) < 2.8 && far(DOOR.inside) < far(DOOR.outside));
     }
+    // (the lamp in the goods lift's cab, wherever the cab has got to)
+    if (this.lift && this.lift.lamp.distanceTo(cam.position) < 16) this.lamps.glow(this.lift.lamp, BUNKER_LAMP, 1.6, 9);
     this.pumps.update(dt, cam.position, this.sites.turned('bolotnaya'), this.sites.spent('bolotnaya'));
     this.kupol.update(dt, cam.position, this.sites.turned('kupol'), this.sites.spent('kupol'), (pos, burn, far) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.6, far));
     this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, TORCH_LIGHT, burn * 0.8, 8), this.effects.fire, this.sites.gateOpen('mine'));
