@@ -1109,6 +1109,11 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; squared to its axes; brought down to a game triangle count; textures capped at 2048; geometry compressed.',
     credit: { name: 'Railway buffer stop', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Railway buffer stop" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-11-01, for the game.' },
   },
+  vault_door: {
+    dir: '../incoming/higgsfield/toys', file: 'vault_door_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Round vault door', author: 'ZONA (Higgsfield, GPT Image and Tripo image-to-3D)', url: 'https://higgsfield.ai', line: '"Round vault door" made for ZONA with Higgsfield (GPT Image and Tripo image-to-3D), 2026-11-01, for commercial use under the plan.' },
+  },
   rail_track: {
     dir: '../incoming/higgsfield/toys', file: 'rail_track_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',

@@ -8,6 +8,7 @@ import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { physics } from '../core/physics';
 import { BUNKER, bunkerAt, bunkerPlan, levelY, type Place } from '../sim/bunker';
+import { inMetres } from './bunker';
 import { DEEP, ESCAPE, HALL3, VAULT_DOOR, WALL, deepAreaAt, middle, panes, type Box, type Flight, type Parting, type Rail, type Tank } from '../sim/bunker-deep';
 
 /** a shipping container, as src/world/buildings.ts has it */
@@ -325,29 +326,30 @@ export class DeepWorks {
     this.solid(V.r + 1.98, V.r + half, 5.8, 6.2, Y + V.y - 2.6, cy + half, 'metal');
     this.solid(V.r - half, V.r + half, 5.8, 6.2, cy + 1.95, cy + half, 'metal');
     // (the sill the rim of it stands on, with hazard paint across it, and the track it runs along)
-    this.box(V.r - 3, V.r + V.roll + 3, V.f - V.thick / 2 - 0.02, V.f + V.thick / 2 + 0.02, Y + HALL3.floor, Y + HALL3.floor + 0.012, dark);
-    this.box(V.r - 3, V.r + V.roll + 3, V.f - 1.1, V.f - 0.62, Y + HALL3.floor, Y + HALL3.floor + 0.008, hazard);
-    // (the door, until its model has come: a drum of steel, its spokes and its rim; on rolling it turns)
+    this.box(V.r - 3, V.r + V.roll + 3, V.f + 0.06, V.f + 0.54, Y + HALL3.floor, Y + HALL3.floor + 0.012, dark);
+    this.box(V.r - 3, V.r + V.roll + 3, V.f - 1.2, V.f - 0.72, Y + HALL3.floor, Y + HALL3.floor + 0.008, hazard);
+    // (the door: a drum of plain steel until its model has come. It is the model's +z that looks out, at the hall; on rolling it turns)
     this.disc.position.set(V.r, cy, V.f);
     group.add(this.disc);
-    const R = V.rad, drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, V.thick, 56).rotateX(Math.PI / 2), steel);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(V.rad, V.rad, 0.44, 48).rotateX(Math.PI / 2).translate(0, 0, 0.3), steel);
     this.disc.add(drum);
-    const face = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.72, R * 0.72, V.thick + 0.08, 40).rotateX(Math.PI / 2), this.s.grey);
-    this.disc.add(face);
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI;
-      const spoke = new THREE.Mesh(new THREE.BoxGeometry(R * 1.9, 0.16, V.thick + 0.16), dark);
-      spoke.rotation.z = a;
-      this.disc.add(spoke);
-    }
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, V.thick + 0.26, 24).rotateX(Math.PI / 2), hazard);
-    this.disc.add(hub);
-    for (let k = 0; k < 24; k++) {
-      const a = (k / 24) * Math.PI * 2, b = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, V.thick + 0.12, 8).rotateX(Math.PI / 2), dark);
-      b.position.set(Math.cos(a) * (R - 0.2), Math.sin(a) * (R - 0.2), 0);
-      this.disc.add(b);
-    }
-    this.discBody = this.solid(V.r - 2.2, V.r + 2.2, V.f - V.thick / 2, V.f + V.thick / 2, Y + HALL3.floor, cy + 2.2, 'metal');
+    void assets.model('vault_door').then((scene) => {
+      scene.updateMatrixWorld(true);
+      const kept = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+      scene.traverse((o) => {
+        const src = o as THREE.Mesh;
+        if (!src.isMesh) return;
+        const from = src.material as THREE.MeshStandardMaterial;
+        if (!kept.has(from)) kept.set(from, this.s.mat(from.clone() as THREE.MeshStandardMaterial));
+        const mesh = new THREE.Mesh(inMetres(src), kept.get(from)!);
+        mesh.rotation.y = Math.PI;
+        mesh.position.y = -V.rad;
+        mesh.receiveShadow = true;
+        this.disc.add(mesh);
+      });
+      this.disc.remove(drum);
+    }).catch(() => {});
+    this.discBody = this.solid(V.r - 2.2, V.r + 2.2, V.f + 0.06, V.f + 0.54, Y + HALL3.floor, cy + 2.2, 'metal');
     // (the beacons either side of it, dark until the breaker goes)
     this.beaconOn.visible = false;
     group.add(this.beaconOn);

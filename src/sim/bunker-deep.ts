@@ -141,14 +141,14 @@ export const LEVEL2: Deep = {
   ],
   rails: [
     { ra: 21.5, fa: -26, rb: 21.5, fb: -9, y: 0 }, { ra: 21.5, fa: -5.5, rb: 21.5, fb: 2, y: 0 },
-    { ra: 44.5, fa: -26, rb: 44.5, fb: -9, y: 0 }, { ra: 44.5, fa: -7, rb: 44.5, fb: 2, y: 0 },
+    { ra: 44.5, fa: -26, rb: 44.5, fb: -14.6, y: 0 }, { ra: 44.5, fa: -13.4, rb: 44.5, fb: -9, y: 0 }, { ra: 44.5, fa: -7, rb: 44.5, fb: 2, y: 0 },
     { ra: 23.5, fa: -7, rb: 23.5, fb: -5.5, y: 0 }, { ra: 23.5, fa: -7, rb: 31.5, fb: -7, y: 0 }, { ra: 21.5, fa: -9, rb: 26, fb: -9, y: 0 },
     { ra: 28, fa: -9, rb: 31.5, fb: -9, y: 0 }, { ra: 34.5, fa: -9, rb: 38, fb: -9, y: 0 }, { ra: 40, fa: -9, rb: 44.5, fb: -9, y: 0 }, { ra: 34.5, fa: -7, rb: 44.5, fb: -7, y: 0 },
-    { ra: 6.5, fa: 11.5, rb: 9.2, fb: 11.5, y: 1.6 },
+    { ra: 6.5, fa: 11.5, rb: 7.8, fb: 11.5, y: 1.6 },
   ],
   ladders: [
-    // up out of the pit to the east platform
-    { r: 47.8, f: -14, nr: -1, nf: 0, y0: -3.8, y1: 0.05 },
+    // up out of the pit, on to the east platform: a ladder leans on what it comes out on, so on the platform's edge
+    { r: 44.44, f: -14, nr: -1, nf: 0, y0: -3.8, y1: 0.05 },
   ],
   glazed: [
     { axis: 'f', at: -9, from: -44, to: -11, y0: 0.85, y1: 2.5 },
@@ -180,14 +180,14 @@ export const LEVEL2: Deep = {
     { id: 'metal_office_desk', r: 4.8, f: -1, rot: Math.PI, on: TOP }, { id: 'water_cooler', r: 10.3, f: -0.8, rot: -Q }, { id: 'painted_wooden_cabinet', r: -10.4, f: -0.9, rot: Q, on: TOP },
     // the labs and the morgue
     ...lab(-22, -11, -22, -9, 0), ...lab(-33, -22, -22, -9, 1), ...lab(-44, -33, -22, -9, 2),
-    { id: 'body_lockers', r: -21.5, f: -1.5, rot: Q, solid: true }, { id: 'body_lockers', r: -11.6, f: -1.5, rot: -Q, solid: true },
+    { id: 'body_lockers', r: -20.35, f: -1.5, rot: Q, solid: true }, { id: 'body_lockers', r: -12.65, f: -1.5, rot: -Q, solid: true },
     { id: 'autopsy_table', r: -16.5, f: -2, rot: 0, solid: true }, { id: 'autopsy_table', r: -16.5, f: 2, rot: 0, solid: true }, { id: 'covered_body', r: -16.5, f: 2, rot: 0, y: 0.83 },
     { id: 'autopsy_scales', r: -14.4, f: 3.3, rot: Math.PI }, { id: 'surgical_trolley', r: -14.8, f: -2.6, rot: 0.8 }, { id: 'mop_bucket', r: -18.8, f: 3, rot: 2 },
     // the theatre's table, under its lamp, and the rows looking down at it are built (see `steps` in the world)
     { id: 'autopsy_table', r: -37.5, f: 1.2, rot: 0, y: -2.4, solid: true }, { id: 'covered_body', r: -37.5, f: 1.2, rot: 0, y: -1.57 }, { id: 'surgical_lamp', r: -37.5, f: 1.2, rot: 0, y: 1.4 },
     { id: 'instrument_tray', r: -35.4, f: 2.4, rot: 0.3, y: -1.61 }, { id: 'surgical_trolley', r: -35.4, f: 2.4, rot: 0.3, y: -2.4 }, { id: 'xray_viewer', r: -37.5, f: 3.76, rot: Math.PI, y: -1 },
     // the prep room behind it: nobody looks here
-    { id: 'body_lockers', r: -37.5, f: 9.4, rot: Math.PI, y: -2.4, solid: true }, { id: 'steel_table', r: -40, f: 6.6, rot: Q, y: -2.4, on: [0.79], solid: true }, { id: 'weapons_case', r: -35, f: 6.4, rot: 0.2, y: -2.4 }, { id: 'med_cabinet', r: -33.5, f: 8.2, rot: -Q, y: -2.4, solid: true },
+    { id: 'body_lockers', r: -37.5, f: 8.35, rot: Math.PI, y: -2.4, solid: true }, { id: 'steel_table', r: -40, f: 6.6, rot: Q, y: -2.4, on: [0.79], solid: true }, { id: 'weapons_case', r: -34.6, f: 5.2, rot: 0.2, y: -2.4 }, { id: 'med_cabinet', r: -33.5, f: 8.2, rot: -Q, y: -2.4, solid: true },
     // the benches of the theatre's rows
     ...[0, 1, 2, 3, 4, 5].flatMap((k) => [-44, -41.6, -33.6, -31.2].map((r) => ({ id: 'painted_wooden_bench', r, f: -6.55 + k * 0.9, rot: 0, y: -k * 0.4 } as Things))),
     // behind the morgue: what somebody put by, and the wall they lay against to do it
@@ -206,7 +206,7 @@ export const LEVEL2: Deep = {
   ],
   spots: [
     [0, -19, 0], [-8.8, -1.4, 0], [6.8, -1.4, 0],
-    [-20, -3, 0], [-13, 0, 0], [-37.5, 3.2, -2.4], [-42, 2.2, -2.4], [-34, 7, -2.4], [-39, 8.4, -2.4],
+    [-20, -3, 0], [-13, 0, 0], [-37.5, 3.2, -2.4], [-42, 2.2, -2.4], [-34, 6.2, -2.4], [-39, 5, -2.4],
     [-5.2, 12, 0], [7.4, 12.4, 1.6], [9.2, 13.4, 1.6],
     [-19.6, 6, 0], [-17.4, 7, 0], [14.5, 0.75, 0],
     [33, -8, -3.8], [28, -24.6, -3.8], [43, -2, -3.8], [19.6, -14, 0], [46.2, -18, 0], [33.4, -13.2, 0.2], [51, -14, 0], [53, -11.6, 0], [50, 0, -3.8],
@@ -226,7 +226,7 @@ export const LEVEL2: Deep = {
 /** the great hall: where its floor lies under the galleries, and how high its roof stands */
 export const HALL3 = { floor: -6.2, top: 3.2, r: 13, f0: -22, f1: 6 };
 /** the round door, in the hall's far wall: its middle, its radius, and how far it rolls aside on its track */
-export const VAULT_DOOR = { r: 0, f: 5.62, y: -3.6, rad: 2.6, thick: 0.5, roll: 5.9, wide: 1.8, high: 3.6 };
+export const VAULT_DOOR = { r: 0, f: 5.26, y: -3.6, rad: 2.6, thick: 0.5, roll: 5.9, wide: 1.8, high: 3.6 };
 /** the way out: a ladder up from the end of the east drift to a hatch in the generator hall's floor */
 export const ESCAPE = { r: 40.5, f: 8.25, half: 0.62, high: 3.8 };
 

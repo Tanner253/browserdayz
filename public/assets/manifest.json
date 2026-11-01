@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-01T00:48:06.430Z",
+ "generated": "2026-11-01T05:06:35.938Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -15068,6 +15068,29 @@
    "hi": "assets/models/hi/buffer_stop.glb",
    "hiBytes": 864836,
    "hiCard": 64
+  },
+  "vault_door": {
+   "url": "assets/models/vault_door.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 749272,
+   "srcTris": 29618,
+   "tris": 29618,
+   "min": [
+    -2.6,
+    0,
+    -0.5388
+   ],
+   "max": [
+    2.6,
+    5.1903,
+    0.5388
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/vault_door.glb",
+   "hiBytes": 1491060,
+   "hiCard": 21
   }
  }
 }
