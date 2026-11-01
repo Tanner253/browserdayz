@@ -30,6 +30,8 @@ export interface SiteHost {
   power(on: boolean): void;
   sealed(open: boolean): void;
   stationDoor(open: boolean): void;
+  /** the goods lift, for whoever is in its cab */
+  cab(): { stop: number; left: number } | null;
   scene: THREE.Scene;
   /** the train now: where it stands (-1 on the way), for how long, where it is bound, the shared clock, and whether this body is aboard */
   line(): { stop: number; left: number; bound: number; t: number; aboard: boolean };
@@ -205,11 +207,13 @@ export class Sites {
       return `<kbd>F</kbd>Scan the ${name}`;
     }
     for (const [id, w] of Object.entries(RIDES)) {
-      if (!this.at(w.from, 1.8) || (w.gate && !this.gates.get(w.gate)?.open)) continue;
+      if (!this.at(w.from, 1.8) || (w.gate && !this.gates.get(w.gate)?.open) || (w.unless && this.gates.get(w.unless)?.open)) continue;
       if (go) this.h.work(w.doing, w.secs, '', () => this.h.send({ t: 'ride', w: id }));
       return `<kbd>F</kbd>${w.label}`;
     }
-    // (you always know when the train is: on a platform, and aboard it)
+    // (you always know when the train is, on a platform and aboard it; and the lift, in its cab)
+    const cab = this.h.cab();
+    if (cab) return cab.stop ? `<small>The lift goes ${cab.stop === 1 ? 'down' : 'up'} in ${Math.ceil(cab.left)} s</small>` : `<small>Level ${cab.left < 0 ? 1 : 2}</small>`;
     const me = this.h.feet(), line = this.h.line(), st = stationAt(me.x, me.y, me.z), clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
     if (line.aboard) return line.stop >= 0 ? `<small>${STATIONS[line.stop].name} · leaves in ${clock(line.left)}</small>` : `<small>Next stop ${STATIONS[line.bound].name} · ${clock(line.left)}</small>`;
     if (st) return line.stop === st.stop ? `<small>The train is in · it leaves in ${clock(line.left)}</small>` : `<small>Next train in ${clock(untilAt(st.stop, line.t))}</small>`;

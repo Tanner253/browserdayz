@@ -110,9 +110,6 @@ try {
   // ---- the lift
   const [gx, gy, gz] = spotAt(GATES.lift.at, P);
   await ann.go(gx, gy!, gz);
-  ann.send({ t: 'ride', w: 'lift_down' });
-  await sleep(250);
-  assert.equal(ann.all('put').length, 0, 'the lift ran with its door shut');
   ann.carry('bandage');
   await sleep(200);
   ann.send({ t: 'gate', g: 'lift' });
@@ -123,13 +120,7 @@ try {
   ann.send({ t: 'gate', g: 'lift' });
   await ann.until('the door opened', () => ann.all('gate').some((m) => m.g === 'lift' && m.open));
   await ann.until('the pass was cancelled', () => ann.all('siteok').some((m) => m.card === 'card_red'));
-  const [cx, cy, cz] = spotAt(RIDES.lift_down.from, P);
-  await ann.go(cx, cy!, cz);
-  ann.send({ t: 'ride', w: 'lift_down' });
-  await ann.until('the lift ran', () => ann.all('put').length === 1);
-  const put = ann.all('put')[0], [tx, ty, tz] = spotAt(RIDES.lift_down.to, P);
-  assert.ok(Math.hypot(put.x - tx, put.z - tz) < 0.1 && Math.abs((put.y ?? 0) - ty!) < 0.1, 'the lift went somewhere else');
-  ok('the red pass opens the far door and the lift then goes to Level 2');
+  ok('the red pass opens the far door to the lift');
 
   // ---- the plant
   const L2 = SITES.level2, Y2 = PAD + levelY(2), plant = siteSpot(L2, L2.reader), [px, , pz] = spotAt(plant, P);

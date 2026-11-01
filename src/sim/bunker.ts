@@ -80,6 +80,16 @@ export const levelY = (level = 1) => -BUNKER.depth - (level - 1) * LEVELS.step;
 export const levelAt = (h: number) => (h < levelY(3) + 2.6 ? 3 : h < levelY(2) + 2.6 ? 2 : 1);
 /** the goods lift's cab behind the door at the passage's far end, on every level */
 export const CAB = { r: 1.5, back: -30.4, front: -28.5 };
+/** The goods lift runs by itself on the shared clock, seconds: so long at each level, so long between them. */
+export const LIFT = { stand: 14, move: 7 };
+/** where it is at a moment of that clock: `y` 0 at Level 1 to 1 at Level 2, the level it stands at (0 between them), and how long until that changes */
+export function liftAt(t: number) {
+  const S = LIFT.stand, M = LIFT.move, R = 2 * (S + M), c = ((t % R) + R) % R, ease = (k: number) => k * k * (3 - 2 * k);
+  if (c < S) return { y: 0, stop: 1, left: S - c };
+  if (c < S + M) return { y: ease((c - S) / M), stop: 0, left: S + M - c };
+  if (c < 2 * S + M) return { y: 1, stop: 2, left: 2 * S + M - c };
+  return { y: 1 - ease((c - 2 * S - M) / M), stop: 0, left: R - c };
+}
 
 /**
  * How far under the ground a point is, as the light goes: 0 in the open and at the head of

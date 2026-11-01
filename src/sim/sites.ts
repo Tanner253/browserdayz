@@ -125,10 +125,10 @@ export const GATES: Record<string, Gate> = {
 };
 
 /** A way from one place to another that a body is carried by, seconds on the way; shut with its `gate` */
-export interface Ride { label: string; doing: string; secs: number; gate?: string; from: Spot; to: Spot }
+export interface Ride { label: string; doing: string; secs: number; gate?: string; /** not offered while this gate stands open: there is no need */ unless?: string; from: Spot; to: Spot }
 export const RIDES: Record<string, Ride> = {
-  lift_down: { label: 'Take the lift down', doing: 'The lift goes down', secs: 5, gate: 'lift', from: { level: 1, at: CABIN }, to: { level: 2, at: CABIN } },
-  lift_up: { label: 'Take the lift up', doing: 'The lift goes up', secs: 5, from: { level: 2, at: CABIN }, to: { level: 1, at: CABIN } },
+  // (the lift itself runs by itself: src/game/lift.ts. A bar on the inside of the door it stands behind: nobody is shut in)
+  lift_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, unless: 'lift', from: { level: 1, at: CABIN }, to: { level: 1, at: [0, BUNKER.hall.back + 1.6] } },
   mine_in: { label: 'Go in', doing: 'Through the gate', secs: 2, gate: 'mine', from: { town: MINE_W, at: [3, 0] }, to: { place: [MINE.x0 + 1.5, MINE.y, MINE.z] } },
   mine_in_e: { label: 'Go in', doing: 'Through the gate', secs: 2, gate: 'mine', from: { town: MINE_E, at: [3, 0] }, to: { place: [MINE.x1 - 1.5, MINE.y, MINE.z] } },
   // (out is by a bar on the inside: nobody is shut in)

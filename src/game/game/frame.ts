@@ -303,8 +303,10 @@ export const frameMethods = {
     physics.step(dt, (h) => {
       this.garage.step(h, moveInput);
       this.trainCar.step(h);
+      this.lift?.step(h);
       p.step(h, moveInput);
       this.trainCar.placed();
+      this.lift?.placed();
       // A key press belongs to one simulation step, however many of them this frame needs:
       // seen by two, a single tap of C crouches and stands straight back up.
       input.consumeFixed();
@@ -313,6 +315,7 @@ export const frameMethods = {
     });
     this.trainCar.draw(physics.alpha, this.s.r.camera.position);
     this.trainCar.feel(dt, this.s.r.camera.position);
+    this.lift?.draw(dt, physics.alpha, this.s.r.camera.position);
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead && !this.powers.god);
     this.lightStep(dt, playing && !uiOpen && !typing);

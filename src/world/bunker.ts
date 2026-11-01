@@ -535,17 +535,19 @@ export class BunkerSite {
       block(-L.r - 0.5, L.r + 0.5, L.back - 0.5, L.front, T, T + 0.3, inside);
       for (const w of plan.walls) block(w.r0, w.r1, w.f0, w.f1, Y + (w.y0 ?? 0), T, inside);
       // (the goods lift's cab behind the door at the passage's far end: the same on every level)
-      block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, L.back - 0.5, Y - 0.3, Y, floor);
-      block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, L.back - 0.5, T, T + 0.3, inside);
+      // (between the first two levels it is a shaft, open from one to the other, and the lift's own floor runs in it: src/game/lift.ts)
+      const upper = plan === bunkerPlan(1), lower = plan === bunkerPlan(2), foot = upper ? Y - (LEVELS.step - B.tall) : Y;
+      if (!upper) block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, L.back - 0.5, Y - 0.3, Y, floor);
+      if (!lower) block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, L.back - 0.5, T, T + 0.3, inside);
       // (on the last level its back is a doorway through to the station behind the bunker: src/world/station.ts)
       if (plan === bunkerPlan(LEVELS.last)) {
         const door = 0.95;
         block(-CAB.r - 0.3, -door, CAB.back - 0.3, CAB.back, Y, T, steel, { surface: 'metal' });
         block(door, CAB.r + 0.3, CAB.back - 0.3, CAB.back, Y, T, steel, { surface: 'metal' });
         block(-door, door, CAB.back - 0.3, CAB.back, Y + 2.4, T, steel, { surface: 'metal' });
-      } else block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, CAB.back, Y, T, steel, { surface: 'metal' });
-      block(-CAB.r - 0.3, -CAB.r, CAB.back, L.back - 0.5, Y, T, steel, { surface: 'metal' });
-      block(CAB.r, CAB.r + 0.3, CAB.back, L.back - 0.5, Y, T, steel, { surface: 'metal' });
+      } else block(-CAB.r - 0.3, CAB.r + 0.3, CAB.back - 0.3, CAB.back, foot, T, steel, { surface: 'metal' });
+      block(-CAB.r - 0.3, -CAB.r, CAB.back, L.back - 0.5, foot, T, steel, { surface: 'metal' });
+      block(CAB.r, CAB.r + 0.3, CAB.back, L.back - 0.5, foot, T, steel, { surface: 'metal' });
     };
     shell(plan, Y);
     // a dado round the passages: the lower third of the walls painted, as such places are
