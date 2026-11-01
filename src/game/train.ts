@@ -111,7 +111,7 @@ export class TrainCar {
 
   private async load() {
     this.loading = true;
-    const [wagon, shunter, crate] = await Promise.all([assets.model('gondola_wagon'), assets.model('diesel_shunter'), assets.model('old_military_crate')]);
+    const [wagon, shunter] = await Promise.all([assets.model('gondola_wagon'), assets.model('diesel_shunter')]);
     const set = (m: THREE.Object3D, on: OnRails, turn: number) => {
       const c = m.clone();
       c.rotation.y = turn;
@@ -121,12 +121,12 @@ export class TrainCar {
     // (their long way is their x, and the line's is z; the shunter's cab end faces the wagon)
     set(wagon, this.wagon, Math.PI / 2);
     set(shunter, this.shunter, Math.PI / 2);
-    // (the steps: crates, each as long as they are wide, stacked to the side's height)
-    const size = new THREE.Box3().setFromObject(crate).getSize(new THREE.Vector3());
+    // (the steps, of the plate such things are welded up from)
+    const plate = assets.pbr('rusty_corrugated_iron'), iron = new THREE.MeshStandardMaterial({ map: plate.map, normalMap: plate.normalMap, roughness: 0.8, metalness: 0.4 });
     for (let k = 1; k <= STEPS; k++) {
-      const high = (RIM * (STEPS + 1 - k)) / (STEPS + 1), c = crate.clone();
-      c.scale.set((STEP_DEEP / size.x) * c.scale.x, (high / size.y) * c.scale.y, ((STEP_WIDE * 2) / size.z) * c.scale.z);
-      c.position.set(-CAR.hw + STEP_DEEP * (k - 0.5), 0, 0);
+      const high = (RIM * (STEPS + 1 - k)) / (STEPS + 1), c = new THREE.Mesh(new THREE.BoxGeometry(STEP_DEEP, high, STEP_WIDE * 2), iron);
+      c.position.set(-CAR.hw + STEP_DEEP * (k - 0.5), high / 2, 0);
+      c.castShadow = c.receiveShadow = true;
       this.wagon.group.add(c);
     }
   }
@@ -161,6 +161,11 @@ export class TrainCar {
     next.z = this.v.z;
     return this.turned;
   };
+
+  /** where it is in its round now: standing, and how long for */
+  state() {
+    return trainAt(this.t);
+  }
 
   /** Drawn between its last two steps, as a body is. */
   draw(alpha: number, eye: THREE.Vector3) {

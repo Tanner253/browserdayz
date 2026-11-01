@@ -9,7 +9,7 @@ import type { Atmosphere } from './atmosphere';
 import { assets } from '../core/assets';
 import { painted } from './bunker';
 import { onLine } from '../sim/train';
-import { LINE } from '../sim/train-line';
+import { BORE, LINE } from '../sim/train-line';
 
 /** the bore, metres: half its width, the height of its crown over the rails, and of the springing of its arch */
 const HALF = 3, CROWN = 5.4, SPRING = 2.6;
@@ -31,6 +31,8 @@ const SECTION: number[][] = (() => {
   out.push([HALF, SPRING, -1, 0], [HALF, -0.3, -1, 0]);
   return out;
 })();
+/** the bore's opening, as the stations cut it out of their end walls: across, and up from the rails */
+export const BORE_ARCH = SECTION.map(([x, y]) => [x, y]);
 const ROUND_IT = SECTION.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - SECTION[i - 1][0], p[1] - SECTION[i - 1][1]) : 0), 0);
 
 /** a point of the bore: `x` across and `y` over the rails, at `s` along the line */
@@ -122,6 +124,7 @@ export class Tunnel {
   private all = new THREE.Group();
   private lamps: THREE.Vector3[] = [];
   private held = new THREE.Vector3();
+  private ends: THREE.Mesh[] = [];
 
   constructor(atmo: Atmosphere, scene: THREE.Scene) {
     const L = LINE.length, Nx = 256, Ny = 128;
@@ -150,8 +153,8 @@ export class Tunnel {
 
     for (let s = 0; s < L; s += PIECE) {
       const end = Math.min(L, s + PIECE), piece = new THREE.Group();
-      const shell = new THREE.Mesh(bore(s, end), wall);
-      shell.matrixAutoUpdate = false;
+      const from = Math.max(s, BORE.from), to = Math.min(end, BORE.to), shell = to > from ? new THREE.Mesh(bore(from, to), wall) : null;
+      if (shell) shell.matrixAutoUpdate = false;
       const rail = (x: number): [number, number][] => [[x - 0.04, 0], [x - 0.04, 0.15], [x + 0.04, 0.15], [x + 0.04, 0]];
       const steel = mergeGeometries([
         bar(s, end, rail(-GAUGE), STEEL), bar(s, end, rail(GAUGE), STEEL), sleepers(s, end),
@@ -161,7 +164,7 @@ export class Tunnel {
       const iron1 = new THREE.Mesh(steel, iron);
       iron1.matrixAutoUpdate = false;
       const bulbs: THREE.BufferGeometry[] = [];
-      for (let k = Math.ceil(s / LAMP_EVERY); k * LAMP_EVERY < end; k++) {
+      for (let k = Math.ceil(from / LAMP_EVERY); k * LAMP_EVERY < to; k++) {
         const at = k * LAMP_EVERY, p = onLine(LINE, at), v: number[] = [];
         const side = k % 2 ? 1 : -1;
         place(at, side * (HALF - 0.12), LAMP_UP, v);
@@ -172,7 +175,8 @@ export class Tunnel {
         b.translate(v[0], v[1], v[2]);
         bulbs.push(b);
       }
-      piece.add(shell, iron1);
+      if (shell) piece.add(shell);
+      piece.add(iron1);
       if (bulbs.length) {
         const lights = new THREE.Mesh(mergeGeometries(bulbs, false), bulb);
         lights.matrixAutoUpdate = false;
@@ -183,14 +187,10 @@ export class Tunnel {
       this.pieces.push({ mesh: piece, x: mid.x, y: mid.y, z: mid.z });
       this.all.add(piece);
     }
-    // (the two ends shut with black until the stations stand there: the sky is behind them)
+    // (the bore shut with black where the drawing of it stops: the sky is behind that)
     const shut = new THREE.MeshBasicMaterial({ color: 0, side: THREE.DoubleSide });
-    for (const s of [0, L]) {
-      const p = onLine(LINE, s), end = new THREE.Mesh(new THREE.CircleGeometry(8, 16), shut);
-      end.position.set(p.x, p.y, p.z);
-      end.rotation.y = p.yaw;
-      this.all.add(end);
-    }
+    for (let k = 0; k < 2; k++) this.ends.push(new THREE.Mesh(new THREE.CircleGeometry(8, 16), shut));
+    this.all.add(...this.ends);
     this.all.visible = false;
     scene.add(this.all);
   }
@@ -199,14 +199,23 @@ export class Tunnel {
   update(eye: THREE.Vector3, under: boolean, lit: (pos: THREE.Vector3, burn: number) => void) {
     this.all.visible = under;
     if (!under) return;
-    let any = false;
-    for (const p of this.pieces) {
+    let first = -1, last = -1;
+    this.pieces.forEach((p, i) => {
       const near = Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z) < DRAWN;
       p.mesh.visible = near;
-      any ||= near;
+      if (near) {
+        if (first < 0) first = i;
+        last = i;
+      }
+    });
+    this.all.visible = first >= 0;
+    if (first < 0) return;
+    for (const [k, s] of [[0, first * PIECE], [1, Math.min(LINE.length, (last + 1) * PIECE)]] as const) {
+      const p = onLine(LINE, s);
+      this.ends[k].visible = s > BORE.from && s < BORE.to;
+      this.ends[k].position.set(p.x, p.y, p.z);
+      this.ends[k].rotation.y = p.yaw;
     }
-    this.all.visible = any;
-    if (!any) return;
     // (the lamp ahead of the eye and the ones either side of it: passing them is what lights the wagon, and lets go of it)
     for (const l of this.lamps) if (l.distanceToSquared(eye) < 34 * 34) lit(this.held.copy(l), 1);
   }

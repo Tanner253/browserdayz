@@ -1104,6 +1104,11 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; squared to its axes; textures capped at 2048; geometry compressed.',
     credit: { name: 'Diesel shunter', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Diesel shunter" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
+  buffer_stop: {
+    dir: '../incoming/higgsfield/toys', file: 'buffer_stop_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Made at its true size; squared to its axes; brought down to a game triangle count; textures capped at 2048; geometry compressed.',
+    credit: { name: 'Railway buffer stop', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Railway buffer stop" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-11-01, for the game.' },
+  },
   rail_track: {
     dir: '../incoming/higgsfield/toys', file: 'rail_track_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 1024; geometry compressed.',

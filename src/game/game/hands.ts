@@ -3,7 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import { inMine } from '../../sim/mine';
-import { inTunnel } from '../../sim/train-line';
+import { inTunnel, stationAt } from '../../sim/train-line';
 import { PLACES } from '../../sim/build/pieces';
 import { basementUnder } from '../../sim/basements';
 import { inCave } from '../../world/caves-carved';
@@ -150,7 +150,7 @@ export const handsMethods = {
     const b = this.bunker.place;
     // (the top of the earth: the ground, or the earth the fort lays back over its passage where the ground is cut down for it)
     const top = Math.max(heightAt(this.s.world.heights, at.x, at.z), heightAt(this.s.world.surface, at.x, at.z));
-    const down = this.started && !p.dead && !riding && !p.fly && at.y < top - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48) && !inMine(at.x, at.y, at.z) && !inTunnel(at.x, at.y, at.z) && !castleUnder(this.s.world.castle, at.x, at.y, at.z, (x, z) => heightAt(this.s.world.surface, x, z)) && !basementUnder(this.s.world.basements, at.x, at.y, at.z) && !inCave(at.x, at.y, at.z);
+    const down = this.started && !p.dead && !riding && !p.fly && at.y < top - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48) && !inMine(at.x, at.y, at.z) && !inTunnel(at.x, at.y, at.z) && !stationAt(at.x, at.y, at.z) && !castleUnder(this.s.world.castle, at.x, at.y, at.z, (x, z) => heightAt(this.s.world.surface, x, z)) && !basementUnder(this.s.world.basements, at.x, at.y, at.z) && !inCave(at.x, at.y, at.z);
     this.buriedT = down ? this.buriedT + dt : 0;
     if (this.buriedT < 2) return;
     this.buriedT = 0;

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31T23:57:38.191Z",
+ "generated": "2026-11-01T00:48:06.430Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -15044,6 +15044,29 @@
    "lods": [],
    "hi": "assets/models/hi/diesel_shunter.glb",
    "hiBytes": 1072632,
+   "hiCard": 64
+  },
+  "buffer_stop": {
+   "url": "assets/models/buffer_stop.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 296212,
+   "srcTris": 8994,
+   "tris": 8994,
+   "min": [
+    -1.5962,
+    0,
+    -0.9282
+   ],
+   "max": [
+    1.5962,
+    2.1689,
+    0.9282
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/buffer_stop.glb",
+   "hiBytes": 864836,
    "hiCard": 64
   }
  }

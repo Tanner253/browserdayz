@@ -1,0 +1,226 @@
+// A station of the line (src/sim/train-line.ts for where): a concrete hall dug round the end of the track, a platform level with the wagon's sides, a row of pillars to stand
+// behind, a fence along the edge with a gate that runs back when the train stands and shuts before it goes. It is solid, unlike the tunnel, and drawn only with the eye in
+// it or on the line. All of it is said in the station's own measure, and its own pieces merged by what they are made of.
+
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { assets } from '../core/assets';
+import { WORLD_GROUPS, physics } from '../core/physics';
+import type { Atmosphere } from './atmosphere';
+import { painted } from './bunker';
+import { BORE_ARCH } from './tunnel';
+import { HALL, RIM, type Station } from '../sim/train-line';
+
+/** how far under the platform the rails lie, and the bed under them */
+const RAILS = RIM + 1.4, BED = RAILS + 0.3;
+const PILLAR_EVERY = 9, PILLAR_AT = 6.2, PILLAR = 0.42, LAMP_EVERY = 6;
+const FENCE_HIGH = 1.1, FENCE_UP = 2.6, GATE_HALF = 1.2, GATE_TIME = 1.6;
+/** the concourse behind the buffers at a station that has one: how deep, and out to where across */
+export const COURT = { deep: 6.2, wide: 28.2 };
+
+type Paint = 'wall' | 'floor' | 'tile' | 'steel' | 'yellow' | 'lamp';
+
+export class StationHall {
+  readonly group = new THREE.Group();
+  private bins = new Map<Paint, THREE.BufferGeometry[]>();
+  private yaw: number;
+  private lamps: THREE.Vector3[] = [];
+  private gateMesh = new THREE.Group();
+  private gateBody;
+  private shut = 0;
+  private held = new THREE.Vector3();
+  private buffers = false;
+  get stop() {
+    return this.t.stop;
+  }
+
+  /** @param court the concourse behind the buffers, with a door at this far across (Level 3's): without one the hall just ends */
+  constructor(atmo: Atmosphere, scene: THREE.Scene, private t: Station, court: number | null) {
+    this.yaw = Math.atan2(-t.uz, t.ux);
+    const L = HALL.long, E = HALL.edge, B = HALL.back, F = HALL.far, T = HALL.tall, W = 0.6;
+    const a0 = court === null ? -W : -COURT.deep, bMax = court === null ? B : COURT.wide;
+    // (the platform, its walls, the track's bed and the roof)
+    this.box(0, L, E, B, -BED, 0, 'floor');
+    this.box(a0, 0, F, bMax, -BED, 0, 'floor');
+    this.box(a0 - 0.3, L + W, F - W, bMax + W, T, T + 0.4, 'wall');
+    this.box(0, L, F, E, -BED - 0.4, -BED, 'floor');
+    this.box(0, L, B, B + W, 0, T, 'wall');
+    this.box(a0, L, F - W, F, -BED - 0.4, T, 'wall');
+    this.box(0, L, E, E + 0.3, -0.03, 0.004, 'yellow', false);
+    // (the end of the hall at the tunnel, round the bore: solid beside it and over it)
+    this.box(L, L + W, E + 1.28, B, -BED, T, 'wall');
+    this.box(L, L + W, F, -3, -BED, T, 'wall');
+    this.box(L, L + W, -3, 3, -RAILS + 5.4, T, 'wall');
+    // (the tiles to head height along both walls, and the pillars)
+    for (const [b0, b1] of [[B - 0.03, B], [F, F + 0.03]]) this.box(0, L, b0, b1, b0 > 0 ? 0 : -BED, 2.3, 'tile', false);
+    for (let a = 4; a < L - 2; a += PILLAR_EVERY) this.box(a - PILLAR, a + PILLAR, PILLAR_AT - PILLAR, PILLAR_AT + PILLAR, 0, T, 'wall');
+    if (court !== null) {
+      // (the concourse: the wall behind it, a door through to Level 3's lift, its far end and the wall over the buffers' end of the track)
+      this.box(a0 - 0.3, a0, F, court - 1.1, 0, T, 'wall');
+      this.box(a0 - 0.3, a0, court + 1.1, bMax, 0, T, 'wall');
+      this.box(a0 - 0.3, a0, court - 1.1, court + 1.1, 2.4, T, 'wall');
+      this.box(a0, 0, bMax, bMax + W, 0, T, 'wall');
+      this.box(0, W, B + W, bMax + W, 0, T, 'wall');
+    } else this.box(-W, 0, F, B, -BED, T, 'wall');
+    for (let a = 3; a < L; a += LAMP_EVERY) {
+      for (const b of [4.2, -0.2]) {
+        this.box(a - 0.7, a + 0.7, b - 0.06, b + 0.06, T - 0.1, T, 'lamp', false);
+        this.lamps.push(new THREE.Vector3(...this.at(a, b, T - 0.3)));
+      }
+    }
+    if (court !== null) for (const b of [10, 18]) this.lamps.push(new THREE.Vector3(...this.at(-3, b, T - 0.3)));
+    this.fence();
+    this.gateBody = physics.world.createCollider(physics.R.ColliderDesc.cuboid(GATE_HALF, FENCE_UP / 2, 0.06).setTranslation(...this.at(t.gate, E + 0.08, FENCE_UP / 2)).setRotation(this.turn()).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS));
+    physics.tag(this.gateBody, { surface: 'metal' });
+
+    const c = assets.pbr('dirty_concrete'), f = assets.pbr('concrete_floor_worn_001');
+    const tile = painted(512, 512, (g, rnd) => {
+      g.fillStyle = '#23302a';
+      g.fillRect(0, 0, 512, 512);
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const v = 150 + Math.floor(rnd() * 34);
+        g.fillStyle = `rgb(${v - 34}, ${v}, ${v - 22})`;
+        g.fillRect(x * 64 + 2, y * 64 + 2, 60, 60);
+      }
+    }, 5, true);
+    const paints: Record<Paint, THREE.Material> = {
+      wall: atmo.register(new THREE.MeshStandardMaterial({ map: c.map, normalMap: c.normalMap, roughnessMap: c.armMap, roughness: 1, metalness: 0 })),
+      floor: atmo.register(new THREE.MeshStandardMaterial({ map: f.map, normalMap: f.normalMap, roughnessMap: f.armMap, roughness: 1, metalness: 0 })),
+      tile: atmo.register(new THREE.MeshStandardMaterial({ map: tile, roughness: 0.45, metalness: 0 })),
+      steel: atmo.register(new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.6 })),
+      yellow: atmo.register(new THREE.MeshStandardMaterial({ color: 0xc69a1f, roughness: 0.7 })),
+      lamp: atmo.register(new THREE.MeshStandardMaterial({ color: 0x222222, emissive: new THREE.Color(1, 0.93, 0.78), emissiveIntensity: 3 })),
+    };
+    for (const [k, list] of this.bins) {
+      const m = new THREE.Mesh(mergeGeometries(list, false), paints[k]);
+      m.receiveShadow = true;
+      m.matrixAutoUpdate = false;
+      this.group.add(m);
+    }
+    // (seen from the hall whichever way its triangles came out)
+    const mouth = new THREE.Mesh(this.mouth(), atmo.register(new THREE.MeshStandardMaterial({ map: c.map, normalMap: c.normalMap, roughnessMap: c.armMap, roughness: 1, metalness: 0, side: THREE.DoubleSide })));
+    mouth.matrixAutoUpdate = false;
+    this.group.add(mouth);
+    this.signs(atmo);
+    this.gate(paints.steel);
+    this.group.visible = false;
+    scene.add(this.group);
+  }
+
+  private at(a: number, b: number, y: number): [number, number, number] {
+    const t = this.t;
+    return [t.x + t.ux * a + t.vx * b, t.y + y, t.z + t.uz * a + t.vz * b];
+  }
+
+  private turn() {
+    const h = this.yaw / 2;
+    return { x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) };
+  }
+
+  /** a block of it, from corner to corner in the station's measure, tiled by its size in metres */
+  private box(a0: number, a1: number, b0: number, b1: number, y0: number, y1: number, paint: Paint, solid = true) {
+    const w = a1 - a0, d = b1 - b0, h = y1 - y0, g = new THREE.BoxGeometry(w, h, d), pos = g.getAttribute('position'), nor = g.getAttribute('normal'), uv = g.getAttribute('uv');
+    const [cx, cy, cz] = this.at((a0 + a1) / 2, (b0 + b1) / 2, (y0 + y1) / 2);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i) + cx, y = pos.getY(i) + cy, z = pos.getZ(i) + cz;
+      if (Math.abs(nor.getY(i)) > 0.5) uv.setXY(i, x / 3, z / 3);
+      else if (Math.abs(nor.getX(i)) > 0.5) uv.setXY(i, z / 3, y / 3);
+      else uv.setXY(i, x / 3, y / 3);
+    }
+    g.rotateY(this.yaw);
+    g.translate(cx, cy, cz);
+    if (!this.bins.has(paint)) this.bins.set(paint, []);
+    this.bins.get(paint)!.push(g);
+    if (solid) physics.addStatic(physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2), paint === 'steel' ? 'metal' : 'concrete', { x: cx, y: cy, z: cz }, this.yaw);
+  }
+
+  /** the wall round the tunnel's mouth, its opening the bore's own shape */
+  private mouth(): THREE.BufferGeometry {
+    const shape = new THREE.Shape(), low = -BED - 0.4, top = -RAILS + 5.45;
+    shape.moveTo(-3.6, low).lineTo(3.6, low).lineTo(3.6, top).lineTo(-3.6, top).closePath();
+    const hole = new THREE.Path();
+    BORE_ARCH.forEach(([x, y], i) => (i ? hole.lineTo(x, y - RAILS) : hole.moveTo(x, y - RAILS)));
+    hole.closePath();
+    shape.holes.push(hole);
+    const g = new THREE.ShapeGeometry(shape), pos = g.getAttribute('position'), uv = g.getAttribute('uv');
+    for (let i = 0; i < pos.count; i++) {
+      const b = pos.getX(i), y = pos.getY(i), [px, h, pz] = this.at(HALL.long - 0.02, b, y);
+      pos.setXYZ(i, px, h, pz);
+      uv.setXY(i, b / 3, y / 3);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+
+  /** the fence along the platform's edge, stopping a body up to well over its head (nothing to see past its top rail), with its gap for the gate */
+  private fence() {
+    const L = HALL.long, E = HALL.edge + 0.08, g = this.t.gate, spans = [[0.2, g - GATE_HALF], [g + GATE_HALF, L - 0.2]];
+    for (const [a0, a1] of spans) {
+      for (const y of [FENCE_HIGH, FENCE_HIGH * 0.55]) this.box(a0, a1, E - 0.03, E + 0.03, y - 0.03, y + 0.03, 'steel', false);
+      for (let a = a0; a <= a1 + 0.01; a += (a1 - a0) / Math.max(1, Math.round((a1 - a0) / 3))) this.box(a - 0.04, a + 0.04, E - 0.04, E + 0.04, 0, FENCE_HIGH, 'steel', false);
+      const [x, y, z] = this.at((a0 + a1) / 2, E, FENCE_UP / 2);
+      physics.addStatic(physics.R.ColliderDesc.cuboid((a1 - a0) / 2, FENCE_UP / 2, 0.06), 'metal', { x, y, z }, this.yaw);
+    }
+  }
+
+  /** the gate's leaf: a frame of the fence's own bars, that runs back along it */
+  private gate(steel: THREE.Material) {
+    const parts: THREE.BufferGeometry[] = [], H = GATE_HALF, bar = (w: number, h: number, a: number, y: number) => parts.push(new THREE.BoxGeometry(w, h, 0.05).translate(a, y, 0));
+    for (const y of [0.1, FENCE_HIGH]) bar(H * 2, 0.07, 0, y);
+    for (const a of [-H, H]) bar(0.07, FENCE_HIGH, a, FENCE_HIGH / 2);
+    for (let a = -H + 0.3; a < H; a += 0.3) bar(0.03, FENCE_HIGH, a, FENCE_HIGH / 2);
+    const m = new THREE.Mesh(mergeGeometries(parts, false), steel);
+    this.gateMesh.add(m);
+    this.gateMesh.rotation.y = this.yaw;
+    this.gateMesh.position.set(...this.at(this.t.gate, HALL.edge + 0.16, 0));
+    this.group.add(this.gateMesh);
+  }
+
+  /** the station's name in enamel, along both walls */
+  private signs(atmo: Atmosphere) {
+    const name = this.t.stop ? 'БУНКЕР 17' : 'КУПОЛ', sub = this.t.stop ? 'BUNKER 17 · TERMINUS' : 'KUPOL · TERMINUS';
+    const tex = painted(1024, 256, (g) => {
+      g.fillStyle = '#16284a';
+      g.fillRect(0, 0, 1024, 256);
+      g.strokeStyle = '#e8e4d8';
+      g.lineWidth = 8;
+      g.strokeRect(14, 14, 996, 228);
+      g.fillStyle = '#e8e4d8';
+      g.textAlign = 'center';
+      g.font = '700 118px "Arial Narrow", Arial, sans-serif';
+      g.fillText(name, 512, 130);
+      g.font = '500 44px "Arial Narrow", Arial, sans-serif';
+      g.fillText(sub, 512, 200);
+    }, 1, false);
+    const mat = atmo.register(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, metalness: 0.1 })), geo = new THREE.PlaneGeometry(3.2, 0.8);
+    for (let a = 8.5; a < HALL.long - 2; a += 2 * PILLAR_EVERY) {
+      for (const [b, y, face] of [[HALL.back - 0.05, 3, 1], [HALL.far + 0.05, 3, -1]] as const) {
+        const s = new THREE.Mesh(geo, mat), [x, h, z] = this.at(a, b, y);
+        s.position.set(x, h, z);
+        // (a plane looks along its own +z: here, back into the hall)
+        s.rotation.y = Math.atan2(-this.t.vx * face, -this.t.vz * face);
+        this.group.add(s);
+      }
+    }
+  }
+
+  /** @param dt seconds @param open the train stands here, with time left to board */
+  update(dt: number, eye: THREE.Vector3, on: boolean, open: boolean, lit: (pos: THREE.Vector3, burn: number) => void) {
+    this.shut = THREE.MathUtils.clamp(this.shut + (open ? dt : -dt) / GATE_TIME, 0, 1);
+    this.gateBody.setEnabled(this.shut < 0.6);
+    this.group.visible = on;
+    if (!on) return;
+    if (!this.buffers) {
+      this.buffers = true;
+      // (its buffers look along its +z, here out along the track)
+      void assets.model('buffer_stop').then((m) => {
+        const b = m.clone();
+        b.position.set(...this.at(0.93, 0, -RAILS));
+        b.rotation.y = Math.atan2(this.t.ux, this.t.uz);
+        this.group.add(b);
+      });
+    }
+    this.gateMesh.position.set(...this.at(this.t.gate + this.shut * GATE_HALF * 1.9, HALL.edge + 0.16, 0));
+    for (const l of this.lamps) if (l.distanceToSquared(eye) < 26 * 26) lit(this.held.copy(l), 1);
+  }
+}

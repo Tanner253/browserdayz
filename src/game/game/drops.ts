@@ -4,7 +4,7 @@
 
 import { levelAt } from '../../sim/bunker';
 import { inMine } from '../../sim/mine';
-import { inTunnel } from '../../sim/train-line';
+import { inTunnel, stationAt } from '../../sim/train-line';
 import * as THREE from 'three';
 import { fullIfWanted } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
@@ -530,7 +530,11 @@ export const dropsMethods = {
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
     this.oldMine.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.1, 14));
-    this.tunnel.update(cam.position, inTunnel(cam.position.x, cam.position.y, cam.position.z), (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 1.2, 15));
+    // the train's line: its tunnel, and the halls at its two ends, drawn from either
+    const onTrack = stationAt(cam.position.x, cam.position.y, cam.position.z) !== null || inTunnel(cam.position.x, cam.position.y, cam.position.z), train = this.trainCar.state();
+    const stops = (at: { x: number; y: number; z: number }, burn: number) => this.lamps.glow(at as never, BUNKER_LAMP, burn * 1.2, 15);
+    this.tunnel.update(cam.position, onTrack, stops);
+    for (const h of this.halls) h.update(dt, cam.position, onTrack, train.stop === h.stop && train.left > 4, stops);
     // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
     // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace
     // (a fire basket's light unless the fort says otherwise: its floodlights are white, the wash under its mast red)
