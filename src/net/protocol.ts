@@ -265,7 +265,7 @@ export type C2S =
    */
   | { t: 'hello'; v: number; key: string; name: string; /** the language they read (src/sim/langs.ts) */ lang?: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string; /** the body and the voice they picked (src/sim/survivor.ts) */ bd?: number; vo?: number }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
-  | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
+  | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** where they are in the train's wagon: its across, up and along */ a?: [number, number, number]; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing' }
   /**
@@ -521,7 +521,7 @@ export type S2C =
   | { t: 'join'; p: PlayerInfo }
   | { t: 'leave'; id: number }
   /** each: who, where, what is in their hands and on it, and when their game said so by its own clock (ms) */
-  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ string?][]; /** who went out of this page's sight since the last (server/sight.ts) */ out?: number[] }
+  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ (string | null)?, /** where they are in the train's wagon */ [number, number, number]?][]; /** who went out of this page's sight since the last (server/sight.ts) */ out?: number[] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */

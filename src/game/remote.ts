@@ -129,6 +129,10 @@ export class RemotePlayer implements Damageable {
   private crouch: RAPIER.Collider[] = [];
   private blocker!: RAPIER.Collider;
   private snaps: Snap[] = [];
+  /** the train's wagon, for whoever is aboard it: where a spot in it is in the world. A pose is a fifth of a second old by the time it is drawn, thirty metres back at its speed. */
+  static wagon: ((l: THREE.Vector3, out: THREE.Vector3) => void) | null = null;
+  private wagonAt: THREE.Vector3 | null = null;
+  private wagonTo = new THREE.Vector3();
   /** when each of those was true, and how far in the past they are shown: see src/net/timeline.ts */
   private line = new Timeline();
   /** the time their game put to the last report of them */
@@ -224,6 +228,13 @@ export class RemotePlayer implements Damageable {
    * @param stamp when it was true by the clock of the game it is of, where the server passes that on (an older
    *   server does not: it is then kept by when it came, as all were)
    */
+  /** where they are in the wagon, as they last said (nothing: they are not aboard) */
+  inWagon(a?: [number, number, number]) {
+    if (!a) return void (this.wagonAt = null);
+    this.wagonTo.set(a[0], a[1], a[2]);
+    this.wagonAt ??= this.wagonTo.clone();
+  }
+
   push(p: Pose, now: number, stamp?: number) {
     if (this.away) {
       // (back in sight: set down where they are now, not walked there from where they were last seen)
@@ -551,7 +562,12 @@ export class RemotePlayer implements Damageable {
       // (somebody a held-up report left behind makes the ground up at a run: see caughtUp)
       const secs = (b.t - a.t) / 1000;
       const going = secs > 0 ? Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) / secs : 0;
-      if (tele) this.pos.copy(_to);
+      if (this.wagonAt && RemotePlayer.wagon) {
+        // (where they are in it is what is followed, and what the eye sees is that, where the wagon is now)
+        RemotePlayer.wagon(this.wagonAt, prev);
+        this.wagonAt.lerp(this.wagonTo, Math.min(1, dt * 10));
+        RemotePlayer.wagon(this.wagonAt, this.pos);
+      } else if (tele) this.pos.copy(_to);
       else this.pos.lerp(_to, caughtUp(this.pos.distanceTo(_to), going, dt));
       if (this.drop) {
         this.drop.v += 9.81 * dt;

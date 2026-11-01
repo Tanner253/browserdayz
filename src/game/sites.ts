@@ -28,6 +28,7 @@ export interface SiteHost {
   /** Level 2's plant, and the door at the passage's far end */
   power(on: boolean): void;
   sealed(open: boolean): void;
+  stationDoor(open: boolean): void;
   /** what lies at a site, stood where it lies */
   stand(kind: string, x: number, y: number, z: number): Promise<THREE.Object3D>;
 }
@@ -90,6 +91,7 @@ export class Sites {
   onGate(m: Extract<S2C, { t: 'gate' }>) {
     this.gates.set(m.g, { open: m.open, until: performance.now() + m.left * 1000 });
     if (m.g === 'lift') this.h.sealed(m.open);
+    if (m.g === 'train') this.h.stationDoor(m.open);
   }
 
   private at(spot: Parameters<typeof atSpot>[0], reach = NEAR) {

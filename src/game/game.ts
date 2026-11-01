@@ -566,6 +566,7 @@ export class Game {
     this.tunnel = new Tunnel(atmo, r.scene);
     this.trainCar = new TrainCar(r.scene, () => (Date.now() + this.net.clockOff) / 1000);
     this.player.carry = this.trainCar.carry;
+    RemotePlayer.wagon = (l, out) => void this.trainCar.world(l, out);
     this.player.moverUp = this.trainCar.deck;
     this.halls = [new StationHall(atmo, r.scene, STATIONS[0], null), new StationHall(atmo, r.scene, STATIONS[1], 25)];
     this.darkBeside.push((x, y, z) => (stationAt(x, y, z) ? 0.6 : inTunnel(x, y, z) ? 0.8 : 0));
@@ -697,7 +698,7 @@ export class Game {
         o.rotation.y = 0.5;
         this.s.r.scene.add(o);
         return o;
-      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), has: (id) => this.inv.count(id) > 0,
+      }, bunker: () => this.bunker.place, power: (on) => this.bunker.setPower(on), sealed: (open) => this.bunker.setSealed(open), stationDoor: (open) => void (this.halls[0].doorOpen = open), has: (id) => this.inv.count(id) > 0,
       doorAt: (i) => {
         const p = this.s.buildings.doors[i]?.pivot.position;
         return p ? [p.x, p.z] : null;

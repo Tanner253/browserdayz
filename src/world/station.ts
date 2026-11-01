@@ -14,7 +14,7 @@ import { HALL, RIM, SHAFT, shaftFloor, type Station } from '../sim/train-line';
 /** how far under the platform the rails lie, and the bed under them */
 const RAILS = RIM + 1.4, BED = RAILS + 0.3;
 const PILLAR_EVERY = 9, PILLAR_AT = 6.2, PILLAR = 0.42, LAMP_EVERY = 6;
-const FENCE_HIGH = 1.1, FENCE_UP = 2.6, GATE_HALF = 1.2, GATE_TIME = 1.6;
+const FENCE_HIGH = 1.1, FENCE_UP = 2.6, GATE_HALF = 1.2, GATE_TIME = 1.6, DOOR_TIME = 2.6;
 /** the concourse behind the buffers at a station that has one: how deep, and out to where across */
 export const COURT = { deep: 6.2, wide: 28.2 };
 
@@ -30,6 +30,9 @@ export class StationHall {
   private shut = 0;
   private held = new THREE.Vector3();
   private top = new THREE.Vector3();
+  /** the Kupol's door, between its platform and its stair: it rises into the wall over it */
+  private door: { mesh: THREE.Group; body: ReturnType<typeof physics.world.createCollider>; up: number } | null = null;
+  doorOpen = false;
   private buffers = false;
   get stop() {
     return this.t.stop;
@@ -105,6 +108,8 @@ export class StationHall {
     for (const [k, list] of this.bins) {
       const m = new THREE.Mesh(mergeGeometries(list, false), paints[k]);
       m.receiveShadow = true;
+      // (the roofs stop the sun: the ground overhead casts no shadow down here)
+      m.castShadow = k === 'wall';
       m.matrixAutoUpdate = false;
       this.group.add(m);
     }
@@ -114,6 +119,7 @@ export class StationHall {
     this.group.add(mouth);
     this.signs(atmo);
     this.gate(paints.steel);
+    if (court === null) this.hang(paints.steel, paints.yellow);
     this.group.visible = false;
     scene.add(this.group);
   }
@@ -248,6 +254,27 @@ export class StationHall {
     this.group.add(this.gateMesh);
   }
 
+  /** the door at the foot of the stair: a plate of steel banded in yellow, shut until the purple pass is shown to the reader beside it */
+  private hang(steel: THREE.Material, yellow: THREE.Material) {
+    const S = SHAFT, mid = (S.b0 + S.b1) / 2, half = (S.b1 - S.b0) / 2, mesh = new THREE.Group(), [x, y, z] = this.at(HALL.long + 0.3, mid, S.tall / 2);
+    mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.26, S.tall, half * 2), steel));
+    for (const h of [-0.9, 0.9]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, half * 2), yellow);
+      band.position.y = h;
+      mesh.add(band);
+    }
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = this.yaw;
+    this.group.add(mesh);
+    const c = physics.R.ColliderDesc.cuboid(0.13, S.tall / 2, half).setTranslation(x, y, z).setRotation(this.turn()).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS);
+    const body = physics.world.createCollider(c);
+    physics.tag(body, { surface: 'metal' });
+    this.door = { mesh, body, up: 0 };
+    // (and the reader's foot, which stops a body as the post does)
+    const [rx, ry, rz] = this.at(35.2, 4.35, 0.6);
+    physics.addStatic(physics.R.ColliderDesc.cuboid(0.16, 0.6, 0.2), 'metal', { x: rx, y: ry, z: rz }, this.yaw);
+  }
+
   /** the station's name in enamel, along both walls */
   private signs(atmo: Atmosphere) {
     const name = this.t.stop ? 'БУНКЕР 17' : 'КУПОЛ', sub = this.t.stop ? 'BUNKER 17 · TERMINUS' : 'KUPOL · TERMINUS';
@@ -269,7 +296,6 @@ export class StationHall {
       // (and over the stair's mouth, for whoever comes across the hill)
       const s = new THREE.Mesh(geo, mat), [x, h, z] = this.at(SHAFT.open + 0.02, (SHAFT.b0 + SHAFT.b1) / 2, SHAFT.high + 1.7);
       s.position.set(x, h, z);
-      s.rotation.y = Math.atan2(this.t.ux, this.t.uz) + Math.PI;
       s.rotation.y = Math.atan2(-this.t.ux, -this.t.uz);
       s.scale.setScalar(1.3);
       this.group.add(s);
@@ -289,6 +315,12 @@ export class StationHall {
   update(dt: number, eye: THREE.Vector3, on: boolean, open: boolean, lit: (pos: THREE.Vector3, burn: number) => void) {
     this.shut = THREE.MathUtils.clamp(this.shut + (open ? dt : -dt) / GATE_TIME, 0, 1);
     this.gateBody.setEnabled(this.shut < 0.6);
+    if (this.door) {
+      const d = this.door;
+      d.up = THREE.MathUtils.clamp(d.up + (this.doorOpen ? dt : -dt) / DOOR_TIME, 0, 1);
+      d.body.setEnabled(d.up < 0.7);
+      d.mesh.position.y = this.t.y + SHAFT.tall / 2 + d.up * (SHAFT.tall - 0.1);
+    }
     // (the Kupol's stair is seen from the ground, down its open cut)
     const up = !this.t.stop && Math.hypot(eye.x - this.top.x, eye.z - this.top.z) < 110;
     this.group.visible = on || up;
@@ -296,6 +328,15 @@ export class StationHall {
     if (!this.buffers) {
       this.buffers = true;
       // (its buffers look along its +z, here out along the track)
+      if (!this.t.stop) {
+        // (its panel, its +x, looks out across the landing)
+        void assets.model('card_reader').then((m) => {
+          const r = m.clone();
+          r.position.set(...this.at(35.2, 4.35, 0));
+          r.rotation.y = Math.atan2(-this.t.vz, this.t.vx);
+          this.group.add(r);
+        });
+      }
       void assets.model('buffer_stop').then((m) => {
         const b = m.clone();
         b.position.set(...this.at(0.93, 0, -RAILS));

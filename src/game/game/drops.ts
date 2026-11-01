@@ -239,8 +239,8 @@ export const dropsMethods = {
       // pockets is not a statue's: it is told with the hair's sway it has, a twelfth of a degree, which nobody
       // can see. (The server's rule is being changed to mind what a player DOES: this is for until that is live.)
       const sway = this.input.uiMode ? Math.sin(performance.now() / 700) * 0.0015 : 0;
-      const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw + sway, p.pitch, flags];
-      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()), ...(it?.finish ? { u: it.uid } : {}) });
+      const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw + sway, p.pitch, flags], wagon = this.trainCar.aboard(p.pos);
+      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()), ...(it?.finish ? { u: it.uid } : {}), ...(wagon ? { a: wagon } : {}) });
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;

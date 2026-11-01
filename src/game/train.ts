@@ -189,6 +189,13 @@ export class TrainCar {
     return out.set(p.x, p.y, p.z).applyMatrix4(this.inverse.copy(this.wagon.m1).invert());
   }
 
+  /** where a body is in the wagon, to be told to others so that they see it there and not trailing behind (null: it is not aboard) */
+  aboard(p: { x: number; y: number; z: number }): [number, number, number] | null {
+    const l = this.local(p, this.v), C = CAR;
+    if (Math.abs(l.x) > C.hw + 0.3 || Math.abs(l.z) > C.hl + 0.3 || l.y < -0.5 || l.y > C.over + 0.5) return null;
+    return [Math.round(l.x * 100) / 100, Math.round(l.y * 100) / 100, Math.round(l.z * 100) / 100];
+  }
+
   /** a point in the wagon, in the world */
   world(l: { x: number; y: number; z: number }, out = new THREE.Vector3()) {
     return out.set(l.x, l.y, l.z).applyMatrix4(this.wagon.m1);

@@ -65,6 +65,7 @@ import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './bui
 import { blow, throwCharge, stick, relight } from './raid';
 import { setTrap, takeTrap } from './traps';
 import { doorLocked, takeFuel, useGate, useRide, useSite, useStep } from './sites';
+import { byTheTrain } from '../src/sim/train-line';
 import { blastFrom, blastWalled, reaches, stepWalled, walled, zoneAt } from './solid';
 import { roundClear } from './walls';
 import { knock, swing } from './doors';
@@ -115,6 +116,10 @@ export function handle(c: Client, m: C2S) {
       }
       c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
+      // (aboard, the train carries them past anything legs could do: it is the clock that says where it is, and they must be by it, on the line)
+      const inWagon = Array.isArray(m.a) && m.a.length === 3 && m.a.every(Number.isFinite) && byTheTrain(m.p[0], m.p[1], m.p[2], Date.now() / 1000);
+      c.a = inWagon ? m.a : undefined;
+      if (inWagon) c.check.free = Math.max(c.check.free, Date.now() + 1500);
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       // (nor through a base's wall, floor or shut door: server/solid.ts)
       if (c.pose === m.p && stepWalled(c, was, m.p)) c.pose = [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];

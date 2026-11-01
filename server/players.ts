@@ -62,6 +62,8 @@ export interface Client {
   resumed: boolean;
   w: string | null;
   m: string[];
+  /** where they are in the train's wagon, as they last said and the clock let stand */
+  a?: [number, number, number];
   /** the look of the gun in their hands, if a finish has been put on it (plates.ts) */
   f?: string;
   g: string[];

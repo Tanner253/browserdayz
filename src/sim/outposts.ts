@@ -57,9 +57,6 @@ export const OUTPOSTS: Town[] = [KOLODETS, AERODROM, KARYER, RYBAKI, KEMPING, US
 /** their loot steps: the coast's and the desert's first and second, the valley's second (see westTier) */
 export const OUTPOST_TIERS: Record<string, 1 | 2 | 4> = { Gorodok: 4, Stolovaya: 2, Bolotnaya: 2, Kupol: 4, 'Kupol Siding': 2, 'Old Mine': 2, 'Old Mine East': 2, Kolodets: 1, Aerodrom: 2, "Kar'yer": 2, Rybaki: 1, Kemping: 1, "Ust'ye": 1, Nasosnaya: 1, Brod: 1, "Mel'nitsa": 2, Khutor: 2, Kordon: 2 };
 
-/** the height of the Kupol siding's track, the foot of its bed */
-const RAILS = 199.95;
-
 // (a building north of a lane faces south, rot 0; south of it, north, rot PI)
 const N = 0, S = PI;
 
@@ -202,12 +199,7 @@ const THINGS: Record<string, TownThing[]> = {
     { kind: 'breaker_box', x: -12, z: -8, rot: -0.588 }, { kind: 'breaker_box', x: 12, z: -12, rot: -2.356 }, { kind: 'breaker_box', x: 0, z: 22, rot: 1.571 },
     { kind: 'portable_generator', x: -18, z: 4, rot: 0.4 }, { kind: 'propane_tank', x: -20, z: 8, rot: 0 }, { kind: 'Barrel_01', x: 12, z: 18, rot: 0 }, { kind: 'wooden_military_crate', x: -7, z: 10, rot: 0.3 },
   ],
-  'Kupol Siding': [
-    // the track along the contour, the town's +x, one straight line at one height: never over the ground, and under the snow where it rises (200.9 at
-    // most on the line). The boxcar's length is its x too, and it stands on the rails; the reader's panel (+x) to +z, at its door
-    { kind: 'rail_track', x: -12, z: 0, rot: 0, y: RAILS }, { kind: 'rail_track', x: 0, z: 0, rot: 0, y: RAILS }, { kind: 'rail_track', x: 12, z: 0, rot: 0, y: RAILS },
-    { kind: 'boxcar', x: 0, z: 0, rot: 0, y: RAILS + 0.6 }, { kind: 'card_reader', x: -4, z: 3.4, rot: -Q },
-  ],
+  'Kupol Siding': [],
   'Old Mine': [
     // the portal in the rock (+x straight out of it), and the reader (+x) looking out with it, to one side
     { kind: 'mine_portal', x: 0, z: 0, rot: 0 }, { kind: 'card_reader', x: 2.6, z: 3.8, rot: 0 }, { kind: 'mine_timber', x: 3.4, z: -5, rot: 0.2 }, { kind: 'ore_cart', x: 5, z: -2.6, rot: 1.2 },

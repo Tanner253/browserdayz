@@ -652,7 +652,8 @@ setInterval(() => {
     const p = c.pose;
     const row: Extract<S2C, { t: 'ps' }>['s'][number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m, c.n ?? null];
     // (the finish on the gun in their hands, said only of a plated one)
-    if (c.f) row.push(c.f);
+    if (c.f || c.a) row.push(c.f ?? null);
+    if (c.a) row.push(c.a);
     // (how they are going, from their last two places: where the line of sight takes them to be heading)
     const tr = c.trail, a = tr && tr.length > 1 ? tr[tr.length - 2] : null, b = tr?.[tr.length - 1], dt = a && b ? Math.max(0.05, (b.t - a.t) / 1000) : 1;
     const v = (k: 0 | 2) => (a && b ? Math.max(-12, Math.min(12, (b.p[k] - a.p[k]) / dt)) : 0);

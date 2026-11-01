@@ -273,7 +273,8 @@ export const onlineMethods = {
         const r = this.remotes.get(s[0]);
         if (!r) continue;
         r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now, typeof s[9] === 'number' ? s[9] : undefined);
-        r.setWeapon(s[7], s[8], s[10]);
+        r.setWeapon(s[7], s[8], s[10] ?? undefined);
+        r.inWagon(s[11]);
         if (!(s[6] & F_DEAD)) r.seenAlive(now);
         else r.seenDead(now);
       }

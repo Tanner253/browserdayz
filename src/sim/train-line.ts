@@ -109,6 +109,10 @@ export function stationAt(x: number, y: number, z: number): Station | null {
   return null;
 }
 
+/** at the foot of the Kupol's stair: the reader that opens the way on to the platform, and either side of that door */
+const K = STATIONS[0], kAt = (a: number, b: number): [number, number, number] => [K.x + K.ux * a + K.vx * b, K.y, K.z + K.uz * a + K.vz * b];
+export const DOOR = { reader: kAt(35.3, 5), inside: kAt(33, 6.5), outside: kAt(35.3, 6.5) };
+
 /** is this point in the tunnel? (Under the ground anywhere else, a body is put back on top of it.) */
 export function inTunnel(x: number, y: number, z: number): boolean {
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
@@ -119,4 +123,13 @@ export function inTunnel(x: number, y: number, z: number): boolean {
     }
   }
   return false;
+}
+
+/** in a station or the tunnel: under the ground, and meant to be */
+export const onTheLine = (x: number, y: number, z: number) => inTunnel(x, y, z) || stationAt(x, y, z) !== null;
+
+/** could somebody here be riding the train at this moment of the shared clock? (A word from a game is held against where the clock says the train is.) */
+export function byTheTrain(x: number, y: number, z: number, t: number) {
+  const w = wagonAt(t);
+  return Math.hypot(x - w.x, z - w.z) < 26 && Math.abs(y - w.y) < 6 && onTheLine(x, y, z);
 }

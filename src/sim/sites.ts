@@ -6,7 +6,8 @@
 
 import { BUNKER, CAB, bunkerAt, bunkerPlan, bunkerVault, clearIn, levelAt, levelY, type Place } from './bunker';
 import { inMine, MINE } from './mine';
-import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, SIDING, STOLOVAYA } from './outposts';
+import { BOLOTNAYA, GORODOK, KUPOL, MINE_E, MINE_W, STOLOVAYA } from './outposts';
+import { DOOR, stationAt } from './train-line';
 import { townPoint, type Town } from './towns';
 
 export type SitePhase = 'idle' | 'alarm' | 'spent';
@@ -97,7 +98,8 @@ export const GATES: Record<string, Gate> = {
   lift: { name: 'the goods lift', card: 'card_red', at: { level: 1, at: [BUNKER.door.half + 0.32, BUNKER.hall.back + 0.5] }, open: 1800 },
   // (it stays with whoever shows it: the yellow pass goes on to Bolotnaya, and the Pass is the long way round)
   mine: { name: 'the Old Mine', card: 'card_yellow', keep: true, at: { town: MINE_W, at: [2.6, 3.8] }, also: { town: MINE_E, at: [2.6, 3.8] }, open: 900 },
-  train: { name: 'the carriage', card: 'card_purple', at: { town: SIDING, at: [-4, 3.4] }, open: 120 },
+  // (the door at the foot of the Kupol's stair: while it stands open anybody can go through, and the train comes and goes by itself)
+  train: { name: 'the station door', card: 'card_purple', at: { place: DOOR.reader }, open: 300 },
 };
 
 /** A way from one place to another that a body is carried by, seconds on the way; shut with its `gate` */
@@ -110,8 +112,8 @@ export const RIDES: Record<string, Ride> = {
   // (out is by a bar on the inside: nobody is shut in)
   mine_out: { label: 'Out by the west gate', doing: 'Through the gate', secs: 2, from: { place: [MINE.x0 + 1.5, MINE.y, MINE.z] }, to: { town: MINE_W, at: [4, 0] } },
   mine_out_e: { label: 'Out by the east gate', doing: 'Through the gate', secs: 2, from: { place: [MINE.x1 - 1.5, MINE.y, MINE.z] }, to: { town: MINE_E, at: [4, 0] } },
-  // (the only way into Level 3, and the ladder the only way out of it)
-  train: { label: 'Board the carriage', doing: 'The carriage rolls', secs: 30, gate: 'train', from: { town: SIDING, at: [0, 3] }, to: { level: 3, at: CABIN } },
+  // (off the platform by a bar on the inside: nobody is shut in. The train is the only way into Level 3, and the ladder the other way out of it)
+  train_out: { label: 'Out by the door', doing: 'Through the door', secs: 1, from: { place: DOOR.inside }, to: { place: DOOR.outside } },
   ladder: { label: 'Climb the ladder', doing: 'Up the ladder', secs: 6, from: { level: 3, at: [0, BUNKER.hall.front - 1.4] }, to: { town: GORODOK, at: [18, 45] } },
 };
 
@@ -130,7 +132,7 @@ export function spotAt(s: Spot, P: Place | null): [number, number | null, number
 export function atSpot(s: Spot, P: Place | null, x: number, y: number, z: number, reach: number) {
   const [sx, , sz] = spotAt(s, P);
   if (Math.hypot(sx - x, sz - z) > reach) return false;
-  if ('place' in s) return inMine(x, y, z);
+  if ('place' in s) return inMine(x, y, z) || stationAt(x, y, z) !== null;
   // (a level is only asked of the bunker: Bolotnaya's ground lies lower than its second)
   if (!('level' in s)) return !inMine(x, y, z);
   return !!P && y < P.y - 1 && levelAt(y + 1 - P.y) === s.level;
