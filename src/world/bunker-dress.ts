@@ -19,7 +19,7 @@ const T: Record<string, Thing> = {
   paper: { id: 'paper_stack', w: 0.34, d: 0.3, off: 0.3, turn: 0 },
   box: { id: 'cardboard_box_01', w: 0.4, d: 0.5, off: 0.34, turn: 0 },
   bag: { id: 'trashbag', w: 0.5, d: 0.46, off: 0.34, turn: 0 },
-  tyre: { id: 'old_tyre', w: 0.6, d: 0.16, off: 0.14, turn: 0 },
+  tyre: { id: 'old_tyre', w: 0.6, d: 0.16, off: 0.34, turn: 0 },
   mop: { id: 'mop_bucket', w: 0.8, d: 0.62, off: 0.42, turn: 0 },
   gen: { id: 'portable_generator', w: 0.82, d: 0.56, off: 0.4, turn: 0, solid: true, tall: 0.58 },
   medcab: { id: 'med_cabinet', w: 1.25, d: 0.54, off: 0.3, turn: 0, solid: true, tall: 1.97 },
@@ -27,19 +27,19 @@ const T: Record<string, Thing> = {
   vent: { id: 'ventilator', w: 0.63, d: 0.63, off: 0.4, turn: 0, solid: true, tall: 1.39 },
   cart: { id: 'computer_cart', w: 0.57, d: 0.79, off: 0.45, turn: 0 },
   medbox: { id: 'medical_box', w: 0.53, d: 0.35, off: 0.3, turn: 0 },
-  body: { id: 'covered_body', w: 1.79, d: 0.99, off: 0.62, turn: 0 },
+  body: { id: 'covered_body', w: 1.79, d: 0.99, off: 0.8, turn: 0 },
 };
 /** what stands out on the floor of a big room, left where it was last worked on: each piece of a heap, [what, right, forward, how high] from its middle. The middles of these rooms were bare floor */
 const HEAPS: Partial<Record<string, [keyof typeof T, number, number, number][][]>> = {
-  stores: [[['crate', 0, 0, 0], ['crate', 1.08, 0.1, 0], ['crate', 0.5, 0.05, 1], ['drum', -1, 0.3, 0], ['box', 1.2, 0.9, 0]], [['drum', 0, 0, 0], ['drum', 0.68, 0.1, 0], ['drum', 0.3, 0.66, 0], ['bag', -0.7, -0.3, 0], ['crate', -0.3, -1.1, 0]]],
-  workshop: [[['gen', 0, 0, 0], ['propane', 0.8, 0.2, 0], ['bottles', -0.9, 0.2, 0], ['tyre', 0.5, -0.8, 0], ['box', -0.4, -0.9, 0]], [['crate', 0, 0, 0], ['gen', 0.1, 0.05, 1], ['drum', 1, 0.2, 0], ['tyre', -1.1, 0.3, 0]]],
-  plant: [[['drum', 0, 0, 0], ['drum', 0.68, 0, 0], ['bottles', -0.8, 0.1, 0], ['propane', 0.4, 0.75, 0], ['tyre', 1.3, 0.7, 0]], [['gen', 0, 0, 0], ['crate', 1.1, 0, 0], ['bag', -0.8, 0.3, 0]]],
+  stores: [[['crate', 0, 0, 0], ['crate', 1.08, 0.1, 0], ['crate', 0.5, 0.05, 1], ['drum', -1.02, 0.3, 0], ['box', 1.2, 0.9, 0]], [['drum', 0, 0, 0], ['drum', 0.78, 0.1, 0], ['drum', 0.38, 0.76, 0], ['bag', -0.7, -0.3, 0], ['crate', -0.3, -1.2, 0]]],
+  workshop: [[['gen', 0, 0, 0], ['propane', 0.8, 0.2, 0], ['bottles', -0.9, 0.2, 0], ['tyre', 0.5, -0.8, 0], ['box', -0.4, -0.9, 0]], [['crate', 0, 0, 0], ['gen', 0.1, 0.05, 1], ['drum', 1.02, 0.2, 0], ['tyre', -1.1, 0.3, 0]]],
+  plant: [[['drum', 0, 0, 0], ['drum', 0.78, 0, 0], ['bottles', -0.8, 0.1, 0], ['propane', 0.4, 0.8, 0], ['tyre', 1.4, 0.7, 0]], [['gen', 0, 0, 0], ['crate', 1.1, 0, 0], ['bag', -0.9, 0.3, 0]]],
   armoury: [[['crate', 0, 0, 0], ['crate', 1.05, 0, 0], ['crate', 0.5, 0.1, 1]]],
   archive: [[['cabinet', 0, 0, 0], ['cabinet', 0.6, 0, 0], ['cabinet', 1.2, 0, 0], ['paper', 0.6, 0.75, 0], ['box', -0.5, 0.7, 0]]],
-  barracks: [[['crate', 0, 0, 0], ['box', 0.8, 0.2, 0], ['bag', -0.7, 0.2, 0]]],
+  barracks: [[['crate', 0, 0, 0], ['box', 0.8, 0.2, 0], ['bag', -0.85, 0.2, 0]]],
   medical: [[['body', 0, 0, 0], ['medbox', 1.3, 0.5, 0], ['bag', -1.2, 0.3, 0]], [['vent', 0, 0, 0], ['cart', 0.8, 0.2, 0], ['paper', 0.2, 0.8, 0], ['medbox', -0.8, 0.3, 0]]],
   control: [[['cabinet', 0, 0, 0], ['cabinet', 0.6, 0, 0], ['paper', 0.3, 0.7, 0], ['box', -0.6, 0.4, 0]], [['cart', 0, 0, 0], ['paper', 0.7, 0.2, 0], ['bag', -0.6, 0.3, 0]]],
-  washroom: [[['mop', 0, 0, 0], ['drum', 0.9, 0.2, 0], ['bag', -0.8, 0.3, 0]]],
+  washroom: [[['mop', 0, 0, 0], ['drum', 0.95, 0.2, 0], ['bag', -0.8, 0.3, 0]]],
 };
 /** what hangs on a wall: how high its middle, and how far off it */
 const HANG: Record<string, { id: string; y: number; off: number; turn: number }> = {
@@ -63,6 +63,8 @@ const KITS: Record<string, Kit> = {
   cells: { wall: [], floor: ['bag'], hang: ['poster'] },
 };
 
+/** how much floor furniture holds, m, where it is more than the usual: a bank of body lockers is four metres long */
+const WIDE: Record<string, number> = { zil_wreck: 3.4, tractor_wreck: 2.6, body_lockers: 2.4, bunker_machine: 1.7, old_bed_frame: 1.2, metal_office_desk: 1.2 };
 /** rooms that stay as they were made: what is in them is the whole of the place (the vault's racks; the theatre's seats) */
 const SPARED = /vault|anatomy|under the landing|sump/i;
 
@@ -151,8 +153,18 @@ export function dressPlan(plan: Plan): Dressed {
       return plan.walls.some((w) => inBox(w, br, bf) && y + ly >= (w.y0 ?? 0) && y + ly <= (w.y1 ?? 3));
     });
   };
-  const held: { r: number; f: number; rad: number }[] = [...plan.stood.map((s) => ({ r: s.r, f: s.f, rad: 0.8 })), ...plan.made.filter((m) => m.solid !== false).map((m) => ({ r: m.r, f: m.f, rad: Math.max(m.w, m.d) / 2 + 0.2 })), ...plan.spots.map((s) => ({ r: s.r, f: s.f, rad: 0.3 }))];
+  const held: { r: number; f: number; rad: number }[] = [...plan.stood.map((s) => ({ r: s.r, f: s.f, rad: WIDE[s.id] ?? 0.8 })), ...plan.made.filter((m) => m.solid !== false).map((m) => ({ r: m.r, f: m.f, rad: Math.max(m.w, m.d) / 2 + 0.2 })), ...plan.spots.map((s) => ({ r: s.r, f: s.f, rad: 0.3 }))];
   const clear = (r: number, f: number, rad: number) => !held.some((h) => Math.hypot(h.r - r, h.f - f) < h.rad + rad);
+  // (a wall anywhere about a spot, of those that stand on this floor)
+  const walled = (r: number, f: number, rad: number, y: number) => plan.walls.some((w) => (w.y0 ?? 0) < y + 1 && (w.y1 ?? 3) > y + 0.2 && r + rad > w.r0 && r - rad < w.r1 && f + rad > w.f0 && f - rad < w.f1);
+  // (the foot of a ladder and either end of a stair are ways too: nothing is left where a body comes off them)
+  if (deep) {
+    for (const l of deep.ladders) held.push({ r: l.r + l.nr * 0.6, f: l.f + l.nf * 0.6, rad: 1.3 });
+    for (const q of deep.flights) {
+      const across = q.up[0] === 'r', mid = across ? (q.f0 + q.f1) / 2 : (q.r0 + q.r1) / 2;
+      for (const end of across ? [q.r0, q.r1] : [q.f0, q.f1]) held.push({ r: across ? end : mid, f: across ? mid : end, rad: 1.6 });
+    }
+  }
   plan.rooms.forEach((q, n) => {
     const kit = KITS[q.kind];
     if (!kit || SPARED.test(q.name)) return;
@@ -166,6 +178,8 @@ export function dressPlan(plan: Plan): Dressed {
       for (let i = 0; i < tries; i++) {
         const at = along(roll(k++), roll(k++), t.off), rad = Math.max(t.w, t.d) / 2 + 0.12;
         if (!at || !clear(at[0], at[1], rad) || !flat(at[0], at[1], rad, floor)) continue;
+        const side = t.w / 2 + 0.05;
+        if ([-side, side].some((k) => walled(at[0] + k * Math.abs(at[4]), at[1] + k * Math.abs(at[3]), 0.02, floor))) continue;
         held.push({ r: at[0], f: at[1], rad });
         out.things.push({ id: t.id, turn: t.turn, r: at[0], f: at[1], y: floor, rot: at[2] + (t.solid ? 0 : (roll(k++) - 0.5) * 0.9) });
         if (t.solid) out.solid.push({ r: at[0], f: at[1], y: floor, rot: at[2], w: t.w, d: t.d, h: t.tall ?? 1 });
@@ -185,7 +199,7 @@ export function dressPlan(plan: Plan): Dressed {
         for (let tr = 0; tr < 10 && !found; tr++) {
           cr = q.r0 + (W * (i + 0.5)) / across + (roll(k++) - 0.5) * 4;
           cf = q.f0 + (D * (j + 0.5)) / down + (roll(k++) - 0.5) * 4;
-          found = !q.doors.some(([dr, df]) => Math.hypot(dr - cr, df - cf) < 3) && clear(cr, cf, 1.3) && flat(cr, cf, 1.7, floor) && cr - q.r0 > 2.4 && q.r1 - cr > 2.4 && cf - q.f0 > 2.4 && q.f1 - cf > 2.4;
+          found = !q.doors.some(([dr, df]) => Math.hypot(dr - cr, df - cf) < 3) && clear(cr, cf, 1.3) && flat(cr, cf, 1.7, floor) && !walled(cr, cf, 1.7, floor) && cr - q.r0 > 2.4 && q.r1 - cr > 2.4 && cf - q.f0 > 2.4 && q.f1 - cf > 2.4;
         }
         if (!found) continue;
         held.push({ r: cr, f: cf, rad: 2 });
@@ -205,7 +219,9 @@ export function dressPlan(plan: Plan): Dressed {
       // (over whatever is low against the wall: only what stands as high would hide it)
       for (let tr = 0; tr < 24; tr++) {
         const at = along(roll(k++), roll(k++), 0.03);
-        if (!at || hanging.some((h) => Math.hypot(h[0] - at[0], h[1] - at[1]) < 1.1) || plan.stood.some((s) => tallAt(s) && Math.hypot(s.r - at[0], s.f - at[1]) < 0.9)) continue;
+        if (!at || hanging.some((h) => Math.hypot(h[0] - at[0], h[1] - at[1]) < 1.1) || plan.stood.some((s) => tallAt(s) && Math.hypot(s.r - at[0], s.f - at[1]) < 0.9) || out.solid.some((s) => s.h > 1.15 && Math.hypot(s.r - at[0], s.f - at[1]) < 0.9)) continue;
+        // (an extinguisher hangs at the height of whatever stands there)
+        if (name === 'extinguisher' && !clear(at[0], at[1], 0.35)) continue;
         hanging.push([at[0], at[1]]);
         hungAll.push([at[0], at[1]]);
         held.push({ r: at[0], f: at[1], rad: 0.45 });
@@ -306,71 +322,83 @@ function flats(list: Flat[], Y: number, paint: THREE.Material, group: THREE.Obje
 
 /** how far off what dresses a room is drawn, metres, and how far the eye goes before that is looked at again. A level holds some hundreds of these at a few thousand triangles each, and walls hide nearly all of them */
 const SEEN = 42, MOVED = 3;
+/** what lies on a floor, small and in a dark room, is not looked for from as far (m) */
+const SMALL = /paper_stack|trashbag|cardboard_box|old_tyre|mop_bucket|propane_tank|medical_box|fire_extinguisher|wall_clock/, SEEN_SMALL = 26;
+
+/** a model's paint in the bunker: one for all its levels, told to the day and the dark once */
+const paints = new Map<string, THREE.MeshStandardMaterial>();
 
 /**
  * It stood in the level, every kind of thing a list of its own. @param register how a paint is told to the day and the dark @param solid what stops a body
- * @returns what moves in it, and `look`: what is near the eye, the rest not drawn
+ * @returns what moves in it, `look`: what is near the eye, the rest not drawn, and `load`: everything it takes sent for, once the eye comes near the bunker. Most lives never go down, and a phone has better things to hold
  */
 export function dressLevel(plan: Plan, Y: number, group: THREE.Object3D, register: (m: THREE.MeshStandardMaterial) => THREE.MeshStandardMaterial, selfLit: (m: THREE.MeshStandardMaterial, k: number) => THREE.MeshStandardMaterial, solid: (s: Dressed['solid'][number]) => void) {
   const d = dressPlan(plan), byId = new Map<string, Laid[]>();
   for (const t of d.things) (byId.get(t.id) ?? byId.set(t.id, []).get(t.id)!).push(t);
   for (const s of d.solid) solid(s);
   const q = new THREE.Quaternion(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
-  const sets: { many: THREE.InstancedMesh; all: Float32Array; list: Laid[] }[] = [];
+  const sets: { many: THREE.InstancedMesh; all: Float32Array; list: Laid[]; far: number }[] = [];
   let lastR = Infinity, lastF = Infinity;
   const look = (r: number, f: number) => {
     if (Math.hypot(r - lastR, f - lastF) < MOVED) return;
     lastR = r;
     lastF = f;
-    for (const { many, all, list } of sets) {
+    for (const { many, all, list, far } of sets) {
       const to = many.instanceMatrix.array as Float32Array;
       let n = 0;
       list.forEach((t, i) => {
-        if (Math.hypot(t.r - r, t.f - f) < SEEN) to.set(all.subarray(i * 16, i * 16 + 16), n++ * 16);
+        if (Math.hypot(t.r - r, t.f - f) < far) to.set(all.subarray(i * 16, i * 16 + 16), n++ * 16);
       });
       many.count = n;
       many.instanceMatrix.needsUpdate = true;
     }
   };
-  for (const [id, list] of byId) {
-    void assets.model(id).then((root) => {
-      root.updateMatrixWorld(true);
-      root.traverse((o) => {
-        const src = o as THREE.Mesh;
-        if (!src.isMesh) return;
-        // (no see-through glass: that shader asks for the camera's matrix a second time beside what the paints are ranked with, and a generator's gauge failed to draw at all)
-        const paint = register(selfLit(Object.assign((src.material as THREE.MeshStandardMaterial).clone(), { metalness: 0.15, transmission: 0 }), id === 'filing_cabinet' || id === 'oxygen_bottles' ? 0.1 : 0.18));
-        const many = new THREE.InstancedMesh(src.geometry, paint, list.length), m = new THREE.Matrix4(), all = new Float32Array(list.length * 16);
-        list.forEach((t, i) => m.compose(p.set(t.r, Y + t.y, t.f), q.setFromAxisAngle(up, t.rot + t.turn), one).multiply(src.matrixWorld).toArray(all, i * 16));
-        many.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        many.count = 0;
-        many.frustumCulled = false;
-        many.receiveShadow = true;
-        group.add(many);
-        sets.push({ many, all, list });
-        lastR = Infinity;
-      });
-    }).catch(() => {});
-  }
-  // (the posters: one sheet of pictures, one thing to draw)
-  sheet ??= register(selfLit(new THREE.MeshStandardMaterial({ map: assets.texture('assets/tex/posters.webp', { srgb: true, repeat: false }), roughness: 0.9, metalness: 0 }), 0.35));
-  const A = SHEET.across, B = SHEET.down;
-  flats(d.posters.map((o) => {
-    const u0 = (o.k % A) / A, v1 = 1 - Math.floor(o.k / A) / B;
-    return { r: o.r, f: o.f, y: o.y, rot: o.rot, x: SHEET.w / 2, h: SHEET.h / 2, uv: [u0 + 0.008, v1 - 1 / B + 0.008, u0 + 1 / A - 0.008, v1 - 0.008] as Flat['uv'] };
-  }), Y, sheet, group);
-  // (the marks: paint on the wall, over whatever the wall's own rank is)
-  if (!marks) {
-    marks = register(selfLit(new THREE.MeshStandardMaterial({ map: assets.texture('assets/tex/marks.webp', { srgb: true, repeat: false }), transparent: true, depthWrite: false, roughness: 0.85, metalness: 0 }), 0.22));
-    marks.polygonOffset = true;
-    marks.polygonOffsetFactor = -4;
-    marks.polygonOffsetUnits = -30;
-  }
-  flats(d.marks.flatMap((o) => {
-    const m = MARKS[o.name];
-    if (!m) return [];
-    const [l, t, r, b] = m.box, S = 1024, u0 = l / S, u1 = r / S;
-    return [{ r: o.r, f: o.f, y: o.y, rot: o.rot, x: wideOf(m, o.tall), h: o.tall / 2, tilt: o.tilt, uv: [o.flip ? u1 : u0, 1 - b / S, o.flip ? u0 : u1, 1 - t / S] as Flat['uv'] }];
-  }), Y, marks, group);
-  return { life: d.life, look };
+  let loaded = false;
+  const load = () => {
+    if (loaded) return;
+    loaded = true;
+    for (const [id, list] of byId) {
+      void assets.model(id).then((root) => {
+        root.updateMatrixWorld(true);
+        root.traverse((o) => {
+          const src = o as THREE.Mesh;
+          if (!src.isMesh) return;
+          // (no see-through glass: that shader asks for the camera's matrix a second time beside what the paints are ranked with, and a generator's gauge failed to draw at all)
+          const made = src.material as THREE.MeshStandardMaterial;
+          const paint = paints.get(made.uuid) ?? register(selfLit(Object.assign(made.clone(), { metalness: 0.15, transmission: 0 }), id === 'filing_cabinet' || id === 'oxygen_bottles' ? 0.1 : 0.18));
+          paints.set(made.uuid, paint);
+          const many = new THREE.InstancedMesh(src.geometry, paint, list.length), m = new THREE.Matrix4(), all = new Float32Array(list.length * 16);
+          list.forEach((t, i) => m.compose(p.set(t.r, Y + t.y, t.f), q.setFromAxisAngle(up, t.rot + t.turn), one).multiply(src.matrixWorld).toArray(all, i * 16));
+          many.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          many.count = 0;
+          many.frustumCulled = false;
+          many.receiveShadow = true;
+          group.add(many);
+          sets.push({ many, all, list, far: SMALL.test(id) ? SEEN_SMALL : SEEN });
+          lastR = Infinity;
+        });
+      }).catch(() => {});
+    }
+    // (the posters: one sheet of pictures, one thing to draw)
+    sheet ??= register(selfLit(new THREE.MeshStandardMaterial({ map: assets.texture('assets/tex/posters.webp', { srgb: true, repeat: false }), roughness: 0.9, metalness: 0 }), 0.35));
+    const A = SHEET.across, B = SHEET.down;
+    flats(d.posters.map((o) => {
+      const u0 = (o.k % A) / A, v1 = 1 - Math.floor(o.k / A) / B;
+      return { r: o.r, f: o.f, y: o.y, rot: o.rot, x: SHEET.w / 2, h: SHEET.h / 2, uv: [u0 + 0.008, v1 - 1 / B + 0.008, u0 + 1 / A - 0.008, v1 - 0.008] as Flat['uv'] };
+    }), Y, sheet, group);
+    // (the marks: paint on the wall, over whatever the wall's own rank is)
+    if (!marks) {
+      marks = register(selfLit(new THREE.MeshStandardMaterial({ map: assets.texture('assets/tex/marks.webp', { srgb: true, repeat: false }), transparent: true, depthWrite: false, roughness: 0.85, metalness: 0 }), 0.22));
+      marks.polygonOffset = true;
+      marks.polygonOffsetFactor = -4;
+      marks.polygonOffsetUnits = -30;
+    }
+    flats(d.marks.flatMap((o) => {
+      const m = MARKS[o.name];
+      if (!m) return [];
+      const [l, t, r, b] = m.box, S = 1024, u0 = l / S, u1 = r / S;
+      return [{ r: o.r, f: o.f, y: o.y, rot: o.rot, x: wideOf(m, o.tall), h: o.tall / 2, tilt: o.tilt, uv: [o.flip ? u1 : u0, 1 - b / S, o.flip ? u0 : u1, 1 - t / S] as Flat['uv'] }];
+    }), Y, marks, group);
+  };
+  return { life: d.life, look, load };
 }

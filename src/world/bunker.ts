@@ -378,7 +378,7 @@ export class BunkerSite {
   /** what moves in it */
   private life: BunkerLife | null = null;
   /** what the rooms were dressed with, level by level */
-  private dressed: { level: number; look: (r: number, f: number) => void }[] = [];
+  private dressed: { level: number; look: (r: number, f: number) => void; load: () => void }[] = [];
   private liftOpen = false;
   private poweredAt = -1e6;
   private waking = 0;
@@ -419,7 +419,8 @@ export class BunkerSite {
     const outside = mat(new THREE.MeshStandardMaterial({ map: concretePaint(17, [128, 126, 116]), roughness: 0.94, metalness: 0 }));
     const inside = mat(new THREE.MeshStandardMaterial({ map: concretePaint(4711, [112, 114, 106]), roughness: 0.9, metalness: 0 }));
     const floor = mat(new THREE.MeshStandardMaterial({ map: concretePaint(909, [86, 88, 84]), roughness: 0.8, metalness: 0 }));
-    const steel = mat(new THREE.MeshStandardMaterial({ color: 0x4a504b, roughness: 0.55, metalness: 0.7 }));
+    // (metal shines with what is round it, and there is nothing round it down here: at the metalness of a real steel the ladders, cages and rails stood as black shapes)
+    const steel = mat(new THREE.MeshStandardMaterial({ color: 0x565c57, roughness: 0.6, metalness: 0.22 }));
     const group = new THREE.Group();
     group.position.set(P.x, P.y, P.z);
     group.rotation.y = P.rot;
@@ -565,8 +566,8 @@ export class BunkerSite {
     const Dr = B.door;
 
     // ---- what was made for it. Each is built about its own middle, facing forward, and stood where the plan says.
-    const olive = mat(new THREE.MeshStandardMaterial({ map: steelPaint(11, [70, 82, 62]), roughness: 0.6, metalness: 0.45 }));
-    const grey = mat(new THREE.MeshStandardMaterial({ map: steelPaint(29, [96, 100, 98]), roughness: 0.5, metalness: 0.6 }));
+    const olive = mat(new THREE.MeshStandardMaterial({ map: steelPaint(11, [70, 82, 62]), roughness: 0.65, metalness: 0.2 }));
+    const grey = mat(new THREE.MeshStandardMaterial({ map: steelPaint(29, [96, 100, 98]), roughness: 0.6, metalness: 0.2 }));
     const dark = mat(new THREE.MeshStandardMaterial({ color: 0x191a18, roughness: 0.7, metalness: 0.4 }));
     const cloth = mat(new THREE.MeshStandardMaterial({ color: 0x4d4a3a, roughness: 0.97 }));
     const hazard = mat(new THREE.MeshStandardMaterial({ color: 0xb8922a, roughness: 0.6, metalness: 0.3 }));
@@ -797,7 +798,7 @@ export class BunkerSite {
       physics.addStatic(physics.R.ColliderDesc.cuboid(s.w / 2, s.h / 2, s.d / 2), 'metal', { x, y, z }, P.rot + s.rot);
     });
     const level = Y === levelY(3) ? 3 : Y === levelY(2) ? 2 : 1;
-    this.dressed.push({ level, look: dressed.look });
+    this.dressed.push({ level, look: dressed.look, load: dressed.load });
     (this.life ??= new BunkerLife(P, group)).add(level, Y, dressed.life);
     };
     furnish(plan, Y);
@@ -1210,7 +1211,10 @@ export class BunkerSite {
     }
     if (this.all) {
       const near = Math.hypot(eye.x - P.x, eye.z - P.z);
-      if (near < 130) this.works?.loadLooks();
+      if (near < 130) {
+        this.works?.loadLooks();
+        for (const d of this.dressed) d.load();
+      }
       const [wr, wf] = bunkerLocal(P, eye.x, eye.y, eye.z);
       this.all.visible = near < SEEN_FROM || inWings(wr, wf, 16);
       if (this.all.visible) this.buried(this.all, P, eye, near);

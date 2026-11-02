@@ -210,7 +210,7 @@ export class DeepWorks {
     this.glass = s.mat(new THREE.MeshStandardMaterial({ color: 0xa8c8c4, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.17, depthWrite: false, side: THREE.DoubleSide }));
     const map = deckPaint();
     map.repeat.set(1, 1);
-    this.tread = s.mat(new THREE.MeshStandardMaterial({ map, roughness: 0.6, metalness: 0.55 }));
+    this.tread = s.mat(new THREE.MeshStandardMaterial({ map, roughness: 0.65, metalness: 0.22 }));
     this.water = s.mat(new THREE.MeshStandardMaterial({ color: 0x0c1412, roughness: 0.06, metalness: 0.6, transparent: true, opacity: 0.86, depthWrite: true }));
   }
 
@@ -372,7 +372,7 @@ export class DeepWorks {
     }
     for (let y = y0 + 0.3; y < y1 - 0.05; y += 0.3) {
       const cr = r + nr * 0.05, cf = f + nf * 0.05, wr = Math.abs(tr) * 0.25 + 0.018, wf = Math.abs(tf) * 0.25 + 0.018;
-      this.box(cr - wr, cr + wr, cf - wf, cf + wf, y - 0.018, y + 0.018, this.s.dark);
+      this.box(cr - wr, cr + wr, cf - wf, cf + wf, y - 0.018, y + 0.018, s);
     }
     if (y1 - y0 > 3.4) for (let y = y0 + 2.3; y < y1 - 0.3; y += 0.9) {
       // (a hoop of the cage, round the back of whoever climbs)

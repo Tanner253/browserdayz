@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-01T12:56:51.312Z",
+ "generated": "2026-11-02T05:07:15.727Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -15233,9 +15233,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 176532,
-   "srcTris": 8965,
-   "tris": 8965,
+   "bytes": 540524,
+   "srcTris": 16642,
+   "tris": 16642,
    "min": [
     -0.2831,
     0,
@@ -15253,9 +15253,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 328124,
-   "srcTris": 6931,
-   "tris": 6931,
+   "bytes": 585312,
+   "srcTris": 12846,
+   "tris": 12846,
    "min": [
     -0.3163,
     0,
@@ -15263,7 +15263,7 @@
    ],
    "max": [
     0.3163,
-    1.5996,
+    1.5997,
     0.2335
    ],
    "lods": []
@@ -15273,9 +15273,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 219116,
-   "srcTris": 4453,
-   "tris": 4453,
+   "bytes": 371996,
+   "srcTris": 8330,
+   "tris": 8330,
    "min": [
     -0.1374,
     0,
@@ -15293,9 +15293,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 200708,
-   "srcTris": 2700,
-   "tris": 2700,
+   "bytes": 348656,
+   "srcTris": 7674,
+   "tris": 7674,
    "min": [
     -0.2097,
     0,
@@ -15313,18 +15313,18 @@
    "tags": [
     "prop"
    ],
-   "bytes": 280504,
-   "srcTris": 5510,
-   "tris": 5510,
+   "bytes": 457924,
+   "srcTris": 8607,
+   "tris": 8607,
    "min": [
     -0.2,
     0,
-    -0.1489
+    -0.1476
    ],
    "max": [
     0.2,
-    0.1847,
-    0.1489
+    0.1987,
+    0.1476
    ],
    "lods": []
   }
