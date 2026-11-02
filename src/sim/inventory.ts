@@ -866,7 +866,10 @@ export class PlayerInventory {
   }
 
   count(id: string) {
-    return this.containers.reduce((s, c) => s + c.count(id), 0);
+    // (and what is in the hands, as `take` reaches it and the server's `carries` sees it: with full pockets a thing taken up goes there, and a reader went on saying Locked to the card in them.
+    // The owner, 2026-11-02: "i picked up a bunker 3 card while i was in vinicnity for the door and it didnt update")
+    const h = this.slots.held;
+    return this.containers.reduce((s, c) => s + c.count(id), 0) + (h?.id === id ? h.qty : 0);
   }
 
   take(id: string, n: number) {

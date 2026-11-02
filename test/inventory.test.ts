@@ -822,4 +822,13 @@ ok('keys 1 and 2 are the back\'s whatever moves (the owner: "the 1 and 2 hotkey 
   assert.equal(inv.hotOf(sniper), -1);
 });
 
+ok('what is in the hands is counted, as it can be taken', () => {
+  const inv = new PlayerInventory(), card = makeItem('card_purple');
+  assert.equal(inv.count('card_purple'), 0);
+  inv.slots.held = card;
+  assert.equal(inv.count('card_purple'), 1, 'a card in the hands is carried');
+  assert.equal(inv.take('card_purple', 1), 1);
+  assert.equal(inv.count('card_purple'), 0, 'and gone when it is taken');
+});
+
 console.log(`\n${n} checks passed`);
