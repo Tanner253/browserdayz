@@ -740,7 +740,9 @@ setInterval(() => {
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
   // (the bunker's are not put back while its door stands open; by its own mark, as the caves' homes are no open ground either)
   horde.crowd(eventOn(now) ? EVENT.crowd : 1);
-  const turn = horde.tick(now,[...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.bunker && bunkerDoor.open);
+  // (whoever has fought their way down has the place cleared for as long as they hold it, however they came: Levels 2 and 3 are come to by the train and the stair, with the blast door shut)
+  const below = [...clients.values()].some((c) => c.alive && !away(c) && !c.power.hidden && inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], 2.5));
+  const turn = horde.tick(now,[...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.bunker && (bunkerDoor.open || below));
   for (const i of turn.gone) {
     broadcast({ t: 'i-', i });
     // (and what is left in its body goes with it; with somebody in it, when they are done, as a player's body does)

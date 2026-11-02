@@ -217,6 +217,12 @@ export function guarded(x: number, z: number, yaw: number, fx: number, fz: numbe
 export type Spot = [number, number, number, number?];
 
 /** somewhere they live: the middle of it, how far out they are found, and how many */
+/**
+ * How long after one goes down the bunker puts another back, seconds, by level: the surface's 260 was a whole level full again before anybody had got through it, and those who come by the train
+ * come a long way (the owner, 2026-11-02: "zombies respawning in bunker way too fast escpecially bunker lvl 3").
+ */
+export const BUNKER_BACK = { 1: 600, 2: 900, 3: 1500 };
+
 export interface Home {
   x: number;
   z: number;
@@ -224,8 +230,10 @@ export interface Home {
   n: number;
   /** a place that is not open ground (the bunker): the spots they turn up at, and no others (and in the bunker, which of its rooms or passages each is in) */
   inside?: Spot[];
-  /** the bunker's: none comes back while its door is open */
+  /** the bunker's: none comes back while its door is open, or anybody is down there */
   bunker?: boolean;
+  /** how long after one of its goes down another is owed, seconds (none: INFECTED.respawn) */
+  back?: number;
   /** its ones are still ones (`InfectedInfo.w`) */
   still?: boolean;
 }
@@ -403,8 +411,8 @@ export function infectedHomes(world: World): Home[] {
   const works = world.sites.find((s) => s.kind === 'works');
   if (works) homes.push({ x: works.x, z: works.z, r: WORKS_REACH, n: AT_WORKS });
   const below = bunkerSpots(world), rooms = bunkerSpots(world, true), bunker = world.sites.find((s) => s.kind === 'bunker');
-  if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_PASSAGES, inside: below, bunker: true });
-  if (bunker && rooms.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_ROOMS, inside: rooms, bunker: true, still: true });
+  if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_PASSAGES, inside: below, bunker: true, back: BUNKER_BACK[1] });
+  if (bunker && rooms.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_ROOMS, inside: rooms, bunker: true, still: true, back: BUNKER_BACK[1] });
   if (bunker) homes.push({ x: bunker.x, z: bunker.z, r: 40, n: OVER_BUNKER });
   for (const s of world.sites) if (!EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
@@ -429,9 +437,9 @@ export function infectedHomes(world: World): Home[] {
   for (const h of fort) homes.push(h);
   // (and the levels under the first: asleep in their rooms, and more of them the deeper it goes)
   if (world.towns) homes.push({ x: MINE.hall.x, z: MINE.z, r: 120, n: mineSpots().length, inside: mineSpots(), still: true });
-  if (bunker) for (const [level, n] of [[2, 14], [3, 15]]) homes.push({ x: bunker.x, z: bunker.z, r: 30, n, inside: bunkerSpots(world, true, level), bunker: true, still: true });
+  if (bunker) for (const [level, n] of [[2, 14], [3, 15]] as const) homes.push({ x: bunker.x, z: bunker.z, r: 30, n, inside: bunkerSpots(world, true, level), bunker: true, still: true, back: BUNKER_BACK[level] });
   // (and Level 1's wings: in their own rooms, and put back only with the door shut, as the rest of the bunker's are)
-  if (bunker && wingSpots(world).length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: 16, inside: wingSpots(world), bunker: true, still: true });
+  if (bunker && wingSpots(world).length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: 16, inside: wingSpots(world), bunker: true, still: true, back: BUNKER_BACK[1] });
   return homes.filter((h) => h.n > 0);
 }
 
@@ -669,7 +677,7 @@ export class Director {
       b.s[5] = 0;
       b.own = null;
       // (owed from when it went down, not from when its body is cleared away; one an admin stood lived nowhere, and nothing is owed for it)
-      if (b.home >= 0 && this.stood(b.home) < this.homes[b.home].n * this.times) this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
+      if (b.home >= 0 && this.stood(b.home) < this.homes[b.home].n * this.times) this.due.push({ home: b.home, at: now + (this.homes[b.home].back ?? INFECTED.respawn) * 1000 });
     }
     return { hp: b.hp, dead: b.hp <= 0 };
   }

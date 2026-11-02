@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { generateWorld, bunkerPlace } from '../src/world/worldgen';
 import { BUNKER, bunkerLocal, bunkerPlan, bunkerWays, levelY } from '../src/sim/bunker';
-import { Director, HOUSE, crosses, homeSpot, infectedHomes, roundHouse } from '../src/sim/infected';
+import { BUNKER_BACK, Director, HOUSE, crosses, homeSpot, infectedHomes, roundHouse } from '../src/sim/infected';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -115,7 +115,7 @@ ok('the director stands them all, the still ones marked so for every game, and p
   if (cave) assert.equal(caveBack, 1, 'a cave one waited on the bunker door');
   // shut: both come back, the still one still
   let again: number[] = [];
-  for (let t = 400; t < 420; t++) again = again.concat(d.tick(t * 1000, []).added.filter((b) => homes[b.home].bunker).map((b) => b.w ?? 0));
+  for (let t = BUNKER_BACK[1] + 31; t < BUNKER_BACK[1] + 60; t++) again = again.concat(d.tick(t * 1000, []).added.filter((b) => homes[b.home].bunker).map((b) => b.w ?? 0));
   assert.deepEqual(again.sort(), [0, 1]);
 });
 
@@ -146,6 +146,19 @@ ok('up top, round the house and its yard, never through it', () => {
   // with nothing in the way it walks straight
   assert.equal(roundHouse(-10, 0, -10, 30), null);
   assert.equal(roundHouse(10, 2, -10, 2), null);
+});
+
+ok('the bunker is slower to fill the deeper it goes, and none comes back while it is held', () => {
+  const home = { x: 0, z: 0, r: 30, n: 1, inside: [{ x: 0, y: 0, z: 0 }], bunker: true, still: true, back: BUNKER_BACK[3] };
+  const d = new Director([home as never], () => ({ x: 0, y: 0, z: 0 }), () => 0.5);
+  const one = d.tick(0, []).added[0];
+  assert.ok(one, 'it stands');
+  d.hurt(one.i, 1e6, 1000);
+  const owed = (at: number, held = false) => d.tick(at, [], () => held).added.length;
+  assert.equal(owed(1000 + 260_000), 0, 'not by the surface time');
+  assert.equal(owed(1000 + BUNKER_BACK[3] * 1000 + 1, true), 0, 'nor while somebody holds the place, however long it has been owed');
+  assert.equal(owed(1000 + BUNKER_BACK[3] * 1000 + 2), 1, 'and it comes when they have gone');
+  assert.ok(BUNKER_BACK[1] < BUNKER_BACK[2] && BUNKER_BACK[2] < BUNKER_BACK[3], 'the deeper the slower');
 });
 
 console.log(`${n} passed`);
