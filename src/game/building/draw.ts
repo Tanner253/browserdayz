@@ -114,6 +114,8 @@ interface Drawn {
 
 /** a leaf's turn at `a` of the way open (eased: quick to start, soft to stop) */
 const angleAt = (l: Leaf, a: number) => l.open * a * a * (3 - 2 * a);
+/** how much of a door that rolls is left below its head at `a`: what is drawn and what stops a body are the one figure */
+const leftOf = (l: Leaf, a: number) => (l.rolls ? Math.max(0.015, 1 - angleAt(l, a) / l.open) : 1);
 
 export class BaseDraw {
   private meshes = new Map<string, THREE.InstancedMesh>();
@@ -298,7 +300,7 @@ export class BaseDraw {
     leaves.forEach((l, i) => {
       _h.makeTranslation(l.hinge[0], l.hinge[1], l.hinge[2]);
       // (the owner, 2026-11-01: "the station door is how garage doors should open ... we can unrender the garage door top as it goes up so it dissapears": smoke and mirrors, it runs up into the head)
-      if (l.rolls) _h.multiply(_m.makeScale(1, Math.max(0.015, 1 - angleAt(l, d.a) / l.open), 1));
+      if (l.rolls) _h.multiply(_m.makeScale(1, leftOf(l, d.a), 1));
       else _h.multiply(_m.makeRotationAxis(l.axis === 'y' ? _up : _x, angleAt(l, d.a)));
       d.parts[first + i].matrix.multiplyMatrices(d.frame, _h);
     });
@@ -349,7 +351,7 @@ export class BaseDraw {
       const mid = swing.solid.find((q) => 'box' in q), room = mid && 'box' in mid ? Math.sign(leafPoint(swing, swing.open, [mid.box[0], mid.box[1], mid.box[2]])[2]) || 1 : 1;
       if (room * local.z > -0.05) {
         const want = room * (DOOR.body + 0.2) - local.z, step = Math.sign(want) * Math.min(Math.abs(want), PUSH_STEP);
-        d.frame.decompose(_s, _q, _p);
+        d.frame.decompose(_p, _q, _s);
         return out.set(0, 0, step).applyQuaternion(_q);
       }
     }
@@ -371,9 +373,9 @@ export class BaseDraw {
     return leaves.some((l, i) => l.solid.some((s) => {
       if (!('box' in s)) return false;
       const [cx, cy, cz, sx, sy, sz] = s.box;
-      d.parts[first + i].matrix.decompose(_s, _q, _p);
+      d.parts[first + i].matrix.decompose(_p, _q, _s);
       _p.set(cx, cy, cz).applyMatrix4(d.parts[first + i].matrix);
-      return physics.world.intersectionWithShape(_p, _q, new physics.R.Cuboid(sx / 2, (sy / 2) * _s.y, sz / 2), undefined, BODY_QUERY) !== null;
+      return physics.world.intersectionWithShape(_p, _q, new physics.R.Cuboid(sx / 2, (sy / 2) * leftOf(l, d.a), sz / 2), undefined, BODY_QUERY) !== null;
     }));
   }
 
@@ -397,14 +399,14 @@ export class BaseDraw {
       }
       const cols = d.leafCols?.[i];
       if (!cols) return;
-      q.matrix.decompose(_s, _q, _p);
+      q.matrix.decompose(_p, _q, _s);
       l.solid.forEach((s, k) => {
         if (!('box' in s) || !cols[k]) return;
         _p.set(s.box[0], s.box[1], s.box[2]).applyMatrix4(q.matrix);
         cols[k].setTranslation({ x: _p.x, y: _p.y, z: _p.z });
         cols[k].setRotation({ x: _q.x, y: _q.y, z: _q.z, w: _q.w });
         // (a door that rolls away is that much less of a door: it does not turn, and left its full size it stood in the opening with nothing drawn. The owner, 2026-11-01: "the collision does not gi away and i cant eactually enter the doorways")
-        if (l.rolls) cols[k].setHalfExtents({ x: s.box[3] / 2, y: (s.box[4] / 2) * _s.y, z: s.box[5] / 2 });
+        if (l.rolls) cols[k].setHalfExtents({ x: s.box[3] / 2, y: (s.box[4] / 2) * leftOf(l, d.a), z: s.box[5] / 2 });
       });
     });
   }
