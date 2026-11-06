@@ -846,3 +846,6 @@ body.tr-tall .x28-clock { top: 240px; }
 .x28-clock { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); text-align: center; text-shadow: 0 3px 16px rgba(0, 0, 0, 0.85); }
 .x28-clock i { display: block; font: 800 24px/1 var(--trailer-font); font-style: normal; letter-spacing: 0.24em; color: #f2ede2; margin-bottom: 6px; }
 .x28-clock b { display: block; font: 800 92px/1 var(--trailer-font); letter-spacing: 0.02em; color: #ffd35a; font-variant-numeric: tabular-nums; }
+/* the thirtieth film: the line over the six cards */
+.x30-chain { position: absolute; left: 0; right: 0; top: 70px; text-align: center; }
+.x30-chain b { font: 800 46px/1 var(--trailer-font); letter-spacing: 0.14em; color: #f2ede2; text-shadow: 0 4px 26px rgba(0, 0, 0, 0.9); }

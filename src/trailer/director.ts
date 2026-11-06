@@ -439,6 +439,8 @@ let pumping = true;
 function hookAudio() {
   const plain = (v: unknown): unknown => (v && typeof v === 'object' && 'x' in (v as Any) ? { x: (v as Any).x, y: (v as Any).y, z: (v as Any).z } : v);
   const names = ['gunshot', 'dryFire', 'click', 'blow', 'boltCycle', 'reloadNear', 'magOut', 'magIn', 'shellIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'infected', 'setListener', 'updateAmbience'];
+  // (the thirtieth goes down the bunker: its door, its gates and what lives in it are heard too)
+  if (CUT === 30) names.push('blastDoor', 'lightGate', 'alarm', 'drip', 'spark', 'flies', 'beep');
   for (const n of names) {
     (audio as unknown as Any)[n] = (...a: unknown[]) => {
       if (logging && !S.mute) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });
@@ -490,8 +492,10 @@ async function stage() {
     g.horde.director = null;
   }
   // a grenade's blast reaches the stand-in players as it would real ones: the game draws it, this keeps the score
-  const explode = g.explode.bind(g);
+  const explode = g.explode.bind(g), own = g.grenades.onExplode;
   g.grenades.onExplode = (at: THREE.Vector3, mine: boolean, id?: string) => {
+    // (a flare or a smoke grenade is no blast: the game's own way with them, src/game/toys.ts)
+    if (id === 'ammo_flare' || id === 'smoke_grenade') return own(at, mine, id);
     // (which grenade it was is passed on, as the game passes it: a frag goes off as a frag. The films before the tenth threw only the stick grenade, which is what is meant when nothing is said.)
     explode(at, mine, id === 'frag' ? 'frag' : 'grenade');
     for (const a of S.actors) {
@@ -582,7 +586,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 29) {
+  if (CUT === 30) {
+    // (the thirtieth is "The way down", the card chain to the vault on Level 3, for X: see shots30.ts)
+    const cut = await import('./shots30');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds();
+    ownScore = cut.score;
+  } else if (CUT === 29) {
     // (the twenty-ninth is "Friendly", a music video for phones: see shots29.ts)
     const cut = await import('./shots29');
     shots = cut.buildShots(S);
