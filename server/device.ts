@@ -38,7 +38,9 @@ export const DEVICE = {
    * DEVICE_FARM=watch and /unban them. The device kept off for being sent back again and again is applied as `mode` says.
    */
   farm: (process.env.DEVICE_FARM === 'watch' ? 'watch' : 'enforce') as 'watch' | 'enforce',
-  live: process.env.DEVICE_LIVE === undefined ? 2 : Math.max(0, Number(process.env.DEVICE_LIVE) || 0),
+  // (any number at once until DEVICE_LIVE is set again: a café's machines are one model, one screen, one card and one zone, and say one device. the owner, 2026-11-06, for a gaming café, every machine of it behind one address: "we need to allow multiple connections from same ip, for now".
+  // A farm, one device from many addresses, is still kept off)
+  live: process.env.DEVICE_LIVE === undefined ? 0 : Math.max(0, Number(process.env.DEVICE_LIVE) || 0),
   spread: process.env.DEVICE_SPREAD === undefined ? 3 : Math.max(0, Number(process.env.DEVICE_SPREAD) || 0),
   within: 3600_000,
   hours: Number(process.env.DEVICE_HOURS) || 24,

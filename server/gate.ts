@@ -98,7 +98,8 @@ export function flooding(ip: string): boolean {
   return times.length > HELLOS_A_MINUTE;
 }
 
-const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 20;
+// (a room of them starting at once says more than twenty: the owner, 2026-11-06, for a gaming café, every machine of it behind one address: "we need to allow multiple connections from same ip, for now")
+const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 120;
 
 // ---- the bot check (2026-10-12: "lets build our own bot detector... no ip can reach the server and join the game
 // without passing this bot check. the players character wont spawn in the game and they wont join the game server
@@ -753,9 +754,10 @@ export function deviceRules(key: string, ip: string, fp: string, name: string): 
  * How many may play from one address at a time (PER_ADDRESS; 0: any number). Asked for 2026-10-11, the day of
  * the cheats: "we should limit 1 connection per IP". It costs two friends in one house their game together, and
  * a whole street behind one address on some phone networks: it is the owner's to set. Whoever has a role is not
- * counted or refused, and it is not asked while the host hides addresses (see ipsTellApart).
+ * counted or refused, and it is not asked while the host hides addresses (see ipsTellApart). Any number until it is
+ * set again (the owner, 2026-11-06, for a gaming café, every machine of it behind one address: "we need to allow multiple connections from same ip, for now").
  */
-export const PER_ADDRESS = process.env.PER_ADDRESS === undefined ? 1 : Math.max(0, Number(process.env.PER_ADDRESS) || 0);
+export const PER_ADDRESS = process.env.PER_ADDRESS === undefined ? 0 : Math.max(0, Number(process.env.PER_ADDRESS) || 0);
 
 export function addressFull(key: string, ip: string): boolean {
   if (!PER_ADDRESS || !publicIp(ip) || !ipsTellApart() || ADMIN.state.roles[keyHash(key)]) return false;

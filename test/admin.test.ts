@@ -267,7 +267,7 @@ if (ALL) await withServer(async () => {
   assert.match(await ann.order('/demote Cat'), /Nobody online is "Cat"/);
   checks++;
   console.log('  ok  after a restart the admin is an admin and the banned are banned; a ban is of a key, not a name; one who has left can be banned; an unban lets them in');
-});
+}, { PER_ADDRESS: '1' });
 
 // ---- what an admin can do that nobody else can: the lists, going and bringing, things, the powers
 if (ALL) await withServer(async () => {
