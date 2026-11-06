@@ -12,7 +12,6 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { WebSocketServer } from 'ws';
 import { buildWorldData } from './world';
-import { EVENT, eventOn } from '../api/_lib/event';
 import { Economy, lootPrint, type WorldLoot } from '../src/sim/economy';
 import { type SerializedInventory, Container, keepHotHeld } from '../src/sim/inventory';
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
@@ -739,7 +738,6 @@ setInterval(() => {
   }
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
   // (the bunker's are not put back while its door stands open; by its own mark, as the caves' homes are no open ground either)
-  horde.crowd(eventOn(now) ? EVENT.crowd : 1);
   // (whoever has fought their way down has the place cleared for as long as they hold it, however they came: Levels 2 and 3 are come to by the train and the stair, with the blast door shut)
   const below = [...clients.values()].some((c) => c.alive && !away(c) && !c.power.hidden && inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], 2.5));
   const turn = horde.tick(now,[...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.bunker && (bunkerDoor.open || below));
