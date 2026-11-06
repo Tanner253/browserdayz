@@ -40,7 +40,10 @@ export function shots30(c: Ctx) {
   const title = piece('x28-title', '<img src="/brand/zona-mark.svg" alt=""><b>ZONA</b><u>THE WAY DOWN</u><i>BUNKER 17 GOES THREE LEVELS DEEP</i>');
   const end = piece('x28-end', '<img src="/brand/zona-mark.svg" alt=""><b>ZONA</b><u>THE WAY DOWN</u><h5>FREE · PLAYS IN YOUR BROWSER · NO DOWNLOAD</h5><em>WWW.ZONAPVP.FUN</em>');
   const chain = piece('x30-chain', '<b>SIX CARDS · THREE LEVELS · ONE VAULT</b>');
-  cleaners.push(() => { for (const el of [title, end, chain]) el.style.display = 'none'; });
+  cleaners.push(() => {
+    for (const el of [title, end, chain]) el.style.display = 'none';
+    c.chip.style.top = c.chip.style.bottom = '';
+  });
   const fade = (t: number, a: number, b: number, k = 0.35) => (t < a || t > b ? 0 : Math.min(1, (t - a) / k, (b - t) / k));
 
   // ------------------------------------------------------------ the infected: the bunker's in their orange suits, and the stops' own
@@ -181,7 +184,7 @@ export function shots30(c: Ctx) {
         lightHands();
         kit(['flashlight', 'ak', ['ammo_762', 30]]);
         S.hold('primary');
-        const me = BW(1, 0, H0.front - 10), far = BW(1, 0.3, H0.front - 24);
+        const me = BW(1, 0, H0.front - 10), far = BW(1, 0, H0.front - 20.5);
         S.me(me.x, me.z, yawTo(me, far), 0, me.y);
         await run(20);
         S.tap('KeyL');
@@ -189,15 +192,20 @@ export function shots30(c: Ctx) {
         dropped = false;
         await run(16);
         if (z) onTo(z, far);
-        await run(100);
         hand.set(yawTo(eye(), z ? zedAt(z) : far), -0.03);
         if (z) hand.look(-0.3, () => zedAt(z), true, 0);
       },
       tick: (t, _S, dt) => {
         look(t, dt);
         const near = z ? Math.hypot(z.pos.x - P().pos.x, z.pos.z - P().pos.z) : 99;
-        if (z && Math.abs(t % 0.5) < 0.02) say(`zed at ${t.toFixed(1)}: ${z.pos.x.toFixed(1)},${z.pos.y.toFixed(1)},${z.pos.z.toFixed(1)} mode ${z.mode} ${near.toFixed(1)} m, dead ${z.dead}, seen ${z.avatar?.root?.visible}`);
-        S.key('Mouse0', !dropped && near < 8.5 && t % 0.32 < 0.12);
+        // (it has him in sight down the passage: kept after him, as one is that has seen somebody)
+        if (z && !dropped && t < 1.5) {
+          z.mode = I_CHASE;
+          z.after = (g.horde as Any).host.me().id;
+          z.seenAt = performance.now();
+          z.lastSeen?.copy(P().pos);
+        }
+        S.key('Mouse0', !dropped && near < 6.5 && t % 0.32 < 0.12);
         if (z && !dropped && near < 5.2) {
           dropped = true;
           c.infected.dropZ(z, eye());
@@ -206,44 +214,30 @@ export function shots30(c: Ctx) {
       after: chipIn(1.5 * BAR30, 'NOT ALONE', 'THE INFECTED LIVE DOWN HERE', 0.5),
     });
   }
-  // the blue pass: lying where it was found, seen low beside it; he comes up, bends and takes it (the game's own bend)
-  {
-    const op = new Operator(BRACED, 3008, 40);
-    let card = V(0, 0, 0), lens = V(0, 0, 0), aim = V(0, 0, 0);
-    shot(1, 'blue-pass', {
-      m: 'loot',
-      setup: async () => {
-        g.bunker.setOpen(true, true);
-        kit(['flashlight']);
-        S.hold(null);
-        card = BW(1, 0.45, H0.front - 7.2);
-        card.y = ground.floorAt(card.x, card.z, card.y + 0.5);
-        c.lie('card_blue', card, 0.5);
-        await c.dressedNow();
-        const me = BW(1, 0.1, H0.front - 4.4), stop = BW(1, 0.2, H0.front - 6.5);
-        S.me(me.x, me.z, yawTo(me, card), -0.4, me.y);
-        lay([me, stop], { walk: true, stop: 0.2 });
-        hand.set(P().yaw, -0.5);
-        hand.look(-0.4, card, true, 0);
-        await run(20);
-        S.tap('KeyL');
-        await run(30);
-        // (beside the card, a hand's height off the floor, looking past it at him coming)
-        lens = BW(1, -0.75, H0.front - 7.75, 0.3);
-        lens.y = card.y + 0.3;
-        aim = card.clone().lerp(me, 0.25).setY(card.y + 0.18);
-        op.reset(lens, aim);
-        say(`blue pass: card ${card.x.toFixed(2)},${card.y.toFixed(2)},${card.z.toFixed(2)} lens ${lens.x.toFixed(2)},${lens.y.toFixed(2)},${lens.z.toFixed(2)} me ${P().pos.x.toFixed(2)},${P().pos.y.toFixed(2)},${P().pos.z.toFixed(2)}`);
-      },
-      tick: (t, _S, dt) => {
-        legs();
-        look(t, dt);
-        when(t, 1.45, 'take', () => S.tap('KeyF'));
-      },
-      cam: (t) => op.update(t, lens, aim.clone().lerp(card, Math.min(1, t / 1.4) * 0.6)),
-      after: chipIn(BAR30, 'BLUE CLEARANCE PASS', 'FOUND ON LEVEL 1', 0.2),
-    });
-  }
+  // the blue pass: found, and held up to the torch
+  shot(1, 'blue-pass', {
+    m: 'loot',
+    setup: async () => {
+      g.bunker.setOpen(true, true);
+      lightHands(2, 1.3);
+      kit(['card_blue', 'flashlight']);
+      S.hold(null);
+      const me = BW(1, 0, H0.front - 6), on = BW(1, 0, H0.front - 16, 1.0);
+      S.me(me.x, me.z, yawTo(me, on), -0.1, me.y);
+      hand.set(P().yaw, -0.12);
+      hand.look(-0.4, on, true, 0);
+      await run(20);
+      g.takeUp([...g.inv.carried()].find((i: Any) => i.id === 'card_blue'));
+      S.tap('KeyL');
+      await run(50);
+    },
+    tick: (t, _S, dt) => look(t, dt),
+    after: (t) => {
+      chipSay(t, 0.2, BAR30 - 0.08, 'BLUE CLEARANCE PASS', 'FOUND ON LEVEL 1');
+      c.chip.style.top = '64px';
+      c.chip.style.bottom = 'auto';
+    },
+  });
 
   // ============================================================ THE CHAIN
   // Stolovaya: the blue pass held to the reader, the beam, the lamp gone green, the strong room's door opening, a flare up
@@ -300,34 +294,29 @@ export function shots30(c: Ctx) {
       after: chipIn(2 * BAR30, 'STOLOVAYA', 'THE BLUE PASS OPENS THE STRONG ROOM'),
     });
   }
-  // the Old Mine: the torch-lit hoist room, and him coming up the drift out of the dark toward it (the yellow pass opens its gates)
-  {
-    const op = new Operator(BRACED, 3010, 44);
-    const lens = V(MINE.hall.x - 3, MINE.y + 1.55, MINE.z + 1.6), aim = V(MINE.hall.x - 16, MINE.y + 1.2, MINE.z);
-    shot(1.5, 'mine', {
-      m: 'sneak',
-      under: true,
-      setup: async () => {
-        kit(['card_yellow', 'flashlight'], {}, ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack']);
-        S.hold(null);
-        gate('mine', true, 900);
-        const a = V(MINE.hall.x - 19, MINE.y, MINE.z), b = V(MINE.hall.x - 6, MINE.y, MINE.z + 0.6);
-        S.me(a.x, a.z, yawTo(a, b), 0, MINE.y + 0.05);
-        lay([a, b], { walk: true, stop: 0.5 });
-        hand.set(P().yaw, 0);
-        hand.look(-0.4, ahead(9), true, 0);
-        await c.dressedNow();
-        await run(120);
-        op.reset(lens, aim);
-      },
-      tick: (t, _S, dt) => {
-        legs();
-        look(t, dt);
-      },
-      cam: (t) => op.update(t, lens, aim.clone().lerp(eye().add(V(0, -0.3, 0)), Math.min(1, t / 1.2) * 0.5)),
-      after: chipIn(1.5 * BAR30, 'THE OLD MINE', 'THE YELLOW PASS OPENS ITS GATES'),
-    });
-  }
+  // the Old Mine: along the drift by its torches, toward the hoist room (the yellow pass opens its gates)
+  shot(1.5, 'mine', {
+    m: 'sneak',
+    under: true,
+    setup: async () => {
+      lightHands(0.8, 0.5);
+      kit(['card_yellow'], {}, ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack']);
+      S.hold(null);
+      gate('mine', true, 900);
+      // (from past the fall, in the pool of the torch at the drift's turn, slowing to a stop before the dark between torches)
+      const a = V(MINE.hall.x - 26.5, MINE.y, MINE.z), b = V(MINE.hall.x - 21, MINE.y, MINE.z);
+      S.me(a.x, a.z, yawTo(a, b), 0, MINE.y + 0.05);
+      lay([a, b], { walk: true, stop: 0.5 });
+      hand.set(P().yaw, 0);
+      hand.look(-0.4, ahead(9), true, 0);
+      await run(150);
+    },
+    tick: (t, _S, dt) => {
+      legs();
+      look(t, dt);
+    },
+    after: chipIn(1.5 * BAR30, 'THE OLD MINE', 'THE YELLOW PASS OPENS ITS GATES'),
+  });
   // Bolotnaya: a valve turned as the swamp gives them up
   {
     const s = SITES.bolotnaya, op = new Operator(BRACED, 3003, 42);
@@ -339,8 +328,11 @@ export function shots30(c: Ctx) {
         const [vx, vz] = townPoint(s.town, s.steps!.at[0][0], s.steps!.at[0][1]), [mx, mz] = sitePoint(s, s.room);
         valve = V(vx, 0, vz);
         valve.y = ground.floorAt(vx, vz);
-        const out = V(vx - mx, 0, vz - mz).normalize(), side = V(-out.z, 0, out.x);
-        const me = valve.clone().addScaledVector(out, 0.9);
+        // (he stands at the wheel's face: it is set 0.42 m off its stand on this bearing, src/world/pump-works.ts. The owner on
+        // the first draft: "the player is on wrong side of the wheel")
+        void mx; void mz;
+        const out = V(Math.sin(2.09), 0, Math.cos(2.09)), side = V(-out.z, 0, out.x);
+        const me = valve.clone().addScaledVector(out, 1.0);
         me.y = ground.floorAt(me.x, me.z);
         kit([], {}, ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack']);
         S.hold(null);
@@ -372,37 +364,42 @@ export function shots30(c: Ctx) {
       after: chipIn(1.5 * BAR30, 'BOLOTNAYA', '3 VALVES · 6 MINUTES'),
     });
   }
-  // the goods lift: the Level 2 keycard opens it; from Level 1's side he goes down in the cab
-  {
-    const op = new Operator(BRACED, 3009, 44);
-    let lens = V(0, 0, 0);
-    shot(1, 'lift', {
-      m: 'sneak',
-      under: true,
-      setup: async () => {
-        g.bunker.setOpen(true, true);
-        kit(['card_red'], {}, ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack']);
-        S.hold(null);
-        gate('lift', true, 1800);
-        const me = BW(1, CAB.r, (CAB.back + CAB.front) / 2);
-        lens = BW(1, CAB.r - 0.4, CAB.front + 2.9, 1.5);
-        S.me(me.x, me.z, yawTo(me, lens), 0, me.y + 0.05);
-        // (the shared clock set so the cab goes down just as the shot begins: liftAt's own phases)
-        const now = Date.now() / 1000;
-        let want = 0;
-        for (let k = 0; k < 4200; k++) {
-          const L = liftAt(k / 100), N = liftAt(k / 100 + 0.01);
-          if (L.y === 0 && N.y === 0 && L.left < 0.55 && L.left > 0.45) { want = k / 100; break; }
-        }
-        g.net.clockOff = (want - now - 80 / 60) * 1000;
-        await run(80);
-        op.reset(lens, eye());
-        say(`lift: me ${P().pos.x.toFixed(2)},${P().pos.y.toFixed(2)},${P().pos.z.toFixed(2)} lens ${lens.x.toFixed(2)},${lens.y.toFixed(2)},${lens.z.toFixed(2)} cab ${JSON.stringify(g.lift?.cabFor?.(P().pos))}`);
-      },
-      cam: (t) => op.update(t, lens, eye().add(V(0, -0.2, 0))),
-      after: chipIn(BAR30, 'LEVEL 2', 'THE GOODS LIFT · THE LEVEL 2 KEYCARD'),
-    });
-  }
+  // the goods lift: the cab standing at Level 2, its gate open, and him walking out of it into the Institute. (The ride
+  // itself is not filmed: the owner on the first draft, "the eleveator is glitched in the video")
+  shot(1, 'lift', {
+    m: 'sneak',
+    under: true,
+    setup: async () => {
+      g.bunker.setOpen(true, true);
+      lightHands(0.8, 0.5);
+      kit(['card_red', 'flashlight']);
+      S.hold(null);
+      gate('lift', true, 1800);
+      // (the shared clock set so the cab has just come to Level 2 and stands there the whole shot: liftAt's own phases)
+      const now = Date.now() / 1000;
+      let want = 0;
+      for (let k = 0; k < 4200; k++) {
+        const L = liftAt(k / 100);
+        if (L.stop === 2 && L.left < 11 && L.left > 10.9) { want = k / 100; break; }
+      }
+      g.net.clockOff = (want - now - 80 / 60) * 1000;
+      // (out of the cab and up to the decon's glass doors, which he stops short of)
+      const me = BW(2, CAB.r, CAB.back + 0.6), door = BW(2, 0, CAB.front + 1.2), on = BW(2, 0, CAB.front + 3.6, 1.3);
+      S.me(me.x, me.z, yawTo(me, door), 0, me.y + 0.05);
+      lay([me, door, on], { walk: true, stop: 0.3 });
+      hand.set(P().yaw, 0);
+      hand.look(-0.4, ahead(6), true, 0);
+      await run(20);
+      S.tap('KeyL');
+      await run(60);
+      say(`lift: cab ${JSON.stringify(g.lift?.cabFor?.(P().pos))}, me at ${P().pos.y.toFixed(2)} (level 2 ${BW(2, 0, 0).y.toFixed(2)})`);
+    },
+    tick: (t, _S, dt) => {
+      legs();
+      look(t, dt);
+    },
+    after: chipIn(BAR30, 'LEVEL 2', 'THE GOODS LIFT · THE LEVEL 2 KEYCARD'),
+  });
   // Level 2's plant: the jerrycan poured, the plant turning over, the lamps coming up
   {
     const op = new Operator(BRACED, 3004, 48);
@@ -415,7 +412,9 @@ export function shots30(c: Ctx) {
         const pl = bunkerPlan(2).made.find((m) => m.kind === 'generator')!;
         aim = BW(2, pl.r, pl.f, 1.0);
         lens = BW(2, pl.r + 3.2, pl.f + pl.d / 2 + 4.2, 1.65);
+        // (stood on the room's own floor, which is not the level's: the owner, "the player is gltiched through the ground")
         const me = BW(2, pl.r + 0.4, pl.f + pl.d / 2 + 0.75);
+        me.y = ground.floorAt(me.x, me.z, me.y + 1.5);
         kit(['jerrycan', 'flashlight']);
         S.hold(null);
         S.me(me.x, me.z, yawTo(me, aim), 0, me.y);
@@ -538,7 +537,7 @@ export function shots30(c: Ctx) {
   // ============================================================ GET IN
   // the six cards, the real things, laid on the great hall's floor with the round door behind them
   {
-    const op = new Operator(BRACED, 3007, 46);
+    const op = new Operator(BRACED, 3007, 40);
     const ids = ['keycard', 'card_blue', 'card_yellow', 'card_red', 'card_black', 'card_purple'];
     let row: THREE.Vector3[] = [], key: THREE.SpotLight | null = null;
     cleaners.push(() => { if (key) key.visible = false; });
@@ -568,12 +567,12 @@ export function shots30(c: Ctx) {
         key.position.copy(mid).add(V(0, 2.2, 0)).addScaledVector(fwdOf(bunker().rot), 1.2);
         key.target.position.copy(mid);
         await run(60);
-        op.reset(mid.clone().add(V(0, 0.32, 0)).addScaledVector(fwdOf(bunker().rot), 1.0), mid.clone().add(V(0, 0.04, 0)).addScaledVector(fwdOf(bunker().rot), -1.0));
+        op.reset(mid.clone().add(V(0, 0.22, 0)).addScaledVector(fwdOf(bunker().rot), 0.6), mid.clone().add(V(0, -0.05, 0)).addScaledVector(fwdOf(bunker().rot), -0.45));
       },
       cam: (t) => {
         // (from the hall side, low over the floor, the round door standing open behind the row)
         const mid = row[0].clone().lerp(row[5], 0.5), back = fwdOf(bunker().rot), k = t / (2 * BAR30);
-        return op.update(t, mid.clone().add(V(0, 0.32 - 0.04 * k, 0)).addScaledVector(back, 1.0 - 0.15 * k).addScaledVector(rightOf(bunker().rot), 0.14 - 0.28 * k), mid.clone().add(V(0, 0.04, 0)).addScaledVector(back, -1.0));
+        return op.update(t, mid.clone().add(V(0, 0.22 - 0.03 * k, 0)).addScaledVector(back, 0.6 - 0.1 * k).addScaledVector(rightOf(bunker().rot), 0.1 - 0.2 * k), mid.clone().add(V(0, -0.05, 0)).addScaledVector(back, -0.45));
       },
       after: (t) => show(chain, fade(t, 0.5, 2 * BAR30 - 0.1)),
     });
