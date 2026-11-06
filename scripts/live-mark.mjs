@@ -22,15 +22,10 @@ const BRAND = path.join(ROOT, 'public', 'brand');
 // ------------------------------------------------------------------ the season: THE one switch
 /** each set: its pieces left to right, a picture each (public/brand), how tall it stands (of the tallest's 64), and
  * a lit picture to flicker over it if it has a light in it */
-const SETS = {
-  // (scripts/halloween-sprites.mjs: a jack-o'-lantern and a pumpkin, from a real model)
-  halloween: [
-    { src: 'halloween-lantern.webp', lit: 'halloween-lantern-lit.webp', h: 64 },
-    { src: 'halloween-pumpkin.webp', h: 40 },
-  ],
-};
+// (October's jack-o'-lantern and pumpkin went with Halloween, 2026-11-06: the mark stands alone in November)
+const SETS = {};
 /** the set the bars show now; null for none */
-const SEASON = 'halloween';
+const SEASON = null;
 
 // ------------------------------------------------------------------ the mark
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

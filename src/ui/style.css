@@ -88,7 +88,9 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at 50% 40%, #1b1e1c 0%, #0b0c0c 70%);
+  /* a cold night for November's first snow */
+  background: radial-gradient(ellipse at 50% 40%, #1b232a 0%, #0c1014 62%, #07090b 100%);
+  overflow: hidden;
   z-index: 50;
   transition: opacity 0.9s ease;
 }
@@ -217,53 +219,58 @@ body {
 @keyframes lm-swell { 0% { scale: 0.45; animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); } 56%, 100% { scale: 1.35; } }
 @keyframes lm-fade { 0% { opacity: 0; } 5% { opacity: 0.85; } 22% { opacity: 0.6; } 56%, 100% { opacity: 0; } }
 .load-name { position: relative; }
-.load-title,
-.load-blood .lb {
+.load-title {
   font-size: 84px;
   font-weight: 700;
   letter-spacing: 0.32em;
   margin-right: -0.32em;
   color: var(--ink);
 }
-/* blood on the letters: the owner, "the zona letters with blood splatter on them". Splashes are drawn into the
-   title's own background, cut to its letters; drips hang below (src/ui/loading-fx.ts) */
-.load-title.bled,
-.load-blood .lb {
-  background-repeat: no-repeat;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* November, first snow (the owner, 2026-11-06: "its no longer halloween, we are in november! new loading page";
+   src/ui/loading-fx.ts and loading-frost.ts). Flakes fall at three depths, each flake a small layer the compositor
+   moves, so they keep falling while the start stalls the page; the layers lean with the pointer as the mark does. */
+.load-snow,
+.load-fog { position: absolute; inset: 0; pointer-events: none; }
+.ls { position: absolute; inset: 0; transition: translate 0.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.ls i {
+  position: absolute;
+  top: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(240, 246, 252, 0.95) 0, rgba(240, 246, 252, 0.5) 45%, rgba(240, 246, 252, 0) 72%);
+  animation: ls-fall var(--t) linear var(--d) infinite, ls-sway var(--w) ease-in-out var(--d) infinite alternate;
 }
-.load-blood { position: absolute; inset: 0; pointer-events: none; }
-.load-blood .lb { position: absolute; left: 0; top: 0; right: 0; }
-.ld { position: absolute; top: 0; left: 0; }
-.ld-run,
-.ld-drop { position: absolute; left: 0; top: 0; }
-.ld-run {
-  width: 100%;
-  border-radius: 0 0 50% 50% / 0 0 3px 3px;
-  background: linear-gradient(90deg, #3e0404, #7e0e0b 38%, #9a1915 55%, #4a0505);
+@keyframes ls-fall { from { translate: 0 0; } to { translate: var(--x) calc(100vh + 28px); } }
+@keyframes ls-sway { from { transform: translateX(calc(var(--s) * -1)); } to { transform: translateX(var(--s)); } }
+/* mist along the bottom, two banks drifting against each other */
+.load-fog { top: auto; height: 36%; bottom: -4%; left: -15%; right: -15%; }
+.load-fog i {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 40% 60% at 30% 80%, rgba(170, 190, 205, 0.16), rgba(170, 190, 205, 0) 70%),
+    radial-gradient(ellipse 45% 55% at 75% 85%, rgba(170, 190, 205, 0.12), rgba(170, 190, 205, 0) 70%);
+  animation: lf-drift 34s ease-in-out infinite alternate;
+}
+.load-fog i + i { scale: -1 1; opacity: 0.8; animation-duration: 47s; animation-direction: alternate-reverse; }
+@keyframes lf-drift { from { translate: -6% 0; } to { translate: 6% 0; } }
+/* the letters frosted: drawn again on a canvas over the title, which gives way beneath it once it has faded in */
+.load-frost { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
+.load-frost.in { opacity: 1; }
+.load-frost canvas { position: absolute; }
+.load-title.frosted { color: transparent; }
+/* a drop swells at an icicle's tip and falls */
+.lf-drop {
+  position: absolute;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 35%, #fff, rgba(200, 225, 245, 0.85) 50%, rgba(150, 190, 220, 0.6));
   transform-origin: 50% 0;
+  opacity: 0;
+  animation: lf-drip var(--t) ease-in var(--d) infinite;
 }
-.ld-drop {
-  border-radius: 50% 50% 50% 50% / 58% 58% 42% 42%;
-  background: radial-gradient(circle at 36% 34%, #b02622 0, #760c0b 46%, #420404 100%);
-}
-/* pumpkins either side of the word, for October (src/ui/loading-pumpkins.ts): each stands on the letters' baseline,
-   its picture's bottom there; a lantern's candle flickers (its lit picture over its dark one) and lights the ground */
-.load-pumpkins { position: absolute; inset: 0; pointer-events: none; transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
-.lp { position: absolute; width: 0; height: 0; scale: var(--s, 1); visibility: hidden; }
-.lp.in { visibility: visible; }
-.lp-body { position: absolute; left: 0; bottom: 0; pointer-events: auto; cursor: pointer; transform-origin: 50% 100%; filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.55)); }
-.lp-body img { position: absolute; inset: 0; width: 100%; height: 100%; }
-.lp.flip .lp-body img { transform: scaleX(-1); }
-.lp-shadow { position: absolute; left: 0; top: -5px; height: 10px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)); }
-.lp-glow { position: absolute; left: 0; top: -30px; height: 44px; translate: -50% 0; background: radial-gradient(closest-side, rgba(255, 140, 40, 0.3), rgba(255, 120, 30, 0)); }
-.lp-lit,
-.lp-glow { animation: lp-flicker 2.3s linear infinite; animation-delay: calc(var(--k) * -0.7s); }
-@keyframes lp-flicker {
-  0% { opacity: 0.85; } 8% { opacity: 0.55; } 14% { opacity: 0.95; } 22% { opacity: 0.7; } 30% { opacity: 1; } 39% { opacity: 0.72; }
-  47% { opacity: 0.92; } 56% { opacity: 0.6; } 64% { opacity: 0.97; } 73% { opacity: 0.78; } 82% { opacity: 1; } 91% { opacity: 0.66; } 100% { opacity: 0.85; }
+@keyframes lf-drip {
+  0% { opacity: 0; scale: 0.2; translate: 0 0; }
+  55% { opacity: 0.95; scale: 1; translate: 0 0; }
+  68% { opacity: 0.95; scale: 1; translate: 0 0; animation-timing-function: cubic-bezier(0.5, 0, 1, 1); }
+  86%, 100% { opacity: 0; scale: 1; translate: 0 34px; }
 }
 #loading.off { display: none; }
 @media (prefers-reduced-motion: reduce) {
@@ -271,7 +278,8 @@ body {
   .lm-glow, .lm-sign, .lm-hot, .lm-h0, .lm-h1, .lm-h2 { animation: none; }
   .lm-flash, .lm-shock { display: none; }
   .lm-gas { display: none; }
-  .lp-lit, .lp-glow { animation: none; opacity: 0.85; }
+  .ls i, .load-fog i { animation-play-state: paused; }
+  .load-frost { transition: none; }
 }
 /* one line, wider than the bar if it must (a flex row overflows evenly both sides), smaller on a narrow screen;
    the left padding balances the letter-spacing after the last letter */
