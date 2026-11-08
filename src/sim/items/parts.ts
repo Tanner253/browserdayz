@@ -184,7 +184,8 @@ export const PART_ITEMS: ItemDef[] = [
   {
     id: 'rifle_wrap', name: 'Cheek Rest', model: 'sniper', nodeRe: '^cheekrest', w: 2, h: 1, weight: 0.2, category: 'attachment',
     desc: 'A raised rest for the cheek, strapped to the stock. Steadies the rifle: a quarter less sway, and a surer hold.',
-    attach: { fits: ['mosin', 'mosin9130'], slot: 'wrap', ergo: 6 },
+    // (every sniper, the owner, 2026-10-24: "all snipers should take a sniper pad attachment")
+    attach: { fits: ['mosin', 'mosin9130', 'sniper50', 'barrett', 'vssk'], slot: 'wrap', ergo: 6 },
     loot: { pair: 'GhillieAtt_Mossy', at: [0, 0, 5, 3, 1], restock: 1500, usage: ARMY },
     worth: 8,
   },

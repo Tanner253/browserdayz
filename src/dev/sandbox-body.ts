@@ -14,6 +14,7 @@
 //   &frames=12&fps=15&settle=1.2    moments drawn (after so many seconds of going), how many a second
 //   &across=4                       moments to a row of blocks (a picture is drawn no more than 8192 a side)
 //   &cols=4&view=q                  bodies across a block; the camera (q, side, front, back, top), framed on each body
+//   &mods=rifle_wrap,pu_scope       attachments fitted to every gun held, where they fit; &bare=1 the gun alone, no body
 
 import * as THREE from 'three';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from '../game/avatar';
@@ -102,7 +103,9 @@ export async function stageBodies(o: Stage) {
   const weapons = guns ? new Weapons(new THREE.Scene(), new THREE.PerspectiveCamera(), atmo, {} as never, {} as never, {} as never) : null;
   if (weapons) await weapons.load();
   const held = (id: string) => {
-    const def = ITEMS[id], obj = weapons!.worldModel(id, []), grips = weapons!.gripsOf(id, []);
+    // (&mods=rifle_wrap,pu_scope: fitted to every gun held, where it fits)
+    const mods = (q.get('mods') ?? '').split(',').filter((m) => ITEMS[m]?.attach?.fits.includes(id));
+    const def = ITEMS[id], obj = weapons!.worldModel(id, mods), grips = weapons!.gripsOf(id, mods);
     if (!obj || !grips) return null;
     if (def?.weapon) return { obj, grips, kind: def.weapon.akimbo ? ('pistol' as const) : def.weapon.kind };
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
@@ -152,6 +155,8 @@ export async function stageBodies(o: Stage) {
     // (every body from the same moment of its stride, so that two builds drawn side by side step together)
     (a as unknown as { phase: number }).phase = 0;
     if ((a as { gait?: { phase: number } }).gait) (a as unknown as { gait: { phase: number } }).gait.phase = 0;
+    // (&bare=1: the body and what it wears not drawn, the thing in its hands alone: an attachment judged where it sits)
+    if (q.get('bare') === '1') a.root.traverse((m) => void ((m as THREE.SkinnedMesh).isSkinnedMesh && (m.visible = false)));
     return { a, s, pos: new THREE.Vector3((i % 8) * 12, STANDS_OVER, Math.floor(i / 8) * 12), face: 0, goes: 0, side: 0 };
   }));
   const vel = new THREE.Vector3();

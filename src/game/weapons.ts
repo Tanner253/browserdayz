@@ -85,7 +85,7 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the M32's own vertical grip taken off it: where the middle of its top meets the rail under this gun, and the node it rides on in the hands where that is not the gun's body */ grip?: { at: [number, number, number]; size: number; on?: string }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the M32's own vertical grip taken off it: where the middle of its top meets the rail under this gun, and the node it rides on in the hands where that is not the gun's body */ grip?: { at: [number, number, number]; size: number; on?: string }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number; /** the Mosin's cheek rest strapped to this stock: the top of the comb under the middle of it, and how big */ pad?: { at: [number, number, number]; size: number } }> = {
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
@@ -121,6 +121,11 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   a91: { dot: { at: [-0.03, 0.1092, 0.0015], size: 0.85 } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
+  // (every sniper takes the cheek rest, the owner, 2026-10-24: "all snipers should take a sniper pad attachment": the
+  // Mosin's own, strapped where the cheek lies on each stock, behind the grip as far as it is on the Mosin)
+  sniper50: { pad: { at: [-0.165, 0.064, 0.0013], size: 1 } },
+  barrett: { pad: { at: [-0.2, 0.086, 0.0013], size: 1 } },
+  vssk: { pad: { at: [-0.25, 0.081, 0.0013], size: 0.75 } },
 };
 /**
  * A gun looked over (I) that has no such movement drawn in its pack: how long it takes, when in that it is turned
@@ -2451,6 +2456,9 @@ export class Weapons {
     // (the PSO off the VSSK, its foot set where PSO_AT says: what it was on the VSSK is taken off where it stood)
     const psoAt = PSO_AT[o.item];
     if (psoAt) await fitted('scope_vssk', 'vssk', psoAt, 1, onBody, (obj, box) => obj.position.sub(new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2)), undefined, /^scope/);
+    // (the cheek rest off the Mosin: it wraps the comb, its foot 2.2 cm down the stock's sides there, so the top of the comb
+    // is that far above its foot)
+    if (fit?.pad) await fitted('rifle_wrap', 'sniper', fit.pad.at, fit.pad.size, onBody, (obj, box) => obj.position.sub(new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y + 0.022 * fit.pad!.size, (box.min.z + box.max.z) / 2)), undefined, /^cheekrest/);
     // (the red dot: stood on its foot along the gun, its glass to the muzzle, and its dot on the middle of the glass for
     // the eye behind it, which is where the eye goes when it is aimed through)
     let rdAt: THREE.Vector3 | null = null;
