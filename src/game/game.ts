@@ -1150,8 +1150,12 @@ export class Game {
         this.readied('Last touches 2/3');
         if (stale.length) Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
         assets.releaseModels();
+        // (the bot check's range and figures, so that Play goes straight on to it)
         this.readied('Last touches 3/3');
-        await other;
+        await this.range().prepare();
+        // (The lamps' lighting goes on being got ready behind: a lamp's light is held back until it is, see
+        // Renderer.readyToLight. Waited for here, it was most of a minute of the loading screen on the dev page.)
+        void other;
       })
       .catch((e) => console.error('what is built behind the menu', e))
       .then(() => {
@@ -1806,8 +1810,11 @@ export class Game {
   isLoaded = false;
   /** how far what is built behind the menu has got, counted, for whoever presses Deploy before it is done */
   readyText = 'Readying the guns';
+  /** told of each count while the loading screen is up (src/main.ts) */
+  onReadied: ((text: string) => void) | null = null;
   readied(text: string) {
     this.readyText = text;
+    this.onReadied?.(text);
     if (this.wantIn && !this.isLoaded) this.hud?.showStart(true, false, text);
   }
   wantIn = rejoining();
@@ -2084,6 +2091,7 @@ export interface Game {
   idle: Methods<typeof enterMethods>['idle'];
   dress: Methods<typeof enterMethods>['dress'];
   onRange: Methods<typeof enterMethods>['onRange'];
+  range: Methods<typeof enterMethods>['range'];
   enterOffline: Methods<typeof enterMethods>['enterOffline'];
   fillCrate: Methods<typeof enterMethods>['fillCrate'];
   fresh: Methods<typeof enterMethods>['fresh'];

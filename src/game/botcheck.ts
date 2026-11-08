@@ -15,7 +15,7 @@ import { TOUCH } from '../core/device';
 import { physics, HITBOX_GROUPS } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
 import type { C2S, RangeLayout } from '../net/protocol';
-import { BLOCKS, MOVER, RAMP, YARD, blocksOf, fromPlan, moverAt, type Block, type Sighting } from '../sim/course';
+import { BLOCKS, HOSTILES, MOVER, RAMP, YARD, blocksOf, fromPlan, moverAt, type Block, type Sighting } from '../sim/course';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
@@ -171,7 +171,29 @@ export class BotCheck {
   private mats: { wall: THREE.Material; floor: THREE.Material } | null = null;
   private saidEnv = false;
 
+  /** a go has been dealt to this game (the range made ready ahead is not one) */
+  dealt = false;
+  private preparing: Promise<void> | null = null;
+
   constructor(private h: BotCheckHost) {}
+
+  /**
+   * The yard and a first go's figures made ready before any go is dealt, under the loading screen: at the go they were
+   * up to twelve seconds after Play (the owner, 2026-11-08: "when i click play i should isntantly go into the botcheck
+   * so load everything needed"). Nothing of it is seen, and the figures are not to be hit, until a go is dealt.
+   */
+  prepare(): Promise<void> {
+    return (this.preparing ??= (async () => {
+      if (!this.yard) await this.build();
+      const made: Promise<void>[] = [];
+      for (let i = this.figures.length; i < HOSTILES; i++) {
+        const f = new Figure(i, false);
+        this.figures.push(f);
+        made.push(f.load(this.h.atmo, this.h.scene));
+      }
+      await Promise.all(made);
+    })().catch((e) => console.error('the range made ready ahead', e)));
+  }
 
   /** how long since this go began, as this game counts it (thousandths of a second) */
   private get ms() {
@@ -212,6 +234,8 @@ export class BotCheck {
       this.solid(len, YARD.ring, YARD.thick, x, YARD.ring / 2, z, q, this.fixed);
     }
     await this.h.ready(yard).catch(() => {});
+    // (not seen until a go is dealt: made ready ahead, it hangs over the map)
+    yard.visible = this.active;
     this.h.scene.add(yard);
     this.yard = yard;
   }
@@ -303,7 +327,11 @@ export class BotCheck {
     }
     this.h.place(0, this.h.floor + 0.05, 0, turn);
     this.show();
+    this.dealt = true;
+    // (what was made ready ahead is finished first: a figure not yet come cannot stand)
+    if (this.preparing) await this.preparing;
     if (!this.yard) await this.build();
+    this.yard!.visible = true;
     if (!this.active || this.go !== go) return;
     this.raise(turn);
     for (const f of this.figures) f.stand();

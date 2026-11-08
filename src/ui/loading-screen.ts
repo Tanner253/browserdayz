@@ -31,6 +31,33 @@ const LINES = [
   'Spinning the compass',
 ];
 
+/**
+ * Something to read while it loads (the owner, 2026-11-08: "we need to give the user something to chew on to not be
+ * bored"): how the game is played, in the words of its own how-to-play and guide, so every one of them is so.
+ */
+const TIPS = [
+  'You drop in on the west coast with bare hands. The further east, the better the loot.',
+  'Tier 1, where you start, holds no gun. Inland, tier by tier: pistols, then SMGs, then rifles.',
+  'Police and army places hold the most.',
+  'Anyone you meet can kill you and take everything you carry, your dog tag with it.',
+  'Everybody who has lived long enough carries a dog tag. Kill them, loot it, and stay alive with it to cash it in.',
+  'The infected see what is in front of them and hear a shot from far off. Crouch past them, or fit a suppressor.',
+  'The gas at the Chemical Works hides Tier 4 loot and the keycards to the bunker. A gas mask lets you breathe it: the police stations keep them.',
+  'Bunker 17 is dark and shut. A keycard from the gas opens its door, loudly.',
+  'Tier 5, the best loot, is down in Bunker 17 and in the fort.',
+  'The vault on Level 3 of Bunker 17 pays out night vision.',
+  'A cheek rest fits every sniper rifle: a steadier hold, and a quarter less sway.',
+  'A fall or a shot in the leg can break it: you limp until you splint it.',
+  'A campfire mends you and cooks your meat, but its smoke gives you away.',
+  'Blood is not health: when you have lost too much, an IV bag puts it back.',
+  'Build a base: a felling axe for logs, a pickaxe for stone, a hand saw for planks, a hammer to nail it up.',
+  'Lay a claim on your foundation: nobody else may build near it.',
+  'The trader camps, on the map (M), sell nails, planks, the building plan and locks.',
+  'Your inventory is on Tab, and its Crafting page shows what you can make by hand.',
+];
+/** how long a tip is shown, ms: long enough to read twice */
+const TIP_EVERY = 7000;
+
 /** each stage of the start (src/main.ts, Game.init): where the bar stands when it begins (in step with how long
  * each took on a 75 s start), and what is said */
 const STAGES: [prefix: string, at: number, line?: string][] = [
@@ -50,6 +77,8 @@ const STAGES: [prefix: string, at: number, line?: string][] = [
   ['fort', 0.74, 'Pouring concrete for the fort'],
   ['last files', 0.75, 'Last bodies off the road'],
   ['shaders', 0.76],
+  ['Readying the guns', 0.78, 'Oiling the rifles'],
+  ['Last touches', 0.94, 'Zeroing the scopes'],
 ];
 /** the share of the bar the files fill before the world is built (assets, up to world) */
 const FILES = [0.03, 0.08];
@@ -60,6 +89,10 @@ export class LoadingScreen {
   private fill: HTMLElement;
   private label: HTMLElement;
   private count: HTMLElement | null;
+  private at: (typeof STAGES)[number] | null = null;
+  private tip: HTMLElement | null;
+  private tips = TIPS.map((t) => [Math.random(), t] as const).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
+  private tipTimer = 0;
   private shown = 0;
   private stageAt = 0;
   private filing = false;
@@ -73,6 +106,9 @@ export class LoadingScreen {
     this.fill = root.querySelector('.load-fill') as HTMLElement;
     this.label = root.querySelector('.load-label') as HTMLElement;
     this.count = root.querySelector('.load-count');
+    this.tip = root.querySelector('.load-tip span');
+    this.nextTip();
+    this.tipTimer = window.setInterval(() => this.nextTip(), TIP_EVERY);
     this.next();
   }
 
@@ -80,15 +116,20 @@ export class LoadingScreen {
   stage(name: string) {
     // (what is being counted, as so many of so many: with the bar alone at its end, a start that was still working
     // looked stuck. The owner, 2026-11-08: "we need to show a #/# progress too ... i think im stuck and want to refresh")
-    const n = /(\d+\/\d+)$/.exec(name);
-    if (n) this.counted(`${name.slice(0, n.index).trim()} ${n[1]}`);
-    const s = STAGES.find(([p]) => name.startsWith(p));
+    // (and the bar moves through the stage's share by that count)
+    const n = /(\d+)\/(\d+)$/.exec(name), head = n ? name.slice(0, n.index).trim() : name;
+    if (n) this.counted(`${head} ${n[1]}/${n[2]}`);
+    const s = STAGES.find(([p]) => head.startsWith(p));
     if (!s) return;
-    this.filing = s[0] === 'assets';
-    this.stageAt = s[1];
-    this.ends = (STAGES[STAGES.indexOf(s) + 1]?.[1] ?? 1) - 0.005;
-    this.to(s[1]);
-    if (s[2]) this.say(s[2]);
+    if (s !== this.at) {
+      this.at = s;
+      this.filing = s[0] === 'assets';
+      this.stageAt = s[1];
+      this.ends = (STAGES[STAGES.indexOf(s) + 1]?.[1] ?? 1) - 0.005;
+      this.to(s[1]);
+      if (s[2]) this.say(s[2]);
+    }
+    if (n) this.to(this.stageAt + (this.ends - this.stageAt) * (Number(n[1]) / Math.max(1, Number(n[2]))));
   }
 
   /** files come down: they fill their share of the bar while the start waits on them, after that they run behind */
@@ -103,6 +144,18 @@ export class LoadingScreen {
     this.stop();
   }
 
+  private nextTip() {
+    const t = this.tip;
+    if (!t) return;
+    const line = this.tips.shift()!;
+    this.tips.push(line);
+    t.style.opacity = '0';
+    window.setTimeout(() => {
+      t.textContent = line;
+      t.style.opacity = '1';
+    }, 250);
+  }
+
   private counted(text: string) {
     if (this.count) this.count.textContent = text;
   }
@@ -114,6 +167,7 @@ export class LoadingScreen {
   }
 
   stop() {
+    clearInterval(this.tipTimer);
     clearTimeout(this.timer);
     clearInterval(this.creep);
     this.timer = 0;

@@ -123,7 +123,7 @@ export const enterMethods = {
     let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
     if (gone()) return;
     // (the bot check's range, if the server put this game on it, is over one way or the other: see `onRange`)
-    const ranged = !!this.botCheck;
+    const ranged = !!this.botCheck?.dealt;
     this.botCheck?.end();
     this.botCheck = null;
     // (Whoever was on the range and is welcomed cannot be hurt until they have been stood in the world: the range's
@@ -301,21 +301,8 @@ export const enterMethods = {
    * game or turns it away.
    */
   async onRange(this: Game, turn: number, go: number, need: number, secs: number, lay?: RangeLayout) {
-    const { r, atmo, world } = this.s;
-    if (!this.botCheck) {
-      let top = 0;
-      for (let i = 0; i < world.heights.length; i += 7) top = Math.max(top, world.heights[i]);
-      this.botCheck = new BotCheck({
-        scene: r.scene,
-        atmo,
-        camera: r.camera,
-        floor: Math.round(top + 140),
-        place: (x, y, z, yaw) => this.player.spawn(x, y, z, yaw),
-        where: () => this.player.pos,
-        send: (m) => this.net.send(m),
-        ready: (o) => r.ready(o),
-        playing: () => this.input.locked || this.input.touch,
-      });
+    if (!this.botCheck?.dealt) {
+      this.range();
       // a rifle with a sight on it, and more rounds than the range lets anybody fire
       if (this.use) this.breakOff();
       this.weapons.take(null);
@@ -331,7 +318,7 @@ export const enterMethods = {
       this.menu.dispose();
       this.hud.menuScene('', 0);
       this.hud.showStart(false);
-      await this.botCheck.deal(turn, go, need, secs, lay);
+      await this.botCheck!.deal(turn, go, need, secs, lay);
       // (straight to the eyes: the range's clock is running)
       this.director.flyIn(0.5);
       const first = this.inv.held() ? null : this.inv.ring()[0];
@@ -348,10 +335,32 @@ export const enterMethods = {
     // (another go: a fresh magazine with the fresh course)
     const held = this.weapons.equippedItem;
     if (held?.id === 'ar15') Object.assign(held, { mag: 'mag_ar', loaded: 31 });
-    await this.botCheck.deal(turn, go, need, secs, lay);
+    await this.botCheck!.deal(turn, go, need, secs, lay);
+  },
+
+  /** the bot check's range, made the first time it is asked for (ahead, under the loading screen: Game.loaded) */
+  range(this: Game): BotCheck {
+    if (this.botCheck) return this.botCheck;
+    const { r, atmo, world } = this.s;
+    let top = 0;
+    for (let i = 0; i < world.heights.length; i += 7) top = Math.max(top, world.heights[i]);
+    return (this.botCheck = new BotCheck({
+      scene: r.scene,
+      atmo,
+      camera: r.camera,
+      floor: Math.round(top + 140),
+      place: (x, y, z, yaw) => this.player.spawn(x, y, z, yaw),
+      where: () => this.player.pos,
+      send: (m) => this.net.send(m),
+      ready: (o) => r.ready(o),
+      playing: () => this.input.locked || this.input.touch,
+    }));
   },
 
   async enterOffline(this: Game) {
+    // (no bot check alone: the range made ready ahead is taken away)
+    this.botCheck?.end();
+    this.botCheck = null;
     // (said for as long as it is so: nobody else is here, and nothing done here is kept)
     this.hud.setOffline(!!remoteServer());
     const save = loadSave();
