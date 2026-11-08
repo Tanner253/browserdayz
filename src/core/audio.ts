@@ -3,7 +3,6 @@
 // Positional sounds use HRTF panners; gunshots get an outdoor slap-back echo.
 
 import type { Surface } from './physics';
-import { EMOTE } from '../sim/emotes';
 import { VOICES } from '../sim/survivor';
 import { alarmShare, alarmTop } from '../sim/heard';
 import { ITEMS } from '../sim/items';
@@ -2052,50 +2051,23 @@ export class AudioEngine {
     this.rec(`z_${kind}`, out, t, { groan: 0.75, growl: 1.0, alert: 1.6, attack: 1.3, hurt: 1.1, die: 1.2 }[kind], 0.88 + ((seed * 37) % 24) / 100);
   }
 
-  /**
-   * A call said in words by the browser's own speaking voice (the same caller has the same voice and pitch every
-   * time, by their name), quieter the further off and late by as long as sound takes to arrive.
-   * @returns whether it will be said: not where there is no such voice, nor while one call is already waiting
-   *   behind another (three people shouting at once are not said one after the other, long after)
-   */
   /** where a player's voice goes (src/game/voice.ts): the Voice group (see GROUPS), and so with everything else that is heard, under the one volume */
   voiceBus(): AudioNode | null {
     return this.ready ? this.bus.voice : null;
   }
 
-  private speak(words: string, distance: number, voice: number): boolean {
-    const synth = typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
-    // (not while a film's soundtrack is being made from the list of what was heard: that is not this machine's to say aloud)
-    if (!words || !synth || typeof SpeechSynthesisUtterance === 'undefined' || !(this.ctx instanceof AudioContext) || this.volume <= 0 || this.mix.voice <= 0 || synth.pending) return false;
-    const voices = synth.getVoices().filter((v) => /^en/i.test(v.lang));
-    if (!voices.length) return false;
-    const u = new SpeechSynthesisUtterance(words);
-    u.voice = voices[Math.min(voices.length - 1, Math.floor(voice * voices.length))];
-    u.lang = u.voice.lang;
-    u.pitch = 0.7 + voice * 0.6;
-    u.rate = 1.25;
-    // (Somebody else's call is as loud as this voice goes until they are a good way off: at twelve metres it was
-    // half, and nobody near heard it over anything. The browser's voice has no more to give than all of it.)
-    // (It is not sound of this engine's and passes through no gain of it: the Voice group's share is taken off it here.)
-    u.volume = Math.max(0.08, Math.min(1, this.volume * 1.8 * (distance > 0 ? 1 / (1 + distance / 45) : 0.6))) * this.mix.voice;
-    setTimeout(() => synth.speak(u), Math.min(400, (distance / 343) * 1000));
-    return true;
-  }
-
   /**
    * Somebody calls out (src/sim/emotes.ts), in the voice they picked (src/sim/survivor.ts VOICES): its recording,
    * fetched the first time that call in that voice is heard (the owner, 2026-10-24: "we can offer multiple voice
-   * options for the oplayer to pick from in the settings"). A call not recorded in it is said by the browser's
-   * speaking voice, as every call was before.
+   * options for the oplayer to pick from in the settings"). Every call is recorded in every voice.
    * @param pos where they stand; none for the player's own voice
    * @param voice which of VOICES
-   * @param pitch the browser's voice for them, 0..1: the same caller has the same one every time
    */
-  shout(id: string, pos?: V3, distance = 0, voice = 0, pitch = 0.5) {
+  shout(id: string, pos?: V3, distance = 0, voice = 0) {
     if (!this.ready) return;
     const name = `${VOICES[voice]?.id ?? VOICES[0].id}/${id}`, had = called.get(name);
     const say = (buf: AudioBuffer | null) => {
-      if (!buf) return void this.speak(EMOTE[id]?.say ?? '', distance, pitch);
+      if (!buf) return;
       const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
       src.buffer = buf;
       // (as loud as a shout is: a voice raised to carry across a field, and quieter for every metre past the first eight)

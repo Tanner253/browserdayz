@@ -13,7 +13,7 @@ Each line becomes dead once its replacement is judged better and merged. The pat
 ## Survivors
 - [ ] `folded_blanket` as the field jacket and trousers model (`src/sim/items/wear.ts`) | replaced by worn and crumpled clothing models | - | grep `folded_blanket` in the items
 - [ ] the Quaternius bodybuilder base and its reshaping in `scripts/build-character.mjs`, the military suit in `scripts/suit.mjs` | replaced by the four Higgsfield survivors | - | `npm run character` no longer reads `assets-src/characters/src`
-- [ ] `speak()` through the browser's speechSynthesis (`src/core/audio.ts`) | replaced by recorded Higgsfield voices | - | grep `speechSynthesis`
+- [x] `speak()` through the browser's speechSynthesis (`src/core/audio.ts`) | replaced by recorded Higgsfield voices | - | grep `speechSynthesis` (2026-11-08: gone with survivors.md's line)
 - [ ] `CLOTHES` spawn kit of field jacket and trousers (`src/sim/items.ts`) | replaced by DayZ basics | - | -
 
 ## Movement

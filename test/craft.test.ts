@@ -31,7 +31,7 @@ import { KNOWN_AT_START, TREE, learnable, mayUnlock, researchCost, teaches, ways
 import { MAT, PER_BAR } from '../src/sim/craft/materials';
 import { TOOL_LIFE } from '../src/sim/gather';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
-import { placeNear } from '../src/sim/craft/places';
+import { benchAt, placeNear } from '../src/sim/craft/places';
 import { FORGE, cold, forgeStep, lit } from '../src/sim/craft/forge';
 import { SALVAGE, Scrapyard, salvageSpots, spotAt } from '../src/sim/craft/salvage';
 import { WRECK_KINDS, wreckLayer, wreckSpots } from '../src/sim/craft/wrecks';
@@ -162,11 +162,11 @@ ok('a workbench is near when one stands within 4 m on the same floor, not on the
   assert.equal(placeNear(bs, 'bench', wx + 5, wy, wz), null, 'a bench 5 m off was near');
   assert.equal(placeNear(bs, 'bench', wx + 1, wy + 3, wz), null, 'a bench on the floor below was near');
   assert.equal(placeNear(bs, 'forge', wx, wy, wz), null, 'a bench was a forge');
-  // (its level: one unsaid, the best of those within reach)
-  assert.equal(placeNear(bs, 'bench', wx + 1, wy, wz)?.lv, 1);
+  // (its level, at the bench in use: one unsaid, then a Bench III)
   const p = [...b.pieces.values()].find((q) => q.k === 'workbench')!;
+  assert.equal(benchAt(bs, b.id, p.id, wx + 1, wy, wz), 1);
   p.t = 3;
-  assert.equal(placeNear(bs, 'bench', wx + 1, wy, wz)?.lv, 3, 'a Bench III was not three');
+  assert.equal(benchAt(bs, b.id, p.id, wx + 1, wy, wz), 3, 'a Bench III was not three');
 });
 
 ok('blueprints: the basics known; each tree in order, at its level, for its scrap; research costs less and uses the thing up', () => {

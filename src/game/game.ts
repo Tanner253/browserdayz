@@ -9,7 +9,6 @@ import type { Renderer } from '../core/renderer';
 import { physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
-import { voiceOf } from '../sim/emotes';
 import { Input } from '../core/input';
 import { Gamepad } from '../core/gamepad';
 import { controls, translation, type Controls } from '../core/keys';
@@ -1178,7 +1177,7 @@ export class Game {
     // (a voice picked says a call in it, to be heard)
     this.hud.onVoice = (voice) => {
       pickWho({ voice });
-      audio.shout('friendly', undefined, 0, voice, voiceOf(playerName()));
+      audio.shout('friendly', undefined, 0, voice);
     };
     pickWho({});
     this.minimap = new Minimap(world);
@@ -1301,7 +1300,7 @@ export class Game {
       }));
     this.hud.emotes.figure = { grab: () => this.emoteFig?.grab(), turn: (by) => this.emoteFig?.turn(by), drop: () => this.emoteFig?.drop() };
     // (a call picked there is heard as it is called in the game)
-    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
+    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, chosen(playerName()).voice);
     this.hud.emotes.onClose = () => this.toggleEmotes(false);
     this.pad = new Gamepad(this.input, {
       on: () => controls().pad,

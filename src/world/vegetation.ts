@@ -56,7 +56,6 @@ const SOLID: Record<string, [Surface, number]> = {
   valve_stand: ['metal', 0.7],
   breaker_box: ['metal', 0.85],
   ore_cart: ['metal', 0.92],
-  boxcar: ['metal', 0.96],
   tree_stump_01: ['wood', 0.8],
   dead_tree_trunk: ['wood', 0.8],
   Barrel_01: ['metal', 0.9],

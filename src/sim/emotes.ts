@@ -120,9 +120,3 @@ export const SAY_TIME = 2.4;
 /** shortest time from one call to the next, seconds */
 export const EMOTE_GAP = 1;
 
-/** Whose voice, 0 (low and broad) to 1 (higher and thinner): the same name has the same one in every game. */
-export function voiceOf(name: string) {
-  let h = 2166136261;
-  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
-  return ((h >>> 0) % 1000) / 999;
-}

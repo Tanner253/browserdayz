@@ -23,8 +23,6 @@ export interface Near {
   x: number;
   y: number;
   z: number;
-  /** a workbench's level: the best of those within reach */
-  lv: Level;
 }
 
 /**
@@ -38,22 +36,20 @@ export function benchAt(bases: Bases, b: number, p: number, x: number, y: number
   return Math.hypot(px - x, pz - z) < within && Math.abs(py - y) < 2.5 ? levelOf(piece) : 0;
 }
 
-/** the nearest of a place's pieces within reach (on the same floor, near enough), or null; for a workbench, the best level among those within reach */
+/** the nearest of a place's pieces within reach (on the same floor, near enough), or null */
 export function placeNear(bases: Bases, at: Spot, x: number, y: number, z: number, within = REACH[at]): Near | null {
   const k = PLACE_PIECE[at];
-  let best: Near | null = null, d = within, lv: Level = 1;
+  let best: Near | null = null, d = within;
   for (const b of bases.bases.values()) {
     for (const p of b.pieces.values()) {
       if (p.k !== k) continue;
       const [px, py, pz] = toWorld(b, p.x, p.y, p.z), h = Math.hypot(px - x, pz - z);
       if (h >= within || Math.abs(py - y) >= 2.5) continue;
-      lv = Math.max(lv, levelOf(p)) as Level;
       if (h < d) {
         d = h;
-        best = { b: b.id, p: p.id, x: px, y: py, z: pz, lv: 1 };
+        best = { b: b.id, p: p.id, x: px, y: py, z: pz };
       }
     }
   }
-  if (best) best.lv = lv;
   return best;
 }

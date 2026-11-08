@@ -10,4 +10,4 @@ Nothing was replaced, so nothing here is dead. Take all (`takeAll` in `src/ui/in
 - `src/game/game/reclaim.ts` (the game's side), the "Reclaim gear" button in `takeBar()`, and `Stash.own`.
 - What was in the hands now goes into `fell` in `makeCorpse`, onto the ground, and no longer onto the body.
 
-- [ ] Once every page in play speaks PROTOCOL 68, nothing is left to remove: a page of 65 never sees `own` and shows no button.
+- [x] Once every page in play speaks PROTOCOL 68, nothing is left to remove: a page of 65 never sees `own` and shows no button. (2026-11-08: PROTOCOL is 81)

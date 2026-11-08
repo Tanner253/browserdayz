@@ -568,14 +568,6 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'gear'],
     changes: 'One vest of the pack: scaled to a body and stood on the ground; textures re-encoded as WebP; geometry compressed.',
   },
-  vest_t1: {
-    dir: 'vest_holster_pack',
-    only: /^Vest_1_T1/,
-    size: 0.56,
-    tex: 1024,
-    tags: ['loot', 'gear'],
-    changes: 'One vest of the pack: scaled to a body and stood on the ground; textures re-encoded as WebP; geometry compressed.',
-  },
   vest_t2: {
     dir: 'vest_holster_pack',
     only: /^Vest_1_T2/,
@@ -1139,11 +1131,6 @@ export const LOCAL_MODELS = {
     changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
     credit: { name: 'Radar dome', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Radar dome" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
-  boxcar: {
-    dir: '../incoming/higgsfield/toys', file: 'boxcar_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
-    changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
-    credit: { name: 'Freight boxcar', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Freight boxcar" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
-  },
   gondola_wagon: {
     dir: '../incoming/higgsfield/toys', file: 'gondola_wagon_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
     changes: 'Made at its true size; squared to its axes; textures capped at 2048; geometry compressed.',
@@ -1168,11 +1155,6 @@ export const LOCAL_MODELS = {
     dir: '../incoming/higgsfield/toys', file: 'vault_door_sized.glb', scale: 1, tex: 2048, tags: ['prop'],
     changes: 'Made at its true size; textures capped at 2048; geometry compressed.',
     credit: { name: 'Round vault door', author: 'ZONA (Higgsfield, GPT Image and Tripo image-to-3D)', url: 'https://higgsfield.ai', line: '"Round vault door" made for ZONA with Higgsfield (GPT Image and Tripo image-to-3D), 2026-11-01, for commercial use under the plan.' },
-  },
-  rail_track: {
-    dir: '../incoming/higgsfield/toys', file: 'rail_track_sized.glb', scale: 1, tex: 1024, tags: ['prop'],
-    changes: 'Made at its true size; textures capped at 1024; geometry compressed.',
-    credit: { name: 'Railway track', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Railway track" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-31, for the game.' },
   },
   night_vision: {
     dir: '../incoming/higgsfield/toys', file: 'night_vision_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
@@ -1941,10 +1923,6 @@ export const MODELS = {
   medical_box: { res: '1k', tex: 1024, tags: ['loot'] },
   medical_tape: { res: '1k', tex: 1024, tags: ['loot'] },
   binoculars: { res: '1k', tex: 1024, tags: ['loot'] },
-  hatchet: { res: '1k', tex: 1024, tags: ['loot'] },
-  crowbar_01: { res: '1k', tex: 1024, tags: ['loot'] },
-  machete: { res: '1k', tex: 1024, tags: ['loot'] },
-  baseball_bat: { res: '1k', tex: 1024, tags: ['loot'] },
   // The GP-5 alone (2026-10-13): "get rid of the long hose in the front and the box thats attached to the model so
   // its just the mask and the protusion out the front". It came as nine islands of one mesh: the hood, its two
   // eyepieces, the valve housing at the mouth with a small valve beside it and the knurled nut that closes the

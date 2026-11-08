@@ -9,7 +9,7 @@ import { audio } from '../core/audio';
 import { shadowFall, type Atmosphere } from '../world/atmosphere';
 import { EMOTE_BY_N, EMOTE_MASK, EMOTE_SHIFT } from '../sim/emotes';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
-import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
+import { SHOUT_RANGE, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import type { Finish } from './finish';
 import { Avatar, type SeatPose } from './avatar';
@@ -502,7 +502,7 @@ export class RemotePlayer implements Damageable {
     if (e.move) this.avatar.emote(e.move, e.dur);
     const head = this.head(new THREE.Vector3());
     const d = head.distanceTo(listener);
-    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, this.voice, voiceOf(this.name));
+    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, this.voice);
   }
 
   /** your shot or blow landed on them: the server decides what it did, this is the flinch and the grunt */

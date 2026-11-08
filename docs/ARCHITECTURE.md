@@ -103,7 +103,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `assets.ts` | 931 |  |
-| `audio.ts` | 2945 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
+| `audio.ts` | 2961 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `bones.ts` | 137 |  |
 | `breathe.ts` | 114 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `card-keep.ts` | 260 | Pictures taken off the graphics card that nothing in the world uses any more (2026-10-20, the owner: the card's memory at "7.4 of 8 GB — how do we reduce this?"). |
@@ -137,12 +137,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `fit.ts` | 108 | Fitting what is worn on the chest to the body, by measure and not by eye (dev only). |
 | `flight-record.ts` | 119 | A play session recorded to be played again, exactly, by the tests (development builds only, never shipped). |
 | `harness.ts` | 614 | Development-only test harness (window.T). |
-| `loading-film.ts` | 76 | The page's half of scripts/loading-film.mjs: the loading screen's short film for socials (the owner, 2026-10-20: |
 | `look.ts` | 294 | Development-only tools for LOOKING at the game (window.D), beside the harness that drives it (window.T). |
 | `overlap.ts` | 131 | Where two faces lie in one plane, facing the same way, over the same ground: the two are drawn turn and turn about and the wall flickers there ("z-fighting"). |
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
-| `sandbox-body.ts` | 244 | The game's own bodies on the sandbox floor (src/dev/sandbox.ts `&bodies=`): each one stood, crouched or lying, holding what it is told and going the way it is told, posed by the game's own Avatar (the motion... |
+| `sandbox-body.ts` | 249 | The game's own bodies on the sandbox floor (src/dev/sandbox.ts `&bodies=`): each one stood, crouched or lying, holding what it is told and going the way it is told, posed by the game's own Avatar (the motion... |
 | `sandbox-build.ts` | 800 | The sandbox's base-building scenes (2026-10-24): each step of base building looked at on the plain floor before the world (the owner: |
 | `sandbox-heads.ts` | 32 | The portraits a list of people shows (src/ui/icons.ts renderDoll, `face`: the admin panel, the player list, the kill feed), on the sandbox (src/dev/sandbox.ts `&ui=heads`): a row for each of the four bodies, a column... |
 | `sandbox-infected.ts` | 117 | The infected in the sandbox as the game draws them (src/dev/sandbox.ts, &infected=): made by the game's own Avatar, with their kind's movements and the look their number gives them, and stepped by the game's own pose... |
@@ -240,7 +239,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 310 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 355 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 2265 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 2264 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -307,7 +306,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `underground.ts` | 94 | Shut in under the ground (the owner, 2026-11-01: |
 | `vehicle.ts` | 623 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5512 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5520 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
@@ -414,7 +413,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `layer.ts` | 86 | Room on the map for crafting's layers of their own (2026-10-25: the wrecks, the recyclers, the trader camp's stalls). |
 | `learn.ts` | 103 | Blueprints (progression v3, the owner's yes 2026-10-25: |
 | `materials.ts` | 31 | Crafting's materials, their ids, piles and the forge's ratio, in one place (the navigator, 2026-10-25: |
-| `places.ts` | 60 | Where a workbench's, a forge's or a research table's work is done (2026-10-25): near one of them standing in a base, any base's (Rust's bench is anybody's who stands at it). |
+| `places.ts` | 56 | Where a workbench's, a forge's or a research table's work is done (2026-10-25): near one of them standing in a base, any base's (Rust's bench is anybody's who stands at it). |
 | `plan.ts` | 180 | What a craft takes out of a set of pockets, and what comes of it (2026-10-24): one rule, read by the game for its screen and by the server, which judges every craft on its own copy of the pockets (as building does). |
 | `recipes.ts` | 146 | Every recipe, as data (2026-10-24, plan-crafting; progression v3, the owner's yes 2026-10-25). |
 | `recyclers.ts` | 241 | Recyclers (progression v3, the owner's yes 2026-10-25: |
@@ -430,7 +429,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `desert.ts` | 160 | The desert's places for whoever starts on the coast (2026-10-18), the owner: |
 | `drops.ts` | 258 | Supply drops. Every few minutes, while anybody is playing, a crate of the best things on the map is set down somewhere in the open and everyone is told where. It is there for a few minutes, or until somebody has... |
 | `economy.ts` | 893 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
-| `emotes.ts` | 129 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
+| `emotes.ts` | 123 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
 | `fires.ts` | 140 | Campfires. The rings of stones at the lodges, the cabins and the hamlet can be lit. A fire is somewhere to mend: resting beside one puts health back far faster than it comes back on its own, and what is eaten beside... |
 | `gas.ts` | 154 | The gas. One place on the map is sunk in it (the Chemical Works, in the cirque behind the checkpoint: the map's first expansion). A low dome of it lies over the place, thickest at the middle and thinning to nothing... |
 | `gather.ts` | 183 | Gathering (2026-10-24, base building's first step): trees felled for logs, boulders broken for stone, logs sawn into planks, and the tools wearing out as they work. |
@@ -453,7 +452,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `guns.ts` | 353 | The guns, what they fire and the boxes it comes in. |
 | `hunt.ts` | 83 | What a hunt gives, and what keeps a hunter well (2026-10-23, with the animals: src/sim/animals.ts). |
 | `kit.ts` | 206 | What you hit with, eat, drink and mend with. |
-| `parts.ts` | 290 | Magazines, and what is fitted to a gun. |
+| `parts.ts` | 291 | Magazines, and what is fitted to a gun. |
 | `rules.ts` | 139 | What an item's `loot` says: |
 | `tools.ts` | 98 | Tools and odds and ends, the dog tag, and what things are kept in. |
 | `toys.ts` | 73 | The small wins of 2026-10-31 (the owner: |
@@ -664,7 +663,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `bunker-deep.ts` | 725 | Levels 2 and 3 as they are built and as they move (src/sim/bunker-deep.ts says where everything is). |
 | `bunker-dress.ts` | 405 | What makes a room of the bunker look left and not laid out (the owner, 2026-11-01: |
 | `bunker-life.ts` | 175 | What moves down the bunker with nobody there (the owner, 2026-11-01: |
-| `bunker.ts` | 1283 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
+| `bunker.ts` | 1286 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
 | `canyon-beds.ts` | 46 | THE CANYON'S BEDS as a chunk of shader (the terrain's, src/world/terrain.ts, and any other rock of the canyon: the carved rock round the caves' mouths, rock-blend's face), so that where a piece meets the wall its... |
 | `castle-post-shape.ts` | 422 | The signals post on the fort (src/sim/castle-post.ts): the shapes of what is made by hand, as plain numbers. |
 | `castle-post.ts` | 289 | The signals post on the fort (src/sim/castle-post.ts), as it is drawn and as it stops a body: what the game has no model for and is made here by hand. |
@@ -726,7 +725,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `town-plans.ts` | 528 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 267 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `tunnel.ts` | 276 | The tunnel the train runs in (src/sim/train-line.ts for where). |
-| `vegetation.ts` | 1363 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
+| `vegetation.ts` | 1362 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
 | `water.ts` | 464 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `ways-out.ts` | 191 | Nothing stands in a building's way out (the owner, 2026-10-19: |
 | `wells.ts` | 83 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |

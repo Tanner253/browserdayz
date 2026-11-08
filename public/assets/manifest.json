@@ -640,107 +640,6 @@
     }
    ]
   },
-  "hatchet": {
-   "url": "assets/models/hatchet.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 390628,
-   "srcTris": 5250,
-   "tris": 5250,
-   "min": [
-    -0.0132,
-    -0.0618,
-    -0.0271
-   ],
-   "max": [
-    0.0128,
-    0.2269,
-    0.0771
-   ],
-   "lods": [
-    {
-     "url": "assets/models/hatchet_lod1.glb",
-     "tris": 1600,
-     "far": 2,
-     "of": "390628:1791704546424"
-    }
-   ]
-  },
-  "crowbar_01": {
-   "url": "assets/models/crowbar_01.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 359824,
-   "srcTris": 2300,
-   "tris": 2300,
-   "min": [
-    -0.0155,
-    -0.2959,
-    -0.0329
-   ],
-   "max": [
-    0.0249,
-    0.2595,
-    0.0947
-   ],
-   "lods": []
-  },
-  "machete": {
-   "url": "assets/models/machete.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 742948,
-   "srcTris": 3032,
-   "tris": 3032,
-   "min": [
-    -0.0222,
-    -0.2136,
-    -0.0194
-   ],
-   "max": [
-    0.0222,
-    0.5412,
-    0.0417
-   ],
-   "lods": [
-    {
-     "url": "assets/models/machete_lod1.glb",
-     "tris": 1600,
-     "far": 2,
-     "of": "742948:1791630569073"
-    }
-   ]
-  },
-  "baseball_bat": {
-   "url": "assets/models/baseball_bat.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 352144,
-   "srcTris": 2672,
-   "tris": 2672,
-   "min": [
-    -0.032,
-    -0.2542,
-    -0.0321
-   ],
-   "max": [
-    0.0315,
-    0.659,
-    0.0314
-   ],
-   "lods": [
-    {
-     "url": "assets/models/baseball_bat_lod1.glb",
-     "tris": 1599,
-     "far": 2,
-     "of": "352144:1791704546175"
-    }
-   ]
-  },
   "old_gas_mask": {
    "url": "assets/models/old_gas_mask.glb",
    "tags": [
@@ -2832,27 +2731,6 @@
     0.2233,
     0.56,
     0.1821
-   ],
-   "lods": []
-  },
-  "vest_t1": {
-   "url": "assets/models/vest_t1.glb",
-   "tags": [
-    "loot",
-    "gear"
-   ],
-   "bytes": 315048,
-   "srcTris": 18196,
-   "tris": 1136,
-   "min": [
-    -0.2232,
-    0,
-    -0.1795
-   ],
-   "max": [
-    0.2232,
-    0.56,
-    0.1795
    ],
    "lods": []
   },
@@ -15026,49 +14904,6 @@
    "hi": "assets/models/hi/radar_dome.glb",
    "hiBytes": 612112,
    "hiCard": 64
-  },
-  "boxcar": {
-   "url": "assets/models/boxcar.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 253416,
-   "srcTris": 7299,
-   "tris": 7299,
-   "min": [
-    -6.5,
-    0,
-    -1.5636
-   ],
-   "max": [
-    6.5,
-    3.9647,
-    1.5636
-   ],
-   "lods": [],
-   "hi": "assets/models/hi/boxcar.glb",
-   "hiBytes": 731152,
-   "hiCard": 64
-  },
-  "rail_track": {
-   "url": "assets/models/rail_track.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 434216,
-   "srcTris": 1895,
-   "tris": 1895,
-   "min": [
-    -6.0134,
-    0,
-    -1.6833
-   ],
-   "max": [
-    6.0134,
-    0.6422,
-    1.6833
-   ],
-   "lods": []
   },
   "night_vision": {
    "url": "assets/models/night_vision.glb",

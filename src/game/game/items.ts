@@ -13,7 +13,7 @@ import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
 import { BARREL } from '../../sim/barrels';
-import { EMOTE, EMOTE_GAP, voiceOf, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
+import { EMOTE, EMOTE_GAP, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
 import { Radial } from '../../ui/radial';
 import { wheelSlots } from '../../ui/wheel-slots';
 import { playerName } from '../../net/client';
@@ -481,7 +481,7 @@ export const itemsMethods = {
       this.avatar.emote(e.move, e.dur);
       this.armsUntil = now + (e.dur ?? 1.5) * 1000;
     }
-    audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
+    audio.shout(id, undefined, 0, chosen(playerName()).voice);
     this.hud.note('“' + e.say + '”');
     this.net.send({ t: 'emote', e: id });
   },
