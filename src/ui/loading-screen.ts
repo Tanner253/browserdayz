@@ -50,6 +50,7 @@ const STAGES: [prefix: string, at: number, line?: string][] = [
   ['fort', 0.74, 'Pouring concrete for the fort'],
   ['last files', 0.75, 'Last bodies off the road'],
   ['shaders', 0.76],
+  ['arming', 0.8, 'Zeroing the scopes'],
 ];
 /** the share of the bar the files fill before the world is built (assets, up to world) */
 const FILES = [0.03, 0.08];
@@ -83,6 +84,11 @@ export class LoadingScreen {
     this.ends = (STAGES[STAGES.indexOf(s) + 1]?.[1] ?? 1) - 0.005;
     this.to(s[1]);
     if (s[2]) this.say(s[2]);
+  }
+
+  /** how far the stage under way has got, 0..1: the bar moves through its share */
+  within(k: number) {
+    this.to(this.stageAt + (this.ends - this.stageAt) * Math.min(1, Math.max(0, k)));
   }
 
   /** files come down: they fill their share of the bar while the start waits on them, after that they run behind */
