@@ -2727,6 +2727,7 @@ export class AudioEngine {
   /** the hum of the bunker (made when somebody first goes down), whether it is sounding, and how long until the place next makes a noise of its own */
   private bunkerAir: { bed: GainNode; on: boolean; nextT: number; wind: number } | null = null;
   private swarm: GainNode | null = null;
+  private diesel: { lvl: GainNode; oscs: [OscillatorNode, number][]; running: boolean } | null = null;
 
   /** a drop of water hitting a wet floor, close by */
   drip(pos: V3) {
@@ -2772,6 +2773,49 @@ export class AudioEngine {
       this.swarm = lvl;
     }
     this.swarm.gain.setTargetAtTime(near * near * 0.05, ctx.currentTime, 0.4);
+  }
+
+  /**
+   * Level 2's plant: a diesel at its governed speed, four cylinders at 1500 a minute (50 bangs a second, the note), one loop as
+   * loud as the ear is near it, with the rattle of its tin. It comes up to speed when started and runs down when it stops.
+   * @param near 0 (unheard) to 1 (beside it) @param running whether it turns
+   */
+  plant(near: number, running: boolean) {
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.diesel) {
+      if (near <= 0) return;
+      const lvl = ctx.createGain(), lp = this.filter('lowpass', 520, 0.8), shape = ctx.createWaveShaper(), mix = ctx.createGain();
+      lvl.gain.value = 0;
+      const curve = new Float32Array(257);
+      for (let i = 0; i < 257; i++) curve[i] = Math.tanh(((i - 128) / 128) * 2);
+      shape.curve = curve;
+      mix.gain.value = 0.45;
+      const oscs = ([['sawtooth', 1, 0.55], ['square', 0.5, 0.45], ['sawtooth', 2.02, 0.14]] as const).map(([type, k, g]): [OscillatorNode, number] => {
+        const o = ctx.createOscillator(), each = ctx.createGain();
+        o.type = type;
+        o.frequency.value = 50 * k * (running ? 1 : 0.3);
+        each.gain.value = g;
+        o.connect(each).connect(mix);
+        o.start();
+        return [o, k];
+      });
+      mix.connect(shape).connect(lp).connect(lvl);
+      const rattle = ctx.createBufferSource(), band = this.filter('bandpass', 900, 1.4), rg = ctx.createGain();
+      rattle.buffer = this.noiseBuf;
+      rattle.loop = true;
+      rg.gain.value = 0.12;
+      rattle.connect(band).connect(rg).connect(lvl);
+      rattle.start();
+      lvl.connect(this.bus.ambience);
+      this.diesel = { lvl, oscs, running };
+    }
+    const d = this.diesel;
+    if (running !== d.running) {
+      d.running = running;
+      for (const [o, k] of d.oscs) o.frequency.setTargetAtTime(50 * k * (running ? 1 : 0.3), t, running ? 0.9 : 1.4);
+    }
+    d.lvl.gain.setTargetAtTime(running ? near * near * 0.09 : 0, t, running ? 0.6 : 1.2);
   }
 
   /**

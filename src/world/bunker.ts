@@ -1249,12 +1249,15 @@ export class BunkerSite {
     // (the lamps are not looked at from across the map)
     if (Math.hypot(eye.x - P.x, eye.z - P.z) > 90) {
       this.life?.away();
+      audio.plant(0, this.power);
       return;
     }
     const here = bunkerLocal(P, eye.x, eye.y, eye.z), [on, also] = this.levels(here), since = this.clock - this.poweredAt;
     this.works?.update(dt, eye, on, also, gate, this.power, alarm, crowd);
     for (const d of this.dressed) if (d.level === on || d.level === also) d.look(here[0], here[1]);
     this.life?.update(dt, here, on, this.power);
+    // (the plant heard while it runs, in its room and faintly through the floors either side: the handoff, 2026-11-01, "nothing is drawn for the plant running")
+    audio.plant(this.power ? Math.max(0, 1 - Math.hypot(here[0] - PLANT.r, here[1] - PLANT.f) / 34) * (on === 2 ? 1 : (on === 1 && inBunker(P, eye.x, eye.y, eye.z)) || on === 3 ? 0.22 : 0) : 0, this.power);
     // (the lift's cab and its shaft lie past the end of the plan, and were lit by nothing at all: the owner, 2026-11-01, "the elevator seems low quality")
     const inCab = Math.abs(here[0]) < CAB.r + 0.4 && here[1] < BUNKER.hall.back && here[1] > CAB.back - 0.5 && here[2] < -1;
     const want = inCab ? 0.34 : on > 1 || inBunker(P, eye.x, eye.y, eye.z) ? deepFill(on, here[0], here[1], this.power) : 0;
