@@ -608,6 +608,9 @@ export const dropsMethods = {
     void this.s.r.lookOverAll();
     this.s.atmo.afterBoot();
     void this.menu.load();
+    // (the map's sheet printed behind the menu: printed during the loading screen it was a tenth of what the page did there,
+    // for a map nobody opens before they are in. The owner, 2026-11-08: "people click off of the game before it even loads")
+    this.map.ahead();
     // (and whatever of the world was put off because nobody starts by it)
     assets.up();
   },

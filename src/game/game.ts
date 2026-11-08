@@ -1020,6 +1020,9 @@ export class Game {
     // what Deploy waits for, so that the card's last work on it is done in the menu and never in the game, where it
     // was six seconds of a game that stood still, the first night)
     const other = behind.then(() => r.warmOther(this.garage.warmers(), !TOUCH));
+    // (and the bot check's range and figures, beside the guns: much of it is waiting on the card, which the guns' building on
+    // the page goes on through)
+    const ranged = behind.then(() => this.range().prepare());
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
     // (a gun on the ground lies there with what is fitted to it: the copy of it that is seen in the hands)
@@ -1152,7 +1155,7 @@ export class Game {
         assets.releaseModels();
         // (the bot check's range and figures, so that Play goes straight on to it)
         this.readied('Last touches 3/3');
-        await this.range().prepare();
+        await ranged;
         // (The lamps' lighting goes on being got ready behind: a lamp's light is held back until it is, see
         // Renderer.readyToLight. Waited for here, it was most of a minute of the loading screen on the dev page.)
         void other;
@@ -1525,7 +1528,6 @@ export class Game {
       this.hud.setMenuMap(this.minimap.poster(), 2 * SQUARE_HALF, spots, atmo.gases);
       // (and the map opened in the game says the same of the same places)
       this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gases, () => this.minimap.live);
-      this.map.ahead();
       this.map.onClose = () => this.toggleMap(false);
       document.getElementById('ui')!.appendChild(this.map.root);
       // (the death screen's map of beds is drawn on the same sheet: src/ui/spawn-map.ts)
