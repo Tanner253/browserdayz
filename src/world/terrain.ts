@@ -26,6 +26,19 @@ const ARRAY_RES = 1024;
  */
 const OLD_PAINT = TOUCH || (!!import.meta.env?.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('ground') === 'old');
 
+/**
+ * How much of each place is desert (`World.sand`), at half the ground's measure, for the old paint: it has no kinds of
+ * ground, and its splat laid grass in the canyon, drawn green on a phone and red on a computer. A third of a megabyte.
+ */
+function desertTex(world: World): THREE.DataTexture {
+  const s = world.sand, w = Math.ceil(WORLD_NX / 2), h = Math.ceil(WORLD_NZ / 2), out = new Uint8Array(w * h);
+  if (s) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out[j * w + i] = s[(Math.min(WORLD_NZ - 1, j * 2) * WORLD_NX + Math.min(WORLD_NX - 1, i * 2)) * 4];
+  const tex = new THREE.DataTexture(out, w, h, THREE.RedFormat);
+  tex.magFilter = tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function arrayOf(data: Uint8Array, res: number, layers: number, srgb: boolean): THREE.DataArrayTexture {
   const tex = new THREE.DataArrayTexture(data, res, res, layers);
   tex.format = THREE.RGBAFormat;
@@ -504,6 +517,7 @@ export class Terrain {
         tNormal: { value: normals },
         tArm: { value: arm },
         tSplat: { value: this.splatTex },
+        tDesert: { value: desertTex(this.world) },
         tMacro: { value: this.macroTex },
         uTile: { value: new THREE.Vector4(...TILE.map((v) => 1 / v)) },
         ...worldUniforms(),
@@ -825,6 +839,7 @@ uniform sampler2DArray tAlbedo;
 uniform sampler2DArray tNormal;
 uniform sampler2DArray tArm;
 uniform sampler2D tSplat;
+uniform sampler2D tDesert;
 uniform sampler2D tMacro;
 uniform vec4 uTile;
 // (the world's north-west corner and its size in metres; its samples across and down)
@@ -853,6 +868,11 @@ vec4 macro2 = texture2D(tMacro, vTerrainPos.xz / 37.0);
 // jitter the splat lookup so layer boundaries are organic instead of grid-aligned
 vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.zw);
 vec4 w = texture2D(tSplat, splatUv + jitter);
+// (the desert, as much as the world says it is (desertTex): its faces the canyon's red rock and the rest of it sand,
+// both drawn from the rock layers and tinted below, where the splat had laid grass)
+float desertK = texture2D(tDesert, splatUv).r;
+float steepK = 1.0 - smoothstep(0.7, 0.9, normalize(vTerrainNormal).y);
+w = mix(w, vec4(0.0, 0.0, max(w.b, steepK), w.r + w.g + w.a), desertK);
 
 float camDist = length(vTerrainPos - cameraPosition);
 vec2 dPx = dFdx(vTerrainPos.xz);
@@ -904,10 +924,14 @@ for (int i = 0; i < 4; i++) {
   tNrm += (nrms[i] * 2.0 - 1.0) * k;
   tArmV += arms[i] * k;
 }
-// large-scale colour variation (patchy dry grass, damp soil)
+{
+  float lumD = dot(tAlb.rgb, vec3(0.299, 0.587, 0.114));
+  tAlb.rgb = mix(tAlb.rgb, lumD * mix(vec3(1.45, 1.15, 0.8), vec3(1.7, 0.95, 0.62), steepK), desertK);
+}
+// large-scale colour variation (patchy dry grass, damp soil; none of it lush in the desert)
 vec3 dry = vec3(1.06, 1.02, 0.86);
 vec3 lush = vec3(0.84, 1.0, 0.86);
-tAlb.rgb *= mix(lush, dry, smoothstep(0.25, 0.85, macro.r)) * (0.88 + 0.24 * macro.g);
+tAlb.rgb *= mix(mix(lush, dry, smoothstep(0.25, 0.85, macro.r)), dry, desertK) * (0.88 + 0.24 * macro.g);
 tAlb.rgb *= mix(1.0, 0.92 + 0.16 * macro2.b, 0.7);
 // photoscans bake in near-white pebbles; real ground albedo tops out ~0.45. Soft-knee
 // compression stops sunlit pebbles blooming into sparkles that flicker with motion.
