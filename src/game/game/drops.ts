@@ -370,7 +370,7 @@ export const dropsMethods = {
     // mouse is not taken yet: in the game it is, with a click)
     if (!this.started && !this.isLoaded) {
       this.wantIn = true;
-      this.hud.showStart(true, false, 'Loading…');
+      this.hud.showStart(true, false, this.readyText);
       return;
     }
     document.title = this.title;

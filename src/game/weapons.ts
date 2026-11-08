@@ -1755,7 +1755,15 @@ export class Weapons {
     this.arms.setLook(look);
   }
 
-  async load() {
+  /** @param counted how many of the guns' files have come, of how many, as each comes */
+  async load(counted?: (done: number, total: number) => void) {
+    // (Every gun's file asked for at once, read as they come while the guns below are built one by one: each waited for
+    // the one before it to come down and be read, most of half a minute behind the menu. The packs are those built
+    // below; the guns alone are every one with holds.)
+    const files = [...['sniper', 'smg', 'ak', 'aks74u', 'db12', 'dualsmg', 'mp7a1', 'pitchfork', 'sawnoffs', 'scorpion', 'sniper50', 'knife'].map((p) => `${p}_fp`), ...Object.keys(assets.manifest.models).filter((id) => assets.manifest.models[id].holds)];
+    let came = 0;
+    counted?.(0, files.length);
+    for (const id of files) void assets.gltfOf(id).then(() => counted?.(++came, files.length), () => counted?.(++came, files.length));
     await this.arms.load();
     this.vmRoot.add(this.arms.root);
     const art = await muzzleArt();

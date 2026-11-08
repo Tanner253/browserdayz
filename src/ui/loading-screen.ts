@@ -50,7 +50,6 @@ const STAGES: [prefix: string, at: number, line?: string][] = [
   ['fort', 0.74, 'Pouring concrete for the fort'],
   ['last files', 0.75, 'Last bodies off the road'],
   ['shaders', 0.76],
-  ['arming', 0.8, 'Zeroing the scopes'],
 ];
 /** the share of the bar the files fill before the world is built (assets, up to world) */
 const FILES = [0.03, 0.08];
@@ -60,6 +59,7 @@ const EVERY = 1900;
 export class LoadingScreen {
   private fill: HTMLElement;
   private label: HTMLElement;
+  private count: HTMLElement | null;
   private shown = 0;
   private stageAt = 0;
   private filing = false;
@@ -72,11 +72,16 @@ export class LoadingScreen {
   constructor(root: HTMLElement) {
     this.fill = root.querySelector('.load-fill') as HTMLElement;
     this.label = root.querySelector('.load-label') as HTMLElement;
+    this.count = root.querySelector('.load-count');
     this.next();
   }
 
   /** a stage of the start has begun */
   stage(name: string) {
+    // (what is being counted, as so many of so many: with the bar alone at its end, a start that was still working
+    // looked stuck. The owner, 2026-11-08: "we need to show a #/# progress too ... i think im stuck and want to refresh")
+    const n = /(\d+\/\d+)$/.exec(name);
+    if (n) this.counted(`${name.slice(0, n.index).trim()} ${n[1]}`);
     const s = STAGES.find(([p]) => name.startsWith(p));
     if (!s) return;
     this.filing = s[0] === 'assets';
@@ -86,19 +91,20 @@ export class LoadingScreen {
     if (s[2]) this.say(s[2]);
   }
 
-  /** how far the stage under way has got, 0..1: the bar moves through its share */
-  within(k: number) {
-    this.to(this.stageAt + (this.ends - this.stageAt) * Math.min(1, Math.max(0, k)));
-  }
-
   /** files come down: they fill their share of the bar while the start waits on them, after that they run behind */
   files(done: number, total: number) {
+    if (done < total) this.counted(`files ${done}/${total}`);
     if (this.filing) this.to(FILES[0] + (FILES[1] - FILES[0]) * (done / Math.max(total, 1)));
   }
 
   done() {
     this.to(1);
+    this.counted('');
     this.stop();
+  }
+
+  private counted(text: string) {
+    if (this.count) this.count.textContent = text;
   }
 
   /** something went wrong: it is said plainly, and the lines stop */

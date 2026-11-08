@@ -358,14 +358,10 @@ async function boot() {
   // (F8: a flight recorded for the tests to fly again: src/dev/flight-record.ts)
   if (import.meta.env.DEV) (await import('./dev/flight-record')).installFlightRecorder(game);
   game.start();
-  // (the guns, built under the loading screen before the menu's own extras (the sky, the films): one loading, not two.
-  // Built behind the menu, they were a second wait with a "Loading 37%" of its own for whoever pressed Deploy at once:
-  // players, "why does the user need to wait for 2 loadings?")
-  stage('arming');
+  // (the guns, built behind the menu now it is up (Game.loaded), before the menu's own extras (the sky, the films). Built
+  // under the loading screen they kept the menu waiting: the owner, 2026-11-08, "the initial load in at the main menu is
+  // so long its really bad". Whoever presses Deploy first is shown them counted: Game.readied)
   game.buildBehind();
-  assets.onProgress = (d, t) => screen.within(d / Math.max(t, 1));
-  await game.loaded;
-  assets.onProgress = () => {};
   game.afterBoot();
   // (the Zone's how to play, once, on a browser's first visit; never on this machine's own runs, where every fresh
   // headless browser is a first visit: the owner, "when running locally simply disable the how to play modal")

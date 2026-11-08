@@ -1014,7 +1014,7 @@ export class Game {
     // (built behind the menu, begun once the world is up and the menu shown (`buildBehind`, from src/main.ts), and
     // what wants them is done when they are: `loaded`)
     const behind = new Promise<void>((go) => (this.buildBehind = go));
-    const guns = behind.then(() => this.weapons.load());
+    const guns = behind.then(() => this.weapons.load((done, total) => this.readied(`Readying the guns ${done}/${total}`)));
     this.gunsIn = guns;
     // (and beside them the world got ready for the lighting it is not lit by, the lamps' (Renderer.warmOther): part of
     // what Deploy waits for, so that the card's last work on it is done in the menu and never in the game, where it
@@ -1135,6 +1135,7 @@ export class Game {
     this.loaded = guns
       .then(async () => {
         this.weapons.setLook(lookFor(playerName()));
+        this.readied('Last touches 1/3');
         this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
         const held = new THREE.Group();
         for (const id of Object.keys(ITEMS)) {
@@ -1146,8 +1147,10 @@ export class Game {
         // in somebody's hands is readied in full as it is shown: RemotePlayer.readyHeld. 2026-10-21, the owner: "my vram
         // got maxed and throttled".)
         await Promise.race([r.ready([held], false, false), new Promise<void>((done) => setTimeout(done, 6000))]);
+        this.readied('Last touches 2/3');
         if (stale.length) Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
         assets.releaseModels();
+        this.readied('Last touches 3/3');
         await other;
       })
       .catch((e) => console.error('what is built behind the menu', e))
@@ -1801,6 +1804,12 @@ export class Game {
    */
   loaded!: Promise<void>;
   isLoaded = false;
+  /** how far what is built behind the menu has got, counted, for whoever presses Deploy before it is done */
+  readyText = 'Readying the guns';
+  readied(text: string) {
+    this.readyText = text;
+    if (this.wantIn && !this.isLoaded) this.hud?.showStart(true, false, text);
+  }
   wantIn = rejoining();
   /** starts what is built behind the menu (called once the menu is shown) */
   buildBehind: () => void = () => {};

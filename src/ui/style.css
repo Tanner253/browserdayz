@@ -307,6 +307,14 @@ body {
   background: var(--accent);
   transition: width 0.25s ease;
 }
+.load-count {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint, var(--ink-dim));
+  height: 14px;
+}
 .load-label {
   margin-top: 12px;
   font-family: var(--mono);
