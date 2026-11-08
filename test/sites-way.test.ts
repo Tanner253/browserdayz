@@ -169,8 +169,14 @@ try {
   await sleep(250);
   assert.equal(ann.site('vault')?.phase, 'idle', 'the breaker was thrown from the level above');
   await ann.go(bx, Y3, bz);
+  const before = ann.all('i+').length;
   ann.send({ t: 'site', s: 'vault' });
   await ann.until('the vault went off', () => ann.site('vault')?.phase === 'alarm');
+  // (its waves come down the far passages, never beside whoever threw it, and no more than its most in all: the owner, 2026-11-08, "the zombuies are endless")
+  await ann.until('the first wave of the vault came', () => ann.all('i+').length > before);
+  const came = ann.all('i+').slice(before);
+  assert.ok(came.length <= V.wave.most, `the vault stood up ${came.length}`);
+  for (const m of came) assert.ok(Math.hypot(m.b.s[0] - bx, m.b.s[1] - Y3, m.b.s[2] - bz) > 18, 'one stood up in sight of the breaker');
   await ann.until('the vault paid out', () => ann.all('drop+').some((m) => m.d.site?.includes('locker at the vault')), 9000);
   const vault = ann.all('drop+').find((m) => m.d.site?.includes('locker at the vault'))!.d;
   await ann.go(vault.x, vault.y, vault.z);

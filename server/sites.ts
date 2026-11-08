@@ -14,7 +14,7 @@ import { GATES, SITES, atSpot, sitePoint, siteSpot, spotAt, strongDoor, waveSpot
 import type { C2S, S2C } from '../src/net/protocol';
 import { boxes, doors, economy, horde, issue, log, world, type Box } from './index';
 import { place } from './keep';
-import { broadcast, send, type Client } from './players';
+import { broadcast, clients, send, type Client } from './players';
 import { dropInfo } from './drops';
 import { bunkerDoor, carries } from './tags';
 
@@ -24,6 +24,8 @@ interface Run {
   nextWave: number;
   /** what it stood up, to be cleared away at the end */
   stood: Set<number>;
+  /** how many its waves have stood up this time: on a level of the bunker they stop at the wave's `most` */
+  sent: number;
   crates: string[];
   /** when what lies there comes back (0: it is there) */
   fuelAt: number;
@@ -31,7 +33,7 @@ interface Run {
   done: Set<number>;
 }
 
-const runs = new Map<string, Run>(Object.keys(SITES).map((id) => [id, { phase: 'idle', until: 0, nextWave: 0, stood: new Set(), crates: [], fuelAt: 0, done: new Set() }]));
+const runs = new Map<string, Run>(Object.keys(SITES).map((id) => [id, { phase: 'idle', until: 0, nextWave: 0, stood: new Set(), sent: 0, crates: [], fuelAt: 0, done: new Set() }]));
 /** when each gate shuts again (0: it is shut) */
 const gates = new Map<string, number>(Object.keys(GATES).map((g) => [g, 0]));
 /** each site's strong room's door, found when the world is made (-1: none) */
@@ -87,15 +89,28 @@ function crate(s: Site, r: Run, at: [number, number], fill: (c: Container) => vo
   broadcast({ t: 'drop+', d: dropInfo(b) });
 }
 
+/** how far from anybody on its floor one of a bunker level's waves may come, metres: out of sight round the passages */
+const UNSEEN = 18;
+
 function wave(s: Site, r: Run, now: number) {
   for (const i of r.stood) if (!horde.bodies.get(i) || horde.bodies.get(i)!.diedAt) r.stood.delete(i);
   const n = Math.min(s.wave.n, s.wave.most - r.stood.size), [rx, rz] = sitePoint(s, s.reader), level = world.groundAt(rx, rz);
-  // (on a level of the bunker they come down its passages)
+  // (On a level of the bunker they come down its passages: so many in all and no more, each one killed one fewer, and
+  // never where anybody stands to see it come. The owner, 2026-11-08: "in bunker 3 the zombeuis wont stop respawning
+  // when i kill them they auto respawn its impossible for aplayer to explore and loot because the zombuies are
+  // endless". Each wave stood up as many again as had been killed, at its fixed spots, beside whoever was there.)
   if (s.level) {
-    const spots = levelSpots(s.level), y = (world.bunker?.y ?? 0) + levelY(s.level);
-    for (let k = 0; k < n; k++) {
-      const at = spots[Math.floor(Math.random() * spots.length)], [x, z] = sitePoint(s, [at[0], at[1]]), b = horde.place(x, y + at[2], z, now);
+    const y = (world.bunker?.y ?? 0) + levelY(s.level), eyes = [...clients.values()].filter((c) => c.alive).map((c) => c.pose);
+    const free = levelSpots(s.level)
+      .map((at): [number, number, number] => {
+        const [x, z] = sitePoint(s, [at[0], at[1]]);
+        return [x, y + at[2], z];
+      })
+      .filter(([x, sy, z]) => eyes.every((p) => Math.hypot(p[0] - x, p[1] - sy, p[2] - z) > UNSEEN));
+    for (let k = 0, most = Math.min(s.wave.n, s.wave.most - r.sent); k < most && free.length; k++) {
+      const [x, sy, z] = free[Math.floor(Math.random() * free.length)], b = horde.place(x, sy, z, now);
       r.stood.add(b.i);
+      r.sent++;
       broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
     }
     return;
@@ -155,13 +170,13 @@ export function useSite(c: Client, m: Extract<C2S, { t: 'site' }>) {
   if (!s.level) flare(s);
   // (nothing to turn: the door it stands in front of opens, and that is all)
   if (!s.level && !s.steps) return openUp(m.s, s, r, now);
-  Object.assign(r, { phase: 'alarm', until: now + holdOf(s) * 1000, nextWave: now });
+  Object.assign(r, { phase: 'alarm', until: now + holdOf(s) * 1000, nextWave: now, sent: 0 });
   if (s.level) crate(s, r, s.crate, (b) => fillCrate(b, 'weapons_case', Math.random, 'bunker'), `The strong room at ${s.name}`, floorOf(s));
   broadcast(said(m.s, r, now));
 }
 
 function ready(id: string, s: Site, r: Run, now: number) {
-  Object.assign(r, { phase: 'idle', until: 0 });
+  Object.assign(r, { phase: 'idle', until: 0, sent: 0 });
   r.done.clear();
   // (what is left of it cleared away, and the room shut again)
   for (const i of r.stood) {
