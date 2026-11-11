@@ -88,9 +88,8 @@ const PHONE_FAR = { colour: 256, other: 128 };
  */
 const DESK = !TOUCH;
 const DESK_CAP = { colour: 512, other: 256 };
-// (back to 1024 and 512, 2026-10-26: at 2048 a picture of that size went to the card as it came, not made again at the cap,
-// and things lying on the ground were drawn black, the owner: "a lot of objects are rendering all black ... only when on the
-// ground". The frame was lighter at 1024 too)
+// (back to 1024 and 512, 2026-10-26, when things lying on the ground were drawn black at 2048: that was not the size but
+// paints copied while sharp, see `stoodFor`, mended 2026-11-11. The frame was lighter at 1024 too)
 const DESK_NEAR = { colour: 1024, other: 512 };
 /**
  * Each model's file made at DESK_CAP already, for a computer (scripts/lean.mjs): the files carry their pictures at up
@@ -114,6 +113,48 @@ const paints = (o: THREE.Object3D): Painted[] => {
   const m = (o as THREE.Mesh).material;
   return (m ? (Array.isArray(m) ? m : [m]) : []) as unknown as Painted[];
 };
+
+/**
+ * The world's own picture that a sharp one is painted with in place of (see `sharpen`), and a material copied while
+ * it is sharp a copy painted with the world's own (2026-11-11). A copy kept the sharp pictures, nothing knew to put
+ * it back, and ten seconds after the last sharp thing had let go it was painted with pictures that had been thrown
+ * away, which three.js draws as empty ones: black. A gun on the ground is made of copies of the paints of the one in
+ * the hands (`seenParts`, src/game/loot.ts), and a survivor's clothes of copies of the last one's: the owner,
+ * 2026-10-26, "a lot of objects are rendering all black ... only when on the ground"; 2026-11-11, "sometimes meches
+ * go all-black when in game".
+ */
+const stoodFor = new WeakMap<THREE.Texture, THREE.Texture>();
+const cloneAsItCame = THREE.Material.prototype.clone;
+THREE.Material.prototype.clone = function (this: THREE.Material) {
+  const c = cloneAsItCame.call(this) as unknown as Painted;
+  for (const slot of MAPS) {
+    const lo = c[slot] && stoodFor.get(c[slot]!);
+    if (lo) c[slot] = lo;
+  }
+  return c as never;
+};
+
+/** what the card tells one picture from another by: two textures of one source alike in all of these are one picture there */
+const KEYED = ['wrapS', 'wrapT', 'magFilter', 'minFilter', 'anisotropy', 'internalFormat', 'format', 'type', 'generateMipmaps', 'premultiplyAlpha', 'flipY', 'unpackAlignment', 'colorSpace'] as const;
+
+/**
+ * A sharp picture thrown away. Whatever is painted with it still, by a way `clone` above does not see (a material
+ * made from another's pictures by hand), is not left with nothing: from here on it IS the world's own picture under
+ * another name, the same source keyed alike, which the card holds once.
+ */
+function retire(t: THREE.Texture) {
+  const lo = stoodFor.get(t);
+  t.dispose();
+  if (!lo || lo === t) return;
+  const to = t as unknown as Record<string, unknown>, from = lo as unknown as Record<string, unknown>;
+  // (one that was sent in strips is a picture the card was asked to make room for: asked again, it would be empty)
+  to.isFramebufferTexture = false;
+  // (`thin` waits on it to close its picture, which is now the world's)
+  t.onUpdate = null as never;
+  t.source = lo.source;
+  for (const k of KEYED) to[k] = from[k];
+  t.version++;
+}
 
 /**
  * A picture that came with a model is let go of once it is on the graphics card: unpacked, a picture of four
@@ -640,7 +681,8 @@ export class Assets {
             if (!mat[slot] || !hi) continue;
             (first ? this.firsts : this.swaps).push(() => {
               const w = this.worn.get(mat);
-              if (!w || w.n <= 0 || !mat[slot] || mat[slot] === hi) return false;
+              if (!w || w.n <= 0 || !mat[slot]) return false;
+              if (mat[slot] === hi) return this.wear(mat, slot, hi, w), false;
               const size = hi.image as { width: number; height: number } | undefined;
               if (this.onCard.has(hi) || (this.strips && size && Math.max(size.width, size.height) > STRIP_OVER)) {
                 // (A big one: sent to the card over as many frames as it takes, and painted with when the whole of
@@ -648,10 +690,12 @@ export class Assets {
                 let on = this.onCard.get(hi);
                 if (!on) {
                   const wanted = () => !hi.userData.gone && (this.worn.get(mat)?.n ?? 0) > 0;
+                  // (its own picture, held by name: thrown away meanwhile, `hi.image` is the world's: see `retire`)
+                  const page = hi.image as ImageBitmap | undefined;
                   on = this.strips!.put(hi, mat[slot]!.anisotropy, wanted).then((card) => {
                     // (the page's copy goes as soon as the card has it; one that was dropped part way is begun again by whoever wants it next)
                     // (not in the frame its last strip went in: giving 64 MB back is four milliseconds of its own)
-                    if (card) void Promise.resolve(breathe()).then(() => (hi.image as ImageBitmap | undefined)?.close?.());
+                    if (card) void Promise.resolve(breathe()).then(() => page?.close?.());
                     else if (this.onCard.get(hi) === on) this.onCard.delete(hi);
                     return card;
                   });
@@ -661,16 +705,13 @@ export class Assets {
                   if (!card) return false;
                   await oneAFrame();
                   const w = this.worn.get(mat);
-                  if (!w || w.n <= 0 || !mat[slot] || mat[slot] === card) return false;
-                  if (!(slot in w.lo)) w.lo[slot] = mat[slot]!;
-                  mat[slot] = card;
+                  if (w && w.n > 0 && mat[slot]) this.wear(mat, slot, card, w);
                   return false;
                 });
               }
-              if (!(slot in w.lo)) w.lo[slot] = mat[slot]!;
               // (seen at a slant as the one it takes the place of is)
               if (!this.queued.has(hi)) hi.anisotropy = mat[slot]!.anisotropy;
-              mat[slot] = hi;
+              this.wear(mat, slot, hi, w);
               // (a picture that is on its way to the card already costs this one nothing)
               const fresh = !this.queued.has(hi);
               this.queued.add(hi);
@@ -694,6 +735,20 @@ export class Assets {
     };
   }
   private worn = new WeakMap<Painted, { n: number; lo: Partial<Record<(typeof MAPS)[number], THREE.Texture>> }>();
+
+  /**
+   * `sharp` painted with in place of the world's own picture, which is kept to be put back. A material that is
+   * painted with a sharp one already (made from one that was, or from one since thrown away) is put back to what
+   * that one stood for, not left as it is: see `stoodFor`.
+   */
+  private wear(mat: Painted, slot: (typeof MAPS)[number], sharp: THREE.Texture, w: { lo: Partial<Record<(typeof MAPS)[number], THREE.Texture>> }) {
+    const now = mat[slot]!;
+    const lo = stoodFor.get(now) ?? now;
+    if (!(slot in w.lo)) w.lo[slot] = lo;
+    if (now === sharp) return;
+    stoodFor.set(sharp, lo);
+    mat[slot] = sharp;
+  }
 
   /** the next picture put on, and the one after it a moment later */
   private pump() {
@@ -769,8 +824,7 @@ export class Assets {
     if (!s) {
       const pictures = new Set<THREE.Texture>();
       // (its own file, a body's being its id. Not its `hi` copy: that lists its paints in an order of its own, and its
-      // pictures went onto the wrong ones, black, on things lying on the ground; the owner, 2026-10-26, "a lot of objects
-      // are rendering all black ... only when on the ground")
+      // pictures went onto the wrong ones)
       const mats = this.bytes(this.manifest.models[id]?.url ?? id).then((data) =>
         this.sharpTurn(first, () => this.turn(async () => {
           // (only what it is painted with is unpacked: its shapes are in the world already)
@@ -809,19 +863,21 @@ export class Assets {
       this.sharp.delete(id);
       // (when they have come, if they are still on their way)
       const gone = async () => {
+        // (their own pictures in the page, noted before any of them becomes the world's: see `retire`)
+        const page: ImageBitmap[] = [];
         for (const t of s.pictures) {
           // (and its copy on the card, if it was a big one: when that has come, if it is still on its way)
           t.userData.gone = true;
+          const img = t.image as ImageBitmap | undefined;
+          if (img?.close && img.width) page.push(img);
           const on = this.onCard.get(t);
           this.onCard.delete(t);
-          void on?.then((card) => card?.dispose());
-          t.dispose();
+          void on?.then((card) => card && retire(card));
+          retire(t);
         }
         // (A picture that was unpacked and never put on is still whole in the page, 64 MB of it, and giving that
         // back is four milliseconds: one to a frame's spare time. A model's ten at once was 45 ms of nothing drawn.)
-        for (const t of s.pictures) {
-          const img = t.image as ImageBitmap | undefined;
-          if (!img?.close || !img.width) continue;
+        for (const img of page) {
           await breathe();
           img.close();
         }
