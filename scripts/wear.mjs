@@ -618,6 +618,36 @@ for (const [id, piece] of Object.entries(PIECES)) {
     if (chest || waist) bulk = { ...(chest ? { chest } : {}), ...(waist ? { waist } : {}) };
   }
 
+  // ---- the figure's own shirt where its hem lies over a pair of trousers' waist, marked (`_SHIRT`), 2026-11-11.
+  // Meshy made the figure one skin, shirt and trousers together, so the hem is part of the trousers' shape: pale over
+  // a pair of jeans, it showed as a torn grey band under whatever shirt was worn (the owner: "theres tering and
+  // sdtratching all over"). Cut away, the trousers ended a hand lower and a body in them and no top was open at the
+  // waist. So it stays, and the game draws what is marked as the shirt that is worn (src/game/survivors.ts, uShirt):
+  // at the waist, what is of no colour and well lighter than the trousers, evened over its neighbours twice.
+  {
+    const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], hue = (c) => (Math.max(...c) - Math.min(...c)) / Math.max(1e-3, Math.max(...c));
+    if (!notShirt && piece.core.includes('thigh') && (lum(own) < lum(shirt) * 0.75 || hue(own) > 0.12)) {
+      const hipY = Math.max(...body.node.getSkin().listJoints().filter((j) => /^thigh_[lr]$/.test(j.getName())).map((j) => at(M4(j.getWorldMatrix())).y));
+      const least = lum(own) + 0.35 * (lum(shirt) - lum(own));
+      const mine = [...new Set(tris.flat().map((i) => one[i]))], kept = new Set(mine);
+      let mark = new Uint8Array(D.P.length);
+      for (const i of mine) {
+        const r = near[i] < 0 ? -1 : region.getScalar(near[i]);
+        const waist = r === REGION.hips || r === REGION.belly || (r === REGION.thigh && D.P[i].y > hipY);
+        if (waist && hue(D.C[i]) < 0.1 && lum(D.C[i]) > least) mark[i] = 1;
+      }
+      for (let pass = 0; pass < 2; pass++) {
+        const was = mark.slice();
+        for (const i of mine) {
+          const ns = [...next[i]].filter((j) => kept.has(j)), yes = ns.filter((j) => was[j]).length;
+          if (ns.length && yes * 2 !== ns.length) mark[i] = yes * 2 > ns.length ? 1 : 0;
+        }
+      }
+      const marks = Float32Array.from(D.P, (p, i) => mark[one[i]]);
+      if (marks.some((m) => m)) D.prim.setAttribute('_SHIRT', dressed.doc.createAccessor().setType('SCALAR').setArray(marks));
+    }
+  }
+
   // ---- the piece: only its own points, in the order they are first used
   const prim = D.prim, used = new Map();
   for (const t of tris) for (const i of t) if (!used.has(i)) used.set(i, used.size);
@@ -643,13 +673,17 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // its folds and wear stay as they are; see src/game/survivors.ts)
   {
     const { data, info } = await sharp(Buffer.from(mat.getBaseColorTexture().getImage())).raw().toBuffer({ resolveWithObject: true });
-    const uv = prim.getAttribute('TEXCOORD_0'), e = [];
-    let sum = 0;
+    const uv = prim.getAttribute('TEXCOORD_0'), e = [], marks = prim.getAttribute('_SHIRT');
+    // (and how light what is marked as the shirt is, `shirt`: the shirt worn is laid on it in proportion to that)
+    let sum = 0, shirtSum = 0, shirtN = 0;
     for (let i = 0; i < uv.getCount(); i++) {
       const [s, t] = uv.getElement(i, e), o = (Math.round(t * (info.height - 1)) * info.width + Math.round(s * (info.width - 1))) * info.channels;
-      sum += 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
+      const l = 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
+      sum += l;
+      if (marks && marks.getScalar(i) > 0.5) (shirtSum += l), shirtN++;
     }
-    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(bulk ? { bulk } : {}), ...(top !== null ? { top } : {}) });
+    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(shirtN ? { shirt: +(shirtSum / shirtN / 255).toFixed(4) } : {}), ...(bulk ? { bulk } : {}), ...(top !== null ? { top } : {}) });
+    if (shirtN) console.log(`  ${shirtN} points of it are the figure's shirt, light ${(shirtSum / shirtN / 255).toFixed(3)}`);
   }
   await dressed.doc.transform(
     unpartition(),

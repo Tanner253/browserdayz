@@ -143,7 +143,7 @@ export interface ItemDef {
    * the body it covers (the skin there is hidden) and those it is only partly over (drawn a little in from the skin).
    * `each`: made for each body apart, `<model>_<body>` (the balaclava: a head fitted to each head).
    */
-  dress?: { model: string; hides: Region[]; shrinks?: Region[]; each?: boolean };
+  dress?: { model: string; hides: Region[]; shrinks?: Region[]; each?: boolean; /** a shirt over the body's own, which is drawn under it in its colour: src/game/survivors.ts Hidden.shirt */ shirt?: boolean };
   /**
    * The colours it is found in, each one model of it made that colour: as it was drawn (neither said), a colour laid
    * on its cloth, or a camouflage's tile (assets/tex/camo/). Which one a thing is is its own (`c` on it).
