@@ -1093,7 +1093,7 @@ const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007] }
 function foreHold(at: THREE.Vector3, post: boolean): HandGrip {
   return post
     ? { pos: at.clone().add(new THREE.Vector3(-0.05, 0.014, -0.02)), fingers: new THREE.Vector3(0.9, -0.3, 0.3).normalize(), palm: new THREE.Vector3(0.15, -0.1, 1).normalize(), curl: [1.2, 1.25, 1.3, 1.3], thumb: 1 }
-    : { pos: at.clone().add(new THREE.Vector3(-0.02, -0.032, -0.05)), fingers: new THREE.Vector3(0.35, 0.1, 0.93).normalize(), palm: new THREE.Vector3(0, 1, 0.1).normalize(), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 };
+    : { pos: at.clone().add(new THREE.Vector3(-0.02, -0.02, -0.045)), fingers: new THREE.Vector3(0.35, 0.1, 0.93).normalize(), palm: new THREE.Vector3(0, 1, 0.1).normalize(), curl: [0.68, 0.72, 0.76, 0.8], thumb: 0.4 };
 }
 /**
  * How a body's two hands hold a pistol, seen from outside: where each wrist is on the gun (the M9's own measure:

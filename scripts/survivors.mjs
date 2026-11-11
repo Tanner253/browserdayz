@@ -217,6 +217,25 @@ for (const [n, file] of BODIES.entries()) {
     const fit = { crown: r(skull.max.y - head.y), headZ: r((skull.min.z + skull.max.z) / 2 - head.z), headDepth: r(skull.max.z - skull.min.z), chestMin: r(chest.min.z - sp.z), chestMax: r(chest.max.z - sp.z), chestWidth: r(chest.max.x - chest.min.x), ...waistOf(node), ...headOf(node) };
     node.setExtras({ ...node.getExtras(), height: +(hi - lo).toFixed(4), stands: STANDS[n], fit });
   }
+  // ---- every triangle wound as its points face (2026-11-11). Meshy turned some inside out, 57 to 102 a body, and the
+  // skin is drawn from both sides: seen from outside, each was lit as its own inside, a dark slit down body 0's back
+  // that opened as it aimed, dark flecks over the hands and the scalp; the owner, "theres tering and sdtratching all
+  // over". Turned only where all three of its points face away from it: a crease's own folds are left as they lie.
+  let turned = 0;
+  {
+    const prim = node.getMesh().listPrimitives()[0], pos = prim.getAttribute('POSITION'), nor = prim.getAttribute('NORMAL'), idx = prim.getIndices();
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), f = new THREE.Vector3(), m = new THREE.Vector3(), out = idx.getArray().slice();
+    for (let t = 0; t < out.length; t += 3) {
+      a.fromArray(pos.getElement(out[t], []));
+      b.fromArray(pos.getElement(out[t + 1], [])).sub(a);
+      c.fromArray(pos.getElement(out[t + 2], [])).sub(a);
+      f.crossVectors(b, c);
+      if (f.lengthSq() === 0 || [0, 1, 2].some((s) => m.fromArray(nor.getElement(out[t + s], [])).dot(f) >= 0)) continue;
+      [out[t + 1], out[t + 2]] = [out[t + 2], out[t + 1]];
+      turned++;
+    }
+    prim.setIndices(idx.clone().setArray(out));
+  }
   for (const m of root.listMaterials()) m.setName(`survivor_${n}`);
   await doc.transform(
     unpartition(),
@@ -232,5 +251,5 @@ for (const [n, file] of BODIES.entries()) {
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
   console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}
   ${moved}
-  ${weighted}\n  ${cloth}\n  ${worn}`);
+  ${weighted}\n  ${cloth}\n  ${worn}\n  ${turned} triangles turned the right way out`);
 }

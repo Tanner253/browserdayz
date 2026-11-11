@@ -561,11 +561,16 @@ export function plainHands(node, plain, { lift = 0, bones = null, flat = null } 
     const fingers = new Set(names.flatMap((nm, k) => (HAND(s).test(nm) && !nm.startsWith('hand') ? [k] : []))), h = names.indexOf(`hand${s}`);
     // (and the forearm's end, by the wrist, wholly on the forearm: the hand's share of it tore into shards as the wrist bent
     // hard, and the new hand brings its own wrist)
+    // (A body's own forearm wholly on the forearm, however far back, 2026-11-11: from 3.5 cm back it kept the hand's
+    // share the suit's weights gave it, and the band in front of that was put wholly on the arm, so a ring 4 to 5 cm up
+    // the forearm went with the hand while the band before it stayed, and every bend of the wrist folded the skin there
+    // into a torn-looking crease; the owner, "theres tering and sdtratching all over". The new hand brings its own wrist.
+    // A glove's cuff (`lift`) is as it was.)
     const arm = names.indexOf(`lowerarm${s}`);
     for (let i = 0; i < n0; i++) {
       if (P[i].distanceTo(hand) > 0.3) continue;
       ji.getElement(i, a), jw.getElement(i, w);
-      const to = past(P[i], hand) > -0.035 ? arm : h;
+      const to = !lift || past(P[i], hand) > -0.035 ? arm : h;
       if (!a.some((j, c) => w[c] > 0 && (fingers.has(j) || (to === arm && j === h)))) continue;
       let moved = 0;
       for (let c = 0; c < 4; c++) if (fingers.has(a[c]) || (to === arm && a[c] === h)) (moved += w[c]), (w[c] = 0);

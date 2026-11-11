@@ -182,8 +182,12 @@ export const POSE = {
     cheek: { eye: [0.032, 1.64, -0.075] as [number, number, number], x: 0, jaw: 0.05, plate: 0.1, beside: 0.025, front: 0.09, slope: 0.5, tilt: 0.35, body: 0.3, nod: 0.12, crane: [0.03, 0.04] as [number, number], drop: 0.07, shrug: 0.18, lean: 0.09, visored: 0.4 },
     /** aimed, the chest is turned this far off the aim (less than at the ready: the right shoulder comes round to the gun), the left shoulder comes this far forward, and the right this far */
     bladeAim: 0.6,
-    reachAim: 0.75,
-    reachRight: 0.6,
+    // (Half what they were, 0.75 and 0.6, 2026-11-11: 43 and 34 degrees of collarbone is past what a shoulder blade
+    // does, and the survivors' bodies carry their upper backs on the collarbones, so aiming the back behind each shoulder
+    // swelled into a hump, the owner: "the player character models need polish theres tering and sdtratching all over".
+    // The hands keep the gun where it was: progress/anim-polish/half-full.jpg.)
+    reachAim: 0.38,
+    reachRight: 0.3,
     /** how far both shoulders come forward to a pistol, radians (see GUN_ELBOW.pistolR) */
     protract: 0.14,
     // (A pistol at the ready and carried was a hand's width nearer the chest and off to the right: the left arm
