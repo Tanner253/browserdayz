@@ -386,6 +386,7 @@ export class Atmosphere {
       CASCADE_OF.set(l.shadow.getFrustum(), i);
     });
     this.padCascades();
+    this.leanMaps();
   }
 
   /**
@@ -397,6 +398,29 @@ export class Atmosphere {
    * of the card's frame at the crossroads (2026-10-15, frozen against drawn, the view turning). The view being wide,
    * the slice's own box was nearly as wide already: these are a few per cent wider, and the maps no softer to the eye.
    */
+  /**
+   * A cascade's map made here, before three makes it (2026-11-11): the same depths, which are all a shadow is read
+   * from (three's shaders take the map's depth texture), with a picture of one byte a point beside them where three
+   * hangs four. Nothing reads that picture, and every shadow drawn was written to it: 76 MB of the card for the
+   * three cascades at ultra, counted on the card (progress/perf-pass/census.js), now 19.
+   */
+  private leanMaps() {
+    for (const l of this.csm.lights) {
+      const s = l.shadow;
+      if (s.map) continue;
+      const map = new THREE.WebGLRenderTarget(s.mapSize.x, s.mapSize.y, { format: THREE.RedFormat, type: THREE.UnsignedByteType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false });
+      // (the depths as three sets a soft shadow's: compared on the card itself)
+      const depth = new THREE.DepthTexture(s.mapSize.x, s.mapSize.y, THREE.UnsignedIntType);
+      depth.name = `${l.name}.shadowMap`;
+      depth.format = THREE.DepthFormat;
+      depth.compareFunction = THREE.LessEqualCompare;
+      depth.minFilter = depth.magFilter = THREE.LinearFilter;
+      map.depthTexture = depth;
+      s.map = map;
+      s.camera.updateProjectionMatrix();
+    }
+  }
+
   private padCascades() {
     const csm = this.csm, cam = this.camera;
     csm.lights.forEach((l, i) => {
@@ -942,6 +966,7 @@ export class Atmosphere {
     }
     const csm = this.csm;
     csm.update();
+    this.leanMaps();
     const cam = this.camera;
     // (what castsInto reads: the depths are the shader's own, with the fade on either side of each and twice over)
     {
