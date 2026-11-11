@@ -70,6 +70,39 @@ export class Physics {
     }
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = this.fixedDt;
+    // (A collider told to be what it already is, is told nothing. Rapier takes one that is touched at all for changed,
+    // and a changed one that is OFF made the next step go over the whole world's colliders, 73,606 of them: 4.5 ms a
+    // step where it is 0.6, sixty times a second, a fifth of the page's processor with nobody doing anything. Nine such
+    // tellings a frame did it, live from 2026-11-01: the lift's gates, the stations' gate, plate and door, the two
+    // hatches. Measured in the game's own frames, progress/perf-pass/physics-probe5.js, 2026-11-11. One whose body is
+    // itself off is passed on: it is off by its body, which is not the same as off.)
+    const proto = RAPIER.Collider.prototype as RAPIER.Collider & { saidEnabled?: RAPIER.Collider['setEnabled'] };
+    if (!proto.saidEnabled) {
+      const say = (proto.saidEnabled = proto.setEnabled), move = proto.setTranslation, turn = proto.setRotation;
+      // (Moving one that is off costs the same again: the hit zones of somebody dead or away are off, and were put
+      // where their body went every frame. One with no body that is off is not moved: it is put where it was last
+      // told the moment it is put on. One on a body goes with its body, which costs nothing.)
+      const owed = new WeakMap<RAPIER.Collider, { at?: RAPIER.Vector; turn?: RAPIER.Rotation }>();
+      const owe = (c: RAPIER.Collider) => owed.get(c) ?? (owed.set(c, {}), owed.get(c)!);
+      proto.setTranslation = function (this: RAPIER.Collider, at: RAPIER.Vector) {
+        if (this.isEnabled() || this.parent()) return move.call(this, at);
+        owe(this).at = { x: at.x, y: at.y, z: at.z };
+      };
+      proto.setRotation = function (this: RAPIER.Collider, q: RAPIER.Rotation) {
+        if (this.isEnabled() || this.parent()) return turn.call(this, q);
+        owe(this).turn = { x: q.x, y: q.y, z: q.z, w: q.w };
+      };
+      proto.setEnabled = function (this: RAPIER.Collider, on: boolean) {
+        const body = this.parent();
+        if (this.isEnabled() === on && !(body && !body.isEnabled())) return;
+        say.call(this, on);
+        const o = on ? owed.get(this) : undefined;
+        if (!o) return;
+        owed.delete(this);
+        if (o.at) move.call(this, o.at);
+        if (o.turn) turn.call(this, o.turn);
+      };
+    }
   }
 
   tag(c: RAPIER.Collider, tag: ColliderTag) {
