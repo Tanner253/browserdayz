@@ -139,6 +139,12 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
   // (and under a suit over everything, nothing of what is under it drawn where it covers: it is whole, and jeans came
   // out through a ghillie suit's legs drawn in under it)
   if (suit) for (const w of inner) w.underHide = (w.underHide ?? 0) | suit;
+  // (Trousers and no top: the body's hips drawn, a little in, not hidden, 2026-11-11. The body's own grey shirt is what
+  // is worn over the waist then, and hidden under the trousers there was a gap to the air between its hem and their
+  // waistband, which the shirt's hem on the trousers had covered before it was cut away by its colour. Under a top
+  // they stay hidden: drawn, the grey of them showed through every jacket's hem.)
+  const HIPS = hides(['hips']);
+  if (!coat) for (const w of legs) if (w.hides & HIPS) (w.hides &= ~HIPS), (w.shrinks = (w.shrinks ?? 0) | HIPS);
   return { worn, gear };
 }
 

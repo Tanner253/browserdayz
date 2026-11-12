@@ -63,7 +63,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'field_trousers', name: 'Field Trousers', model: 'ground_trousers', tint: 0x5b5d3e, w: 3, h: 2, weight: 0.8, category: 'clothing', slot: 'legs',
     desc: 'Army field trousers with thigh pockets and knee pads strapped on. 20 slots in their pockets, and the pads take a tenth off a fall.', wear: { cargo: [5, 4], fall: 0.9 },
-    dress: { model: 'field_pants', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'field_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Olive', tint: 0x4b5235 }, { name: 'Black', tint: 0x26282a }, { name: 'Woodland', camo: 'woodland' }, { name: 'Autumn', camo: 'autumn' }],
     loot: { pair: 'BDUPants', at: [0, 0, 8, 0, 0], restock: 900, usage: ARMY, favour: { Military: 2 } },
     worth: 8,
@@ -82,7 +82,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'tracksuit_pants', name: 'Tracksuit Trousers', model: 'ground_trousers', tint: 0x23304f, w: 3, h: 2, weight: 0.4, category: 'clothing', slot: 'legs',
     desc: 'Thin polyester tracksuit trousers. 6 slots in their pockets.', wear: { cargo: [3, 2] },
-    dress: { model: 'tracksuit_pants', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'tracksuit_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Navy' }, { name: 'Black', tint: 0x26262a }, { name: 'Grey', tint: 0x7a7c80 }, { name: 'Red', tint: 0x8a2626 }],
     loot: { pair: 'TrackSuitPants_Blue', at: [8, 0, 0, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
     worth: 1,
@@ -130,8 +130,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'jeans', name: 'Jeans', model: 'ground_trousers', tint: 0x3e5d86, w: 3, h: 2, weight: 0.7, category: 'clothing', slot: 'legs',
     desc: 'Denim jeans. 6 slots in their pockets.', wear: { cargo: [3, 2] },
-    // (the hips drawn, a little in: hidden, a body in jeans and no top was open to the air between its shirt and its waistband)
-    dress: { model: 'jeans', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'jeans', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Blue' }, { name: 'Black', tint: 0x2a2b2e }, { name: 'Grey', tint: 0x6e7073 }],
     loot: { pair: 'Jeans_Blue', at: [8, 0, 0, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
     worth: 2,
@@ -156,7 +155,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'work_trousers', name: 'Work Trousers', model: 'ground_trousers', tint: 0x4a3626, w: 3, h: 2, weight: 0.8, category: 'clothing', slot: 'legs',
     desc: 'Heavy cotton work trousers. 12 slots in their pockets.', wear: { cargo: [4, 3] },
-    dress: { model: 'work_pants', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'work_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Brown' }, { name: 'Black', tint: 0x28282a }, { name: 'Khaki', tint: 0x8f8160 }],
     loot: { pair: 'CanvasPants_Beige', at: [0, 8, 0, 0, 0], restock: 600, usage: SHEDS },
     worth: 2,
@@ -201,7 +200,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'cargo_pants', name: 'Cargo Trousers', model: 'ground_trousers', tint: 0x3a3b3c, w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'legs',
     desc: 'Ripstop cargo trousers with big thigh pockets. 16 slots in them.', wear: { cargo: [4, 4] },
-    dress: { model: 'cargo_pants', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'cargo_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Charcoal' }, { name: 'Olive', tint: 0x4b5235 }, { name: 'Tan', tint: 0x9c8562 }],
     loot: { pair: 'CargoPants_Grey', at: [0, 0, 10, 0, 0], restock: 900, usage: ['Hunting', 'Industrial'] },
     worth: 4,
@@ -259,7 +258,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'combat_trousers', name: 'Combat Trousers', model: 'ground_trousers', tint: 0x5b5d3e, w: 3, h: 2, weight: 0.8, category: 'clothing', slot: 'legs',
     desc: 'Army combat trousers in camouflage, knee pads strapped on. 20 slots in their pockets, and the pads take a tenth off a fall.', wear: { cargo: [5, 4], fall: 0.9 },
-    dress: { model: 'field_pants', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'field_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Woodland', camo: 'woodland' }, { name: 'Autumn', camo: 'autumn' }, { name: 'Forest', camo: 'forest' }, { name: 'Desert', camo: 'desert' }],
     loot: { pair: 'GorkaPants_PautRev', at: [0, 0, 0, 3, 0], restock: 1200, usage: ARMY },
     worth: 10,
@@ -295,7 +294,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'mountain_trousers', name: 'Mountain Trousers', model: 'ground_trousers', tint: 0x9a9c94, w: 3, h: 2, weight: 0.9, category: 'clothing', slot: 'legs',
     desc: 'Loose gorka-cut canvas trousers with patched knees. 20 slots in their pockets.', wear: { cargo: [5, 4] },
-    dress: { model: 'smock_pants', hides: ['thigh', 'aboveKnee', 'shin'], shrinks: ['hips'] },
+    dress: { model: 'smock_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Snow', camo: 'snow' }, { name: 'Forest', camo: 'forest' }, { name: 'Flat', tint: 0x7d7a62 }],
     loot: { pair: 'GorkaPants_Winter', at: [0, 0, 0, 0, 2], restock: 1200, usage: ARMY },
     worth: 10,
