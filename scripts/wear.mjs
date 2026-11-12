@@ -90,7 +90,7 @@ const PIECES = {
   // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)
   tactical_jacket: { src: 'wear_tactical_jacket.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
   combat_shirt: { src: 'wear_combat_shirt.glb', body: 1, ...JACKET, grey: true, tex: 2048 },
-  tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048 },
+  tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048, seat: 0.045 },
   winter_boots: { src: 'wear_winter_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   // (the stab vest that takes the all-black one's place, the owner: "the stab vest I think needs a new model"; its
   // straps over the shoulders. All of it over the chest and the belly is the vest, painted its own colour: Meshy drew a
@@ -366,6 +366,18 @@ for (const [id, piece] of Object.entries(PIECES)) {
     }
     keep = keep.map((k, i) => keep[one[i]]);
   }
+  // (and the seat of the trousers Meshy dressed a top's figure in, under its hem behind, left out: the lowest `seat`
+  // metres of it over the thighs behind the hips. Dark navy, it was kept as the tracksuit jacket's own, and hung under
+  // its hem over the trousers' waist as dark lumps, 2026-11-11, the owner: "looks like theres a gap between torso and legs")
+  if (piece.seat) {
+    const hips = B.P.filter((p, n) => region.getScalar(n) === REGION.hips), mid = hips.reduce((s, p) => s + p.z, 0) / hips.length;
+    const seat = (i) => keep[i] && near[i] >= 0 && region.getScalar(near[i]) === REGION.thigh && D.P[i].z < mid;
+    const low = Math.min(...D.P.flatMap((p, i) => (seat(i) ? [p.y] : [])));
+    let n = 0;
+    keep = keep.map((k, i) => (seat(i) && D.P[i].y < low + piece.seat ? (n++, false) : k));
+    keep = keep.map((k, i) => keep[one[i]]);
+    console.log(`  the seat under the hem left out: ${n} points below ${(low + piece.seat).toFixed(3)} m`);
+  }
   let tris = T.filter((t) => t.every((i) => keep[i]));
   // (the skin Meshy made between a sleeve and the side: how much longer a triangle's longest edge is at rest, arms out,
   // than as it was made, arms down, against how much longer they are on the whole; four times is no cloth's)
@@ -478,9 +490,11 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // src/game/survivors.ts Worn.tuck). Tucked by the parts of the body under it, a hem went in in a sawtooth, torn along
   // it, and a boot's shaft drawn in under the trouser leg opened into strips as the ankle bent (the owner, 2026-10-26:
   // "the player models' feet do not look right where the legs meet the shoes"): now a trouser leg goes smoothly into the
-  // shoe or the boot, as trousers are worn in boots
+  // shoe or the boot, as trousers are worn in boots. (A low shoe has a top too, 2026-11-11: the trainers, only what is
+  // over the foot, said none, and a jeans hem tucked to the ankle's joint over them, above their collar, pinched at the
+  // heel into dark spikes out through it, the owner: "maybe between foot and shoes")
   let top = null;
-  if (piece.parts.includes('shin')) {
+  if (piece.parts.includes('shin') || piece.core.includes('foot')) {
     const feet = ['foot_l', 'foot_r'].map((n) => at(M4(body.node.getSkin().listJoints().find((j) => j.getName() === n).getWorldMatrix())));
     const over = D.P.map((p) => p.y - feet.reduce((m, f) => (Math.hypot(f.x - p.x, f.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? f : m)).y);
     if (piece.parts.includes('thigh')) D.prim.setAttribute('_HEM', dressed.doc.createAccessor().setType('SCALAR').setArray(new Float32Array(over)));

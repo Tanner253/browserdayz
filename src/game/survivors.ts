@@ -568,8 +568,9 @@ export class Wardrobe {
     this.hide.hide.value = this.hide.shrink.value = 0;
     this.hide.shirt!.value.set(0, 0, 0, 0);
     const skin = this.skin, bulk: Bulk = {};
-    // (the top of what is worn on the foot, for the trouser legs tucked into it: a boot's shaft, or a shoe's collar)
-    let shoeTop = 0.01;
+    // (the top of what is worn on the foot, for the trouser legs tucked into it: a boot's shaft, or a shoe's collar, which
+    // on trainers is under the ankle's joint, 2026-11-11: tucked above it, a jeans hem pinched at the heel)
+    let shoeTop = -Infinity;
     got.forEach((gltf, k) => {
       if (ITEMS[worn[k].id ?? '']?.slot !== 'feet') return;
       gltf?.scene.traverse((o) => {
@@ -577,6 +578,7 @@ export class Wardrobe {
         if (typeof top === 'number') shoeTop = Math.max(shoeTop, top - 0.01);
       });
     });
+    if (shoeTop === -Infinity) shoeTop = 0.01;
     got.forEach((gltf, k) => {
       const w = worn[k];
       // (a piece that did not come leaves the skin under it drawn)
