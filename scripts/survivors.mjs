@@ -178,14 +178,18 @@ for (const [n, file] of BODIES.entries()) {
   const moved = straightenLegs(node, legJoints(node));
   // (weighted as the old suit is, not as Meshy rigged it: see suitWeights)
   const weighted = suitWeights(node, SUIT);
-  console.log(`  ${plainHands(node, PLAIN)}`);
   // (the picture between its islands filled from them first: what lay there came in at every island's edge; then the
   // cloth mended, as its strips are narrower than what the filling shaves off an island's edge)
+  // (Before the hands are swapped, 2026-11-11: the new hand's triangles borrow the old hand's picture as slivers too thin
+  // to cover a texel, and filled after them the old hand's area was taken for a gap and painted from the pieces beside
+  // it, shirt grey and sky blue, 26 to 102 flecks a body over the fingers; the owner, "theres tering and sdtratching
+  // all over". The old hand covers its own area.)
   {
     const prim = node.getMesh().listPrimitives()[0], idx = prim.getIndices(), tris = [];
     for (let t = 0; t < idx.getCount(); t += 3) tris.push([idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2)]);
     await padTexture(prim, tris);
   }
+  console.log(`  ${plainHands(node, PLAIN)}`);
   const cloth = await cleanCloth(doc, node);
   {
     const pos = node.getMesh().listPrimitives()[0].getAttribute('POSITION');
