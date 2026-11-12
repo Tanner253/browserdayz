@@ -591,6 +591,27 @@ export function plainHands(node, plain, { lift = 0, bones = null, flat = null } 
       const by = lead(pji, pjw, i, pnames) ?? '';
       if (ARM(s).test(by) && (!bones || HAND(s).test(by) && bones.test(by) || /^lowerarm/.test(by)) && past(PP[i], phand) > FROM) keep.add(i);
     }
+    // (How far in the new hand is drawn where it runs under the forearm, 2026-11-11: as thin as this body's own forearm
+    // is there, and no thinner than 0.93 of itself was. The skeleton's hand is thicker at the wrist than these bodies'
+    // forearms, and at 0.93 it stood out of the forearm's end as a cuff with a ragged top edge at every wrist, even at
+    // rest; the owner, "theres tering and sdtratching all over". Measured 0.8 to 2.5 cm back from the wrist, the two at
+    // the same place.)
+    let fit = 0.93;
+    if (!lift) {
+      const band = (along) => along > -0.025 && along < -0.008, ring = (p, along) => p.distanceTo(hand.clone().addScaledVector(dir, along));
+      let rb = 0, nb = 0, rt = 0, nt = 0;
+      for (let i = 0; i < n0; i++) {
+        const along = past(P[i], hand);
+        if (reg.getScalar(i) !== 8 || P[i].distanceTo(hand) > 0.15 || !band(along)) continue;
+        (rb += ring(P[i], along)), nb++;
+      }
+      for (const i of keep) {
+        const p = PP[i].clone().sub(phand).add(hand), along = past(p, hand);
+        if (band(along)) (rt += ring(p, along)), nt++;
+      }
+      if (nb > 10 && nt > 10) fit = Math.min(0.93, (0.96 * rb) / nb / (rt / nt));
+      told.push(`${s === '_l' ? 'left' : 'right'} wrist drawn in to ${fit.toFixed(2)}`);
+    }
     for (const i of keep) {
       pji.getElement(i, a), pjw.getElement(i, w);
       const PB = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -598,7 +619,8 @@ export function plainHands(node, plain, { lift = 0, bones = null, flat = null } 
       const nw = new THREE.Vector3().fromArray(pnor.getElement(i, e)).transformDirection(PB);
       const p = PP[i].clone().sub(phand).add(hand).addScaledVector(nw, lift), along = past(p, hand);
       const axis = hand.clone().addScaledVector(dir, along);
-      if (!lift) p.sub(axis).multiplyScalar(THREE.MathUtils.lerp(0.93, 1, smooth(along, -0.012, 0.012))).add(axis);
+      // (in under the forearm to the wrist, `fit`, and to its own size over the next two centimetres)
+      if (!lift) p.sub(axis).multiplyScalar(THREE.MathUtils.lerp(fit, 1, smooth(along, -0.004, 0.02))).add(axis);
       // (a glove's cuff flared out over the forearm's end, which stood through it at the wrist)
       else p.sub(axis).multiplyScalar(THREE.MathUtils.lerp(1.22, 1, smooth(along, -0.02, 0.025))).add(axis);
       // (its weights, on this body's joints by name)
@@ -634,8 +656,10 @@ export function plainHands(node, plain, { lift = 0, bones = null, flat = null } 
       for (const i of c) {
         const v = pt.get(i);
         tri.getBarycoord(v.p, bary);
-        // (a corner far past that triangle takes its nearest place on it instead: the picture beyond is another piece's)
-        if (Math.min(bary.x, bary.y, bary.z) < -0.6) tri.getBarycoord(tri.closestPointToPoint(v.p, q), bary);
+        // (a corner past that triangle takes its nearest place on it instead: the picture beyond is another piece's. Allowed
+        // 60% past it until 2026-11-11, and those corners took the shirt's grey and the sky's blue from the pieces beside
+        // the hand's on the picture, flecks over the fingers; the owner, "theres tering and sdtratching all over")
+        if (Math.min(bary.x, bary.y, bary.z) < -0.02) tri.getBarycoord(tri.closestPointToPoint(v.p, q), bary);
         const u = flat ?? [0, 1].map((k) => best.reduce((sum, b, m) => sum + uv.getElement(b, e)[k] * bary.getComponent(m), 0));
         add.T.push(n0 + add.P.length);
         add.P.push(v.raw), add.N.push(v.nr), add.UV.push(u), add.J.push(v.J), add.W.push(v.W);
