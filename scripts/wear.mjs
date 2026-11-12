@@ -223,6 +223,27 @@ async function plainCloth(prim, own, least = 0.45) {
   return `plain: ${((bad / N) * 100).toFixed(1)}% of its picture painted from the cloth`;
 }
 
+/** each texel under a triangle, and a texel round it, by its index in the picture */
+function eachTexel(t, uv, W, H, fn) {
+  const q = t.map((i) => uv.getElement(i, [])).map(([s, v]) => [s * (W - 1), v * (H - 1)]);
+  const x0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[0])) - 1)), x1 = Math.min(W - 1, Math.ceil(Math.max(...q.map((p) => p[0])) + 1));
+  const y0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[1])) - 1)), y1 = Math.min(H - 1, Math.ceil(Math.max(...q.map((p) => p[1])) + 1));
+  const [[ax, ay], [bx, by], [cx, cy]] = q, d = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+  if (Math.abs(d) < 1e-9) return;
+  const e = -1.5 / Math.sqrt(Math.abs(d));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const l1 = ((bx - x) * (cy - y) - (cx - x) * (by - y)) / d, l2 = ((cx - x) * (ay - y) - (ax - x) * (cy - y)) / d;
+    if (l1 > e && l2 > e && 1 - l1 - l2 > e) fn(y * W + x);
+  }
+}
+
+/** the texels under the triangles `pick` chooses, and a texel round each */
+function texelsUnder(tris, uv, W, H, pick) {
+  const bad = new Uint8Array(W * H);
+  for (const t of tris) if (pick(t)) eachTexel(t, uv, W, H, (k) => (bad[k] = 1));
+  return bad;
+}
+
 /** the skeleton's own body, for the gloves' hands (see plainHands) */
 const PLAIN = await io.read(TEMPLATE);
 for (const [id, piece] of Object.entries(PIECES)) {
@@ -648,22 +669,8 @@ for (const [id, piece] of Object.entries(PIECES)) {
       // (the picture under what is marked, a triangle at a time, and a texel round it)
       const tex = D.prim.getMaterial().getBaseColorTexture(), uv = D.prim.getAttribute('TEXCOORD_0');
       const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-
-      const W = info.width, H = info.height, bad = new Uint8Array(W * H);
-      let hem = 0;
-      for (const t of tris) {
-        const marked = t.filter((i) => mark[one[i]]).length >= 2;
-        if (marked) hem++;
-        const q = t.map((i) => uv.getElement(i, [])).map(([s, v]) => [s * (W - 1), v * (H - 1)]);
-        const x0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[0])) - 1)), x1 = Math.min(W - 1, Math.ceil(Math.max(...q.map((p) => p[0])) + 1));
-        const y0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[1])) - 1)), y1 = Math.min(H - 1, Math.ceil(Math.max(...q.map((p) => p[1])) + 1));
-        const [[ax, ay], [bx, by], [cx, cy]] = q, d = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
-        if (Math.abs(d) < 1e-9) continue;
-        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-          const l1 = ((bx - x) * (cy - y) - (cx - x) * (by - y)) / d, l2 = ((cx - x) * (ay - y) - (ax - x) * (cy - y)) / d, l3 = 1 - l1 - l2;
-          if (marked && l1 > -1.5 / Math.sqrt(Math.abs(d)) && l2 > -1.5 / Math.sqrt(Math.abs(d)) && l3 > -1.5 / Math.sqrt(Math.abs(d))) bad[y * W + x] = 1;
-        }
-      }
+      const W = info.width, H = info.height, marked = (t) => t.filter((i) => mark[one[i]]).length >= 2;
+      const hem = tris.filter(marked).length, bad = texelsUnder(tris, uv, W, H, marked);
       // (each marked texel the trousers' own colour, as light against it as the hem was against the shirt: its folds kept)
       let painted = 0;
       const shirtLum = Math.max(0.05, lum(shirt));
@@ -675,6 +682,41 @@ for (const [id, piece] of Object.entries(PIECES)) {
       }
       tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer())).setMimeType('image/png');
       console.log(`  the figure's shirt hem at the waist, ${hem} triangles: ${painted} texels painted as the trousers`);
+    }
+    // (Meshy's skin left on the cloth painted as the cloth, 2026-11-11: a skin-coloured triangle at the jeans' fly, the
+    // owner: "theres tering and sdtratching all over". What is skin's own hue (red over green over blue as skin has them:
+    // not a red check, brown leather or copper stitching), two points of a triangle or more, the piece's colour at its
+    // lightness against the skin's.)
+    const skinHue = ([r, g, b]) => r > 0.3 && g / r > 0.6 && g / r < 0.85 && b / r > 0.45 && b / r < 0.78;
+    if ((piece.core.includes('thigh') || piece.core.includes('chest')) && !skinHue(own)) {
+      const tex = D.prim.getMaterial().getBaseColorTexture(), uv = D.prim.getAttribute('TEXCOORD_0');
+      const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const W = info.width, H = info.height, texel = (k) => [data[k * 3] / 255, data[k * 3 + 1] / 255, data[k * 3 + 2] / 255];
+      const reddish = ([r, g, b]) => r > g && g > b && r - b > 0.06;
+      // (by its points, or by its texels: the fly's triangle is skin over two fifths of it, and denim at its corners)
+      const skinny = (t) => {
+        if (t.filter((i) => skinHue(D.C[one[i]])).length >= 2) return true;
+        const red = [0, 0, 0];
+        let n = 0, m = 0;
+        eachTexel(t, uv, W, H, (k) => {
+          n++;
+          const c = texel(k);
+          if (reddish(c)) m++, c.forEach((x, j) => (red[j] += x));
+        });
+        return m > 0.3 * n && skinHue(red.map((x) => x / m));
+      };
+      const found = new Set(tris.filter(skinny)), bad = texelsUnder(tris, uv, W, H, (t) => found.has(t));
+      const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b, skin = 0.55;
+      let painted = 0;
+      for (let k = 0; k < W * H; k++) {
+        // (only what is reddish under them: the denim beside the skin in the fly's triangle kept as it is)
+        if (!bad[k] || !reddish(texel(k))) continue;
+        const f = Math.min(1.3, Math.max(0.55, lum(data[k * 3], data[k * 3 + 1], data[k * 3 + 2]) / 255 / Math.max(0.05, skin)));
+        for (let c = 0; c < 3; c++) data[k * 3 + c] = Math.max(0, Math.min(255, Math.round(own[c] * f * 255)));
+        painted++;
+      }
+      if (painted) tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer())).setMimeType('image/png');
+      console.log(`  skin left on the cloth, ${found.size} triangles: ${painted} texels painted as the piece`);
     }
   }
 

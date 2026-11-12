@@ -191,6 +191,15 @@ function clothPatch(shader: Shader, light: number, worn: Worn, space: THREE.Matr
     );
 }
 
+/**
+ * A thing worn, its inside in shade. Cloth is drawn from both sides and lit by the normal turned toward the eye, so the
+ * inside of a waistband seen over its front edge was lit as its outside and stood out as pale shards (2026-11-11, the
+ * owner: "theres tering and sdtratching all over"). Every piece is wound with its outside out (scripts/wear.mjs).
+ */
+function insidePatch(shader: Shader) {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nif (!gl_FrontFacing) diffuseColor.rgb *= 0.35;');
+}
+
 /** what a survivor is made of that the wardrobe works with (Avatar.make hands it over) */
 export interface Frame {
   /** the skeleton that is drawn, and the copy that is the first-person body (headless), each by its bones' names */
@@ -592,6 +601,7 @@ export class Wardrobe {
           (shader) => {
             stainPatch(shader, f.uniforms, at);
             clothPatch(shader, light, ownColour(w, mat), space);
+            insidePatch(shader);
             regionPatch(shader, under);
             if (mat.userData.back) backPatch(shader, mat.userData.back as number);
           },
