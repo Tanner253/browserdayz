@@ -304,15 +304,14 @@ function backPatch(shader: Shader, by: number) {
 function regionPatch(shader: Shader, hide: Hidden) {
   Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 }, uTuckAt: hide.tuckAt ?? { value: 0 }, uTuckCut: hide.tuckCut ?? { value: 0 }, uShirt: hide.shirt ?? { value: new THREE.Vector4(0, 0, 0, 0) }, uShirtLight: hide.shirtLight ?? { value: 0.25 }, uHeadBone: hide.head ?? { value: -1 } });
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nattribute float _shirt;\nvarying float vHem;\nvarying float vHead;\nvarying float vShirt;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;\nuniform float uHeadBone;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nvHem = _hem;\nvShirt = _shirt;\nvHead = 0.0;\n#ifdef USE_SKINNING\nvHead = dot(skinWeight, vec4(equal(skinIndex, vec4(uHeadBone))));\n#endif\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
+    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nvarying float vHem;\nvarying float vHead;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;\nuniform float uHeadBone;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nvHem = _hem;\nvHead = 0.0;\n#ifdef USE_SKINNING\nvHead = dot(skinWeight, vec4(equal(skinIndex, vec4(uHeadBone))));\n#endif\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nuniform int uHide;\nuniform float uTuckAt;\nuniform float uTuckCut;\nuniform vec4 uShirt;\nuniform float uShirtLight;\nuniform float uHeadBone;\nvarying float vHem;\nvarying float vHead;\nvarying float vShirt;\nflat varying float vRegion;')
+    .replace('#include <common>', '#include <common>\nuniform int uHide;\nuniform float uTuckAt;\nuniform float uTuckCut;\nuniform vec4 uShirt;\nuniform float uShirtLight;\nuniform float uHeadBone;\nvarying float vHem;\nvarying float vHead;\nflat varying float vRegion;')
     // (The body's own shirt in the colour of the shirt worn over it, fold for fold: what is grey, with no colour to
     // speak of as skin has (a third of the way to a colour, where skin is half way and more), and lighter than the
     // shorts. Wherever it is on the body but on the head, by the bone that carries it and not by the part it is marked
     // as: its collar at the nape is marked as the head or as nothing on two of the four bodies, and grey hair is grey.
-    // On a thing worn (no head bone said), only what its file marks as the figure's shirt: scripts/wear.mjs, `_SHIRT`.
     // See Hidden.shirt.)
     .replace(
       '#include <map_fragment>',
@@ -322,8 +321,6 @@ function regionPatch(shader: Shader, hide: Hidden) {
         float most = max(own.r, max(own.g, own.b)), least = min(own.r, min(own.g, own.b)), lit = dot(own, vec3(0.2126, 0.7152, 0.0722));
         float cloth = (1.0 - smoothstep(0.28, 0.38, (most - least) / max(most, 0.001))) * smoothstep(0.35 * uShirtLight, 0.5 * uShirtLight, lit);
         diffuseColor.rgb = mix(own, uShirt.rgb * min(1.5, lit / uShirtLight), cloth);
-      } else if (uShirt.w > 0.5 && uHeadBone < -0.5 && vShirt > 0.5) {
-        diffuseColor.rgb = uShirt.rgb * clamp(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / uShirtLight, 0.6, 1.4);
       }`,
     )
     .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (((uHide >> int(vRegion + 0.5)) & 1) != 0) discard;\nif (uTuckCut > 0.0 && vHem < uTuckAt - uTuckCut) discard;');
@@ -479,16 +476,6 @@ export class Wardrobe {
   skin: THREE.SkinnedMesh | null = null;
   /** which of its parts are under what is worn, not drawn or drawn in a little (see regionPatch) */
   private hide: Hidden = { hide: { value: 0 }, shrink: { value: 0 }, by: { value: 0 }, shirt: { value: new THREE.Vector4(0, 0, 0, 0) }, shirtLight: { value: 0.25 }, head: { value: -1 } };
-  /**
-   * The colour of the figure's shirt where a pair of trousers carries its hem (scripts/wear.mjs `_SHIRT`): the shirt
-   * that is worn, or with none the body's own grey one, which is what hangs over the waist then.
-   */
-  private hem = { value: new THREE.Vector4(0.25, 0.25, 0.25, 1) };
-  private hemAs() {
-    const worn = this.hide.shirt!.value, own = this.hide.shirtLight!.value;
-    if (worn.w > 0.5) this.hem.value.set(worn.x, worn.y, worn.z, 1);
-    else this.hem.value.set(own, own, own, 1);
-  }
   /** what is worn over the skin (see setWorn), as asked for and as drawn */
   private worn: Worn[] = [];
   private wornKey = '[]';
@@ -591,8 +578,6 @@ export class Wardrobe {
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
         // (its parts under a vest drawn in: see Worn.under, and the regions each of its points lies over, scripts/wear.mjs)
         const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 }, tuck: { value: w.tuck ?? 0 }, tuckBy: { value: 0 }, tuckAt: { value: shoeTop }, tuckCut: { value: w.tuck && shoeTop > 0.03 ? 0.012 : 0 } };
-        // (what of it is the figure's own shirt, a hem over a pair of trousers' waist, drawn as the shirt that is worn: scripts/wear.mjs `_SHIRT`)
-        if (typeof mat.userData.shirt === 'number') Object.assign(under, { shirt: this.hem, shirtLight: { value: new THREE.Color().setScalar(mat.userData.shirt).convertSRGBToLinear().r } });
         f.atmo.register(
           mat,
           (shader) => {
@@ -623,7 +608,6 @@ export class Wardrobe {
         }
       });
     });
-    this.hemAs();
     if (this.wornShapes.length) f.dressed(this.wornShapes);
     f.bulk?.(bulk);
   }
@@ -639,7 +623,6 @@ export class Wardrobe {
     this.skin = null;
     this.shown = n;
     this.hide.shirtLight!.value = SHIRT_LIGHT[n ?? 0] ?? 0.25;
-    this.hemAs();
     const src: THREE.SkinnedMesh[] = [];
     gltf?.scene.traverse((o) => void ((o as THREE.SkinnedMesh).isSkinnedMesh && src.push(o as THREE.SkinnedMesh)));
     for (const o of [...f.suit, ...f.fpSuit]) o.visible = !src.length;

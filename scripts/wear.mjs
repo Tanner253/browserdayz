@@ -618,13 +618,15 @@ for (const [id, piece] of Object.entries(PIECES)) {
     if (chest || waist) bulk = { ...(chest ? { chest } : {}), ...(waist ? { waist } : {}) };
   }
 
-  // ---- the figure's own shirt where its hem lies over a pair of trousers' waist, marked (`_SHIRT`), 2026-11-11.
+  // ---- the figure's own shirt where its hem lies over a pair of trousers' waist, painted as the trousers, 2026-11-11.
   // Meshy made the figure one skin, shirt and trousers together, so the hem is part of the trousers' shape: pale over
   // a pair of jeans, it showed as a torn grey band under whatever shirt was worn (the owner: "theres tering and
   // sdtratching all over"). Cut away, the trousers ended a hand lower and a body in them and no top was open at the
-  // waist. So it stays, and the game draws what is marked as the shirt that is worn (src/game/survivors.ts, uShirt):
-  // at the waist, what is of no colour and well lighter than the trousers, evened over its neighbours twice.
-  {
+  // waist; drawn as the shirt worn, crouching it was a shirt's tail over the whole seat, in blotches. So it stays, and
+  // is painted over from the trousers round it: crouched, as the worn shirt rides up, what shows is the trousers. It is
+  // what is of no colour and well lighter than the trousers at the waist, evened over its neighbours twice. (A piece
+  // of one colour, `plain`, is that colour there already: see plainCloth.)
+  if (!piece.plain) {
     const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2], hue = (c) => (Math.max(...c) - Math.min(...c)) / Math.max(1e-3, Math.max(...c));
     if (!notShirt && piece.core.includes('thigh') && (lum(own) < lum(shirt) * 0.75 || hue(own) > 0.12)) {
       const hipY = Math.max(...body.node.getSkin().listJoints().filter((j) => /^thigh_[lr]$/.test(j.getName())).map((j) => at(M4(j.getWorldMatrix())).y));
@@ -643,8 +645,36 @@ for (const [id, piece] of Object.entries(PIECES)) {
           if (ns.length && yes * 2 !== ns.length) mark[i] = yes * 2 > ns.length ? 1 : 0;
         }
       }
-      const marks = Float32Array.from(D.P, (p, i) => mark[one[i]]);
-      if (marks.some((m) => m)) D.prim.setAttribute('_SHIRT', dressed.doc.createAccessor().setType('SCALAR').setArray(marks));
+      // (the picture under what is marked, a triangle at a time, and a texel round it)
+      const tex = D.prim.getMaterial().getBaseColorTexture(), uv = D.prim.getAttribute('TEXCOORD_0');
+      const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+
+      const W = info.width, H = info.height, bad = new Uint8Array(W * H);
+      let hem = 0;
+      for (const t of tris) {
+        const marked = t.filter((i) => mark[one[i]]).length >= 2;
+        if (marked) hem++;
+        const q = t.map((i) => uv.getElement(i, [])).map(([s, v]) => [s * (W - 1), v * (H - 1)]);
+        const x0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[0])) - 1)), x1 = Math.min(W - 1, Math.ceil(Math.max(...q.map((p) => p[0])) + 1));
+        const y0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[1])) - 1)), y1 = Math.min(H - 1, Math.ceil(Math.max(...q.map((p) => p[1])) + 1));
+        const [[ax, ay], [bx, by], [cx, cy]] = q, d = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+        if (Math.abs(d) < 1e-9) continue;
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const l1 = ((bx - x) * (cy - y) - (cx - x) * (by - y)) / d, l2 = ((cx - x) * (ay - y) - (ax - x) * (cy - y)) / d, l3 = 1 - l1 - l2;
+          if (marked && l1 > -1.5 / Math.sqrt(Math.abs(d)) && l2 > -1.5 / Math.sqrt(Math.abs(d)) && l3 > -1.5 / Math.sqrt(Math.abs(d))) bad[y * W + x] = 1;
+        }
+      }
+      // (each marked texel the trousers' own colour, as light against it as the hem was against the shirt: its folds kept)
+      let painted = 0;
+      const shirtLum = Math.max(0.05, lum(shirt));
+      for (let k = 0; k < W * H; k++) {
+        if (!bad[k]) continue;
+        const L = (0.299 * data[k * 3] + 0.587 * data[k * 3 + 1] + 0.114 * data[k * 3 + 2]) / 255, f = Math.min(1.3, Math.max(0.55, L / shirtLum));
+        for (let c = 0; c < 3; c++) data[k * 3 + c] = Math.max(0, Math.min(255, Math.round(own[c] * f * 255)));
+        painted++;
+      }
+      tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer())).setMimeType('image/png');
+      console.log(`  the figure's shirt hem at the waist, ${hem} triangles: ${painted} texels painted as the trousers`);
     }
   }
 
@@ -673,17 +703,13 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // its folds and wear stay as they are; see src/game/survivors.ts)
   {
     const { data, info } = await sharp(Buffer.from(mat.getBaseColorTexture().getImage())).raw().toBuffer({ resolveWithObject: true });
-    const uv = prim.getAttribute('TEXCOORD_0'), e = [], marks = prim.getAttribute('_SHIRT');
-    // (and how light what is marked as the shirt is, `shirt`: the shirt worn is laid on it in proportion to that)
-    let sum = 0, shirtSum = 0, shirtN = 0;
+    const uv = prim.getAttribute('TEXCOORD_0'), e = [];
+    let sum = 0;
     for (let i = 0; i < uv.getCount(); i++) {
       const [s, t] = uv.getElement(i, e), o = (Math.round(t * (info.height - 1)) * info.width + Math.round(s * (info.width - 1))) * info.channels;
-      const l = 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
-      sum += l;
-      if (marks && marks.getScalar(i) > 0.5) (shirtSum += l), shirtN++;
+      sum += 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
     }
-    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(shirtN ? { shirt: +(shirtSum / shirtN / 255).toFixed(4) } : {}), ...(bulk ? { bulk } : {}), ...(top !== null ? { top } : {}) });
-    if (shirtN) console.log(`  ${shirtN} points of it are the figure's shirt, light ${(shirtSum / shirtN / 255).toFixed(3)}`);
+    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(bulk ? { bulk } : {}), ...(top !== null ? { top } : {}) });
   }
   await dressed.doc.transform(
     unpartition(),
