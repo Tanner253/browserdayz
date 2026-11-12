@@ -2128,6 +2128,7 @@ export interface Game {
   updateOnline: Methods<typeof onlineMethods>['updateOnline'];
   addRemote: Methods<typeof onlineMethods>['addRemote'];
   act: Methods<typeof onlineMethods>['act'];
+  showUsed: Methods<typeof onlineMethods>['showUsed'];
   wear: Methods<typeof onlineMethods>['wear'];
   syncBack: Methods<typeof onlineMethods>['syncBack'];
   wornKeys: Methods<typeof onlineMethods>['wornKeys'];

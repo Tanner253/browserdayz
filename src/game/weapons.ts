@@ -5379,6 +5379,9 @@ export class Weapons {
       thumb: 0.5,
     });
     let right = grip(1);
+    // (Food and drink in the fist, its fingers round its middle and closed: held up at the fingers' height, the first
+    // one ran out straight over a tin's top and an apple, pointing, 2026-11-11.)
+    if (h.kind === 'eat' || h.kind === 'drink') right = { ...right, pos: right.pos.setY(-h.size.y * 0.22), fingers: new THREE.Vector3(-0.3, -0.1, -0.95), curl: [curl + 0.25, curl + 0.2, curl + 0.2, curl + 0.2], thumb: 0.75 };
     let left: HandGrip | null = two ? grip(-1) : null;
     // a card: by its near end, the fingers under it and the thumb laid on its face
     if (h.kind === 'swipe') {

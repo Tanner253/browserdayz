@@ -249,7 +249,9 @@ export function handle(c: Client, m: C2S) {
     }
     case 'act': {
       if (!c.alive || !ACTS.includes(m.a)) return;
-      broadcast({ t: 'act', id: c.id, a: m.a, d: num(m.d) ? Math.max(0, Math.min(12, m.d)) : 1 }, c);
+      // (and what is in the hands for it, if it is a thing at all: seen in them by everybody)
+      const w = typeof m.w === 'string' && ITEMS[m.w] ? { w: m.w } : {};
+      broadcast({ t: 'act', id: c.id, a: m.a, d: num(m.d) ? Math.max(0, Math.min(12, m.d)) : 1, ...w }, c);
       return;
     }
     case 'gear': {

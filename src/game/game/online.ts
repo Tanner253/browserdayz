@@ -19,6 +19,7 @@ import { bloodOf, bleedOf } from '../../sim/blood';
 import { type Avatar, GEAR_SHOWN, facepiece, DEATH_REST } from '../avatar';
 import { MOCAP_REST } from '../avatar/deeds';
 import { lookFor } from '../look';
+import { inPalm } from '../in-fist';
 import { RemotePlayer, CorpseBody } from '../remote';
 import { Stash } from '../loot';
 import { JEEP } from '../../sim/vehicles';
@@ -331,6 +332,7 @@ export const onlineMethods = {
     net.on('act', (m) => {
       const r = this.remotes.get(m.id);
       r?.act(m.a, m.d, cam().position, m.a === 'open' ? searched(this, r.pos) : null);
+      if (r?.alive) this.showUsed(r.avatar, m.a, m.w);
     });
     net.on('emote', (m) => {
       const r = this.remotes.get(m.id), e = EMOTE[m.e];
@@ -933,11 +935,30 @@ export const onlineMethods = {
   },
 
   /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
-  act(this: Game, a: Act, d = 1) {
+  /** @param w what is in the hands for it (an item's id): seen in them by everybody, while they eat, drink or see to a wound */
+  act(this: Game, a: Act, d = 1, w?: string) {
     if (a === 'take') this.avatar.pickUp(d);
     else if (a === 'stop') this.avatar.act(null);
     else this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, d);
-    this.net.send({ t: 'act', a, d });
+    this.showUsed(this.avatar, a, w);
+    this.net.send({ t: 'act', a, d, ...(w ? { w } : {}) });
+  },
+
+  /**
+   * What a body's hands are eating, drinking or dressing a wound with, in its right fist (Avatar.useThing; 2026-11-11, the
+   * owner: "the first person as well as 3rd perosn interactions for som eitems are not looking very good, or realistic").
+   * A first aid kit is not: it is worked from, in both hands.
+   */
+  showUsed(this: Game, body: Avatar, a: Act, w?: string) {
+    if (a !== 'eat' && a !== 'drink' && a !== 'bandage') return;
+    const models = this.weapons.itemModels;
+    // (nor the splint's tape, which is for a leg: the hands at work as they were)
+    if (!w || !ITEMS[w] || w === 'splint' || !models) return body.useThing(null);
+    void models.get(w).then((tpl) => {
+      if (body.gesture?.kind !== a) return;
+      const held = inPalm(tpl.group.clone());
+      body.useThing(held && (a !== 'bandage' || Math.max(held.size.x, held.size.z) < 0.14) ? held : null, w);
+    }).catch(() => {});
   },
 
   /** hat, vest and pack as they sit on a body */

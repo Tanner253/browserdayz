@@ -7,6 +7,15 @@ import { POSE, type Gesture, type Move } from './pose';
 import { CUT, UP, _aimQ, _fwd, _head, _right, _v2, settle, type Avatar, type ArmRig } from '../avatar';
 import { jabAt } from '../held-mocap';
 import { MOCAP_HANDS } from '../mocap-switch';
+import { PALM_BACK } from '../in-fist';
+import { ITEMS, isBag } from '../../sim/items';
+
+/**
+ * Where a thing being used goes, from the head (ahead, up, right; metres): held before the chest, its top at the lips,
+ * a bag held up over the shoulder; the left wrist with its forearm held out for a shot or a drip, and how far out
+ * from that forearm's middle its skin is.
+ */
+const USE = { rest: [0.3, -0.42, 0.1], lips: [0.1, -0.03, 0], bag: [0.22, 0.1, 0.24], arm: [0.3, -0.27, 0.12], skin: 0.04 };
 
 /** how much of a movement of the hands is left, if it was broken off: 1 until then */
 const left = (m: { t: number; stop?: number } | null) => (m?.stop === undefined ? 1 : 1 - THREE.MathUtils.smoothstep(m.t, m.stop - CUT, m.stop));
@@ -72,10 +81,49 @@ export const gesturesMethods = {
           const from = r.arm.getWorldPosition(_v2), d = to.distanceTo(from), most = (r.la + r.lb) * 0.93;
           return d > most ? to.sub(from).multiplyScalar(most / d).add(from) : to;
         };
-        const sip = MOCAP_HANDS && (ges.kind === 'eat' || ges.kind === 'drink') ? this.deeds?.get('drink') : undefined;
+        // What is being used, in the right fist (useThing): the hand is set by where the thing is to be and which way
+        // its top points, not the other way about. Everybody saw an empty fist bob to the chin before, 2026-11-11 (the
+        // owner: "the first person as well as 3rd perosn interactions for som eitems are not looking very good, or
+        // realistic").
+        const thing = this.used?.fist.visible ? this.used : null, R = this.armR, L = this.armL;
+        const use = thing ? ITEMS[thing.id]?.use : undefined;
+        /** the right hand round the thing, its middle at `c`, its top along `u`, the fingers round it toward `f` */
+        const palmed = (c: THREE.Vector3, u: THREE.Vector3, f: THREE.Vector3) => {
+          u.normalize();
+          const F = f.addScaledVector(u, -f.dot(u)).normalize(), N = new THREE.Vector3().crossVectors(u, F);
+          const wrist = c.clone().addScaledVector(N, -(0.012 + thing!.size.x / 2)).addScaledVector(F, -PALM_BACK);
+          this.reach(R, near(wrist, R), F, N, thing!.curl, aimQ, wgt);
+        };
+        /** the left forearm held out across the front, palm down, for the right to work on: its middle, and up off it */
+        const forearm = () => {
+          this.reach(L, near(at(USE.arm[0], USE.arm[1], USE.arm[2]), L), dirOf(0.35, -0.05, 1), dirOf(0, -1, 0), [0.35, 0.4, 0.45, 0.5], aimQ, wgt);
+          const elbow = L.fore.getWorldPosition(new THREE.Vector3()), wrist = L.hand.getWorldPosition(new THREE.Vector3());
+          const way = wrist.clone().sub(elbow).normalize(), up = UP.clone().addScaledVector(way, -UP.dot(way)).normalize();
+          return { mid: elbow.lerp(wrist, 0.55), up };
+        };
+        const sip = MOCAP_HANDS && !thing && (ges.kind === 'eat' || ges.kind === 'drink') ? this.deeds?.get('drink') : undefined;
         if (sip) {
           // (on the motion capture: the arms and the chest of somebody drinking, a sip after a sip: see src/game/mocap-switch.ts)
           this.layer(sip, ges.t % sip.getClip().duration, wgt, 0);
+        } else if (thing && (ges.kind === 'eat' || ges.kind === 'drink')) {
+          // Up from the chest to the lips and back, once a bite or a gulp: a tin tipped to them, a bottle tipped up at
+          // them, its top at the lips either way.
+          const drink = ges.kind === 'drink', period = drink ? 1.6 : 1.1;
+          const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, ges.t - 0.3) / period) * Math.PI * 2);
+          const m = THREE.MathUtils.smoothstep(cyc, 0, drink ? 0.6 : 0.8);
+          const u = dirOf(0.15, 1, 0).lerp(drink ? dirOf(-0.85, -0.3, -0.1) : dirOf(-0.75, 0.65, -0.1), m).normalize();
+          const lips = at(USE.lips[0], USE.lips[1], USE.lips[2]);
+          const c = at(USE.rest[0], USE.rest[1], USE.rest[2]).lerp(lips.addScaledVector(u, -thing.size.y / 2), m);
+          palmed(c, u, dirOf(1, 0.2 * m, -0.3));
+        } else if (thing && ges.kind === 'bandage' && isBag(thing.id)) {
+          // a bag held up over the shoulder to run into the left forearm held out
+          forearm();
+          palmed(at(USE.bag[0], USE.bag[1] + Math.sin(ges.t * 1.3) * 0.01, USE.bag[2]), UP.clone(), fwd.clone());
+        } else if (thing && ges.kind === 'bandage' && use?.sound === 'inject') {
+          // a shot into the left forearm held out: the injector stood on it, pressed, held while it empties, let go
+          const f = forearm(), dur = ges.dur;
+          const press = THREE.MathUtils.smoothstep(ges.t, 0.45, 0.7) * (1 - THREE.MathUtils.smoothstep(ges.t, dur - 0.5, dur - 0.25));
+          palmed(f.mid.clone().addScaledVector(f.up, USE.skin + thing.size.y / 2 + 0.04 * (1 - press)), f.up.clone().negate(), fwd.clone());
         } else if (ges.kind === 'eat' || ges.kind === 'drink') {
           // up to the mouth and back down, once a bite or a gulp
           const period = ges.kind === 'eat' ? 0.95 : 1.25;

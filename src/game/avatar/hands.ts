@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { type Grips, type HandGrip, type Curl, bent } from '../arms';
+import type { Held } from '../in-fist';
 import { POSE } from './pose';
 import { BODY_SCALE, EAGER, GUN_ELBOW, HOLD_GONE, THUMB_BESIDE, UP, _a, _b, _ca, _ch, _cq, _cq2, _k1, _k2, _k3, _k4, _k5, _kq, _m1, _m2, _q1, _q2, _q3, _qa, _qb, buttOf, settle, Avatar, type ArmRig } from '../avatar';
 
@@ -33,29 +34,10 @@ export const handsMethods = {
       if (m.isMesh) m.castShadow = true;
     });
     if (kind === 'melee') {
-      // A hatchet, a bat: carried in the right fist, so it swings with the arm as the body
-      // walks. The grip (wrist position, finger and palm directions in the weapon's own
-      // space) is laid onto the hand's own frame.
+      // A hatchet, a bat: carried in the right fist, so it swings with the arm as the body walks.
       const r = this.armR, g = grips.right;
       if (!r || !g) return;
-      // the grip is written in the weapon's own space: bring it out through the weapon's own
-      // placement first, so it is right however the model happens to be turned
-      obj.updateMatrix();
-      const P = g.pos.clone().applyMatrix4(obj.matrix);
-      const F = g.fingers.clone().applyQuaternion(obj.quaternion).normalize();
-      const N = g.palm.clone().applyQuaternion(obj.quaternion);
-      N.sub(F.clone().multiplyScalar(N.dot(F))).normalize();
-      const Lf = r.fingersLocal;
-      const Lp = r.palmLocal.clone().sub(Lf.clone().multiplyScalar(r.palmLocal.dot(Lf))).normalize();
-      _m1.makeBasis(F, N, new THREE.Vector3().crossVectors(F, N));
-      _m2.makeBasis(Lf, Lp, new THREE.Vector3().crossVectors(Lf, Lp));
-      const fist = new THREE.Group();
-      fist.quaternion.setFromRotationMatrix(_m2.multiply(_m1.transpose()));
-      // the hand is a bone of a scaled body: the weapon keeps its own size (whatever size the survivor is drawn: stature)
-      const k = 1 / (BODY_SCALE * this.stature);
-      fist.scale.setScalar(k);
-      fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
-      fist.add(obj);
+      const fist = this.fistOf(r, obj, g);
       r.hand.add(fist);
       // (and where the middle of it is from the hand, in the hand's own frame: which way it hangs, see HANG)
       r.hand.updateWorldMatrix(true, true);
@@ -70,6 +52,52 @@ export const handsMethods = {
     const b = kind !== 'pistol' ? buttOf(obj) : null;
     const butt = b && grips.stand ? b.at.clone().setX(b.at.x - POSE.hold.stockless / obj.scale.x) : (b?.at ?? null);
     this.held = { obj, grips, long: kind !== 'pistol', base: obj.quaternion.clone(), butt, sight: b ? [b.half * obj.scale.y, b.rise * obj.scale.y] : [0.045, 0.095] };
+  },
+
+  /**
+   * `obj` in the hand of `r`, held by `g` (wrist position, finger and palm directions in its own space), as a group on
+   * the hand's bone: the grip is brought out through the thing's own placement first, so it is right however the
+   * model happens to be turned.
+   */
+  fistOf(this: Avatar, r: ArmRig, obj: THREE.Object3D, g: HandGrip) {
+    obj.updateMatrix();
+    const P = g.pos.clone().applyMatrix4(obj.matrix);
+    const F = g.fingers.clone().applyQuaternion(obj.quaternion).normalize();
+    const N = g.palm.clone().applyQuaternion(obj.quaternion);
+    N.sub(F.clone().multiplyScalar(N.dot(F))).normalize();
+    const Lf = r.fingersLocal;
+    const Lp = r.palmLocal.clone().sub(Lf.clone().multiplyScalar(r.palmLocal.dot(Lf))).normalize();
+    _m1.makeBasis(F, N, new THREE.Vector3().crossVectors(F, N));
+    _m2.makeBasis(Lf, Lp, new THREE.Vector3().crossVectors(Lf, Lp));
+    const fist = new THREE.Group();
+    fist.quaternion.setFromRotationMatrix(_m2.multiply(_m1.transpose()));
+    // the hand is a bone of a scaled body: the thing keeps its own size (whatever size the survivor is drawn: stature)
+    const k = 1 / (BODY_SCALE * this.stature);
+    fist.scale.setScalar(k);
+    fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
+    fist.add(obj);
+    return fist;
+  },
+
+  /**
+   * What is being used, in the right fist while the hands are at it (`inPalm` in src/game/in-fist.ts: a tin to the
+   * mouth, a bottle tipped up, a dressing wound on); null: nothing. Shown only while the hands are eating, drinking or
+   * seeing to a wound (update.ts), and the poses for those know it is there (gestures.ts).
+   */
+  useThing(this: Avatar, held: (Held & { size: THREE.Vector3 }) | null, id = '') {
+    this.used?.fist.removeFromParent();
+    this.used = null;
+    const r = this.armR, g = held?.grips.right;
+    if (!held || !r || !g) return;
+    held.obj.traverse((o) => {
+      o.layers.mask = this.layerMask;
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true;
+    });
+    const fist = this.fistOf(r, held.obj, g);
+    fist.visible = false;
+    r.hand.add(fist);
+    this.used = { fist, id, size: held.size, curl: g.curl };
+    Avatar.onDressed([held.obj]);
   },
 
   /**

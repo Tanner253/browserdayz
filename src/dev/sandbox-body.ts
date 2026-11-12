@@ -20,6 +20,7 @@ import * as THREE from 'three';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from '../game/avatar';
 import type { Gesture } from '../game/avatar/pose';
 import { ItemModels } from '../game/loot';
+import { inPalm } from '../game/in-fist';
 import { lookFor } from '../game/look';
 import { Weapons } from '../game/weapons';
 import { CLOTHES, ITEMS } from '../sim/items';
@@ -142,6 +143,8 @@ export async function stageBodies(o: Stage) {
     if (s.held) {
       const h = held(s.held);
       if (h) a.setHeld(h.obj, h.grips, h.kind, true);
+      // (a thing that is no weapon, held for the hands' work: in the fist while they are at it, as the game shows it)
+      else if (s.act && ITEMS[s.held] && !ITEMS[s.held].weapon && !ITEMS[s.held].melee) a.useThing(inPalm((await (models ??= new ItemModels(atmo)).get(s.held)).group.clone()), s.held);
     }
     a.prone = s.prone;
     a.limping = s.limp;

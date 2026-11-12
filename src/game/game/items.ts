@@ -40,8 +40,10 @@ export const itemsMethods = {
     this.toggleInventory(false);
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
-    // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind === 'drip' ? 'bandage' : kind), dur);
+    // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing; and what is eaten,
+    // drunk or put on a wound in them, but a smoke's packet)
+    const shown = kind === 'eat' || kind === 'drink' || kind === 'bandage' || kind === 'inject' || kind === 'drip';
+    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind === 'drip' ? 'bandage' : kind), dur, shown && !seen ? itemId : undefined);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
   },

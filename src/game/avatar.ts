@@ -491,6 +491,8 @@ export class Avatar {
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
   inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean; ready?: boolean; head?: THREE.Vector3; /** a karambit's ring, spun round when it is looked over */ spin?: THREE.Object3D | null } | null = null;
+  /** what is being used, in the right fist while the hands are at it (a tin, a bottle, a dressing: see useThing) */
+  used: { fist: THREE.Object3D; id: string; size: THREE.Vector3; curl: Curl } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** how far a torch is held up (0 at the side, 1 up: RAISE) */
@@ -661,6 +663,8 @@ export interface Avatar {
   muzzle: Methods<typeof dressMethods>['muzzle'];
   setHeld: Methods<typeof handsMethods>['setHeld'];
   takeUp: Methods<typeof handsMethods>['takeUp'];
+  useThing: Methods<typeof handsMethods>['useThing'];
+  fistOf: Methods<typeof handsMethods>['fistOf'];
   faceGear: Methods<typeof dressMethods>['faceGear'];
   setWorldQuat: Methods<typeof handsMethods>['setWorldQuat'];
   turn: Methods<typeof handsMethods>['turn'];

@@ -391,6 +391,8 @@ export const updateMethods = {
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
     if (this.inHand) this.inHand.obj.visible = !using;
+    // (and what is being used is in it only while it is used)
+    if (this.used) this.used.fist.visible = !dead && !!ges && (ges.kind === 'eat' || ges.kind === 'drink' || ges.kind === 'bandage') && ges.t < Math.min(ges.dur, ges.stop ?? Infinity) - 0.1;
     this.heldPivot.rotation.set(pitch, -this.twist, 0);
     this.aimT += ((aiming && !dead ? 1 : 0) - this.aimT) * ease(12);
     this.carryT += (THREE.MathUtils.smoothstep(speed, 2.6, 3.6) * (1 - this.aimT) - this.carryT) * ease(7);

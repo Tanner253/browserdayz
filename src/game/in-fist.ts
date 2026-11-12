@@ -70,6 +70,37 @@ export function inFist(model: THREE.Object3D, id: string): Held | null {
   return { obj, grips: { right: fist(0.03, 1.12), left: null }, kind: 'melee', plumb };
 }
 
+/**
+ * A thing being used (a tin, an apple, a bottle, a dressing, an injector) in the right fist, upright as it comes, its
+ * middle in the palm and its thin way through the fist: the hand's own frame as `inFist` says it, its top along y.
+ * Everybody else saw an empty fist bob to the chin to eat or drink, 2026-11-11 (the owner: "the first person as well as
+ * 3rd perosn interactions for som eitems are not looking very good, or realistic").
+ */
+/** how far behind the middle of a thing in the palm the wrist is, along the fingers, metres */
+export const PALM_BACK = 0.05;
+export function inPalm(model: THREE.Object3D): (Held & { size: THREE.Vector3 }) | null {
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  if (box.isEmpty()) return null;
+  const size = box.getSize(new THREE.Vector3());
+  model.position.sub(box.getCenter(new THREE.Vector3()));
+  const obj = new THREE.Group(), turned = new THREE.Group(), stood = new THREE.Group();
+  stood.add(model);
+  turned.add(stood);
+  obj.add(turned);
+  // (a thing that lies long as it comes, an injector, stood up on its length)
+  if (Math.max(size.x, size.z) > size.y * 1.6) {
+    if (size.x >= size.z) (stood.rotation.z = Math.PI / 2), size.set(size.y, size.x, size.z);
+    else (stood.rotation.x = Math.PI / 2), size.set(size.x, size.z, size.y);
+  }
+  if (size.x > size.z * 1.15) (turned.rotation.y = Math.PI / 2), size.set(size.z, size.y, size.x);
+  // (too thick to close round, a jug: the hand open on its side)
+  const thick = size.x, curl = THREE.MathUtils.clamp(1.2 - (thick - 0.03) * 9, 0.45, 1.3);
+  // (the fingers square across its top's way, so the poses that turn it (gestures.ts `palmed`) turn the hand by it)
+  const right = { pos: new THREE.Vector3(0.012 + thick / 2, 0, PALM_BACK), fingers: new THREE.Vector3(0, 0, -1), palm: new THREE.Vector3(-1, 0, 0), curl: [curl, curl + 0.04, curl + 0.08, curl + 0.1] as [number, number, number, number], thumb: 0.9, tuck: thick > 0.095 ? 0.2 : 0.8 };
+  return { obj, grips: { right, left: null }, kind: 'melee', size };
+}
+
 /** where the head of a torch held up is in the world: the top of it (it stands in the fist: RAISE in src/game/avatar.ts) */
 export function torchHead(obj: THREE.Object3D, out: THREE.Vector3): THREE.Vector3 | null {
   obj.updateWorldMatrix(true, true);

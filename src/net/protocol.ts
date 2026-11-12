@@ -279,7 +279,9 @@ export type C2S =
   | { t: 'nade'; o: [number, number, number]; v: [number, number, number] }
   /** a grenade fired from a launcher: from where, how fast, which (believed from an admin alone) */
   | { t: 'launch'; o: [number, number, number]; v: [number, number, number]; w: string }
-  | { t: 'act'; a: Act; d: number }
+  /** `w`: what is in the hands for it (an item's id), seen in them by everybody (2026-11-11; optional: an older server
+   * passes on no more than it did, and an older game does nothing with it) */
+  | { t: 'act'; a: Act; d: number; w?: string }
   /** something called out, with the movement that goes with it (an id from src/sim/emotes.ts) */
   | { t: 'emote'; e: string }
   /** a bullet of ours found fuel drum number i (see src/sim/barrels.ts), or our blast reached it */
@@ -528,7 +530,7 @@ export type S2C =
   /** somebody near has thrown something (an item's id): every game flies it the same way, and it is told where it lies when it does ('loot+') */
   | { t: 'tossed'; by: number; id: string; o: [number, number, number]; v: [number, number, number] }
   | { t: 'launch'; id: number; o: [number, number, number]; v: [number, number, number]; w: string }
-  | { t: 'act'; id: number; a: Act; d: number }
+  | { t: 'act'; id: number; a: Act; d: number; w?: string }
   | { t: 'emote'; id: number; e: string }
   /** fuel drum number i went up, set off by this player; and a new one has been stood in its place */
   | { t: 'boom'; i: number; by: number }
