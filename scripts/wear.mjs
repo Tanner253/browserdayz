@@ -666,6 +666,10 @@ for (const [id, piece] of Object.entries(PIECES)) {
           if (ns.length && yes * 2 !== ns.length) mark[i] = yes * 2 > ns.length ? 1 : 0;
         }
       }
+      // (and each point said to be of it, `_BAND`: under a shirt worn over the body's own the trousers are cut along it,
+      // and the hem there is the shirt's, src/game/survivors.ts Worn.band: painted as the trousers it stood out over the
+      // T-shirt's tail from behind, a pale ragged band of denim with the shirt through it in white blots)
+      D.prim.setAttribute('_BAND', dressed.doc.createAccessor().setType('SCALAR').setArray(Float32Array.from(D.P, (_, i) => mark[one[i]])));
       // (the picture under what is marked, a triangle at a time, and a texel round it)
       const tex = D.prim.getMaterial().getBaseColorTexture(), uv = D.prim.getAttribute('TEXCOORD_0');
       const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -676,7 +680,8 @@ for (const [id, piece] of Object.entries(PIECES)) {
       const shirtLum = Math.max(0.05, lum(shirt));
       for (let k = 0; k < W * H; k++) {
         if (!bad[k]) continue;
-        const L = (0.299 * data[k * 3] + 0.587 * data[k * 3 + 1] + 0.114 * data[k * 3 + 2]) / 255, f = Math.min(1.3, Math.max(0.55, L / shirtLum));
+        // (never lighter than the trousers: at 1.3 the band stood pale over the jeans' waistband)
+        const L = (0.299 * data[k * 3] + 0.587 * data[k * 3 + 1] + 0.114 * data[k * 3 + 2]) / 255, f = Math.min(1, Math.max(0.55, L / shirtLum));
         for (let c = 0; c < 3; c++) data[k * 3 + c] = Math.max(0, Math.min(255, Math.round(own[c] * f * 255)));
         painted++;
       }
@@ -688,7 +693,8 @@ for (const [id, piece] of Object.entries(PIECES)) {
     // not a red check, brown leather or copper stitching), two points of a triangle or more, the piece's colour at its
     // lightness against the skin's.)
     const skinHue = ([r, g, b]) => r > 0.3 && g / r > 0.6 && g / r < 0.85 && b / r > 0.45 && b / r < 0.78;
-    if ((piece.core.includes('thigh') || piece.core.includes('chest')) && !skinHue(own)) {
+    // (not on cloth that is reddish itself: the work trousers' brown is skin's hue texel by texel)
+    if ((piece.core.includes('thigh') || piece.core.includes('chest')) && !(own[0] > own[1] && own[1] > own[2])) {
       const tex = D.prim.getMaterial().getBaseColorTexture(), uv = D.prim.getAttribute('TEXCOORD_0');
       const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
       const W = info.width, H = info.height, texel = (k) => [data[k * 3] / 255, data[k * 3 + 1] / 255, data[k * 3 + 2] / 255];

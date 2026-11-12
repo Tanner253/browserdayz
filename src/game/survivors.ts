@@ -81,6 +81,9 @@ export interface Worn {
   /** a trouser leg tucked into what is worn on the foot, below its top (`_hem`, each point's height over the ankle, and
    * a shoe's `top`, scripts/wear.mjs): non-zero to do so */
   tuck?: number;
+  /** trousers' shirt hem drawn in (`_band`, the figure's shirt hem that is part of their shape, above the waistband,
+   * scripts/wear.mjs), under a shirt worn over the body's own: non-zero to do so, by BAND */
+  band?: number;
 }
 
 /**
@@ -145,6 +148,10 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
   // they stay hidden: drawn, the grey of them showed through every jacket's hem.)
   const HIPS = hides(['hips']);
   if (!coat) for (const w of legs) if (w.hides & HIPS) (w.hides &= ~HIPS), (w.shrinks = (w.shrinks ?? 0) | HIPS);
+  // (Under a shirt worn over the body's own, the shirt hem that is part of the trousers' shape drawn in under its tail,
+  // 2026-11-11: it stood out over the T-shirt's tail from behind, the shirt through it in white blots. Cut away, the
+  // T-shirt, shorter than the jeans' waist, left a gap to the air.)
+  if (worn.some((w) => w.shirt)) for (const w of legs) w.band = 1;
   return { worn, gear };
 }
 
@@ -317,10 +324,10 @@ function backPatch(shader: Shader, by: number) {
 }
 
 function regionPatch(shader: Shader, hide: Hidden) {
-  Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 }, uTuckAt: hide.tuckAt ?? { value: 0 }, uTuckCut: hide.tuckCut ?? { value: 0 }, uShirt: hide.shirt ?? { value: new THREE.Vector4(0, 0, 0, 0) }, uShirtLight: hide.shirtLight ?? { value: 0.25 }, uHeadBone: hide.head ?? { value: -1 } });
+  Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 }, uTuckAt: hide.tuckAt ?? { value: 0 }, uTuckCut: hide.tuckCut ?? { value: 0 }, uShirt: hide.shirt ?? { value: new THREE.Vector4(0, 0, 0, 0) }, uShirtLight: hide.shirtLight ?? { value: 0.25 }, uHeadBone: hide.head ?? { value: -1 }, uBand: hide.band ?? { value: 0 } });
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nvarying float vHem;\nvarying float vHead;\nvarying float vHidden;\nuniform int uHide;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;\nuniform float uHeadBone;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHidden = float((uHide >> int(_region + 0.5)) & 1);\nvHem = _hem;\nvHead = 0.0;\n#ifdef USE_SKINNING\nvHead = dot(skinWeight, vec4(equal(skinIndex, vec4(uHeadBone))));\n#endif\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
+    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nattribute float _band;\nuniform float uBand;\nvarying float vHem;\nvarying float vHead;\nvarying float vHidden;\nuniform int uHide;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;\nuniform float uHeadBone;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHidden = float((uHide >> int(_region + 0.5)) & 1);\nvHem = _hem;\ntransformed -= normalize(normal) * uBand * _band;\nvHead = 0.0;\n#ifdef USE_SKINNING\nvHead = dot(skinWeight, vec4(equal(skinIndex, vec4(uHeadBone))));\n#endif\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', '#include <common>\nuniform int uHide;\nuniform float uTuckAt;\nuniform float uTuckCut;\nuniform vec4 uShirt;\nuniform float uShirtLight;\nuniform float uHeadBone;\nvarying float vHem;\nvarying float vHead;\nvarying float vHidden;')
     // (The body's own shirt in the colour of the shirt worn over it, fold for fold: what is grey, with no colour to
@@ -373,12 +380,16 @@ interface Hidden {
   shirtLight?: { value: number };
   /** which of the shape's bones is the head (its number among them; -1: none): nothing it carries is the shirt */
   head?: { value: number };
+  /** trousers' shirt hem drawn in this far, in the garment's own units (see Worn.band) */
+  band?: { value: number };
 }
 /** how light each body's own shirt is, at the middle of it (linear): node scripts/base-colours.mjs */
 const SHIRT_LIGHT = [0.27, 0.24, 0.36, 0.26];
 const _c = new THREE.Color();
 /** how deep a trouser hem is tucked in under a shoe, metres */
 const TUCK = 0.04;
+/** and the shirt hem on the trousers in under a T-shirt's tail (Worn.band) */
+const BAND = 0.025;
 /**
  * how far in a part only partly under something worn is drawn, metres: 2.2 cm until the clothes were weighted as the
  * skin under them is (scripts/wear.mjs), when a hem no longer stood off the arm in motion and the arm drawn in so far
@@ -595,7 +606,7 @@ export class Wardrobe {
         const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
         // (its parts under a vest drawn in: see Worn.under, and the regions each of its points lies over, scripts/wear.mjs)
-        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 }, tuck: { value: w.tuck ?? 0 }, tuckBy: { value: 0 }, tuckAt: { value: shoeTop }, tuckCut: { value: w.tuck && shoeTop > 0.03 ? 0.012 : 0 } };
+        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 }, tuck: { value: w.tuck ?? 0 }, tuckBy: { value: 0 }, tuckAt: { value: shoeTop }, tuckCut: { value: w.tuck && shoeTop > 0.03 ? 0.012 : 0 }, band: { value: 0 } };
         f.atmo.register(
           mat,
           (shader) => {
@@ -610,6 +621,7 @@ export class Wardrobe {
         const m = onto(s, f.bones, mat);
         under.by.value = (w.underBy ?? UNDER) / unitOf(m);
         under.tuckBy!.value = TUCK / unitOf(m);
+        under.band!.value = w.band ? BAND / unitOf(m) : 0;
         m.castShadow = m.receiveShadow = true;
         m.intersectsFrustum = f.inSight;
         m.layers.mask = f.layers();
