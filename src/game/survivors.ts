@@ -310,10 +310,10 @@ function backPatch(shader: Shader, by: number) {
 function regionPatch(shader: Shader, hide: Hidden) {
   Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 }, uTuckAt: hide.tuckAt ?? { value: 0 }, uTuckCut: hide.tuckCut ?? { value: 0 }, uShirt: hide.shirt ?? { value: new THREE.Vector4(0, 0, 0, 0) }, uShirtLight: hide.shirtLight ?? { value: 0.25 }, uHeadBone: hide.head ?? { value: -1 } });
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nvarying float vHem;\nvarying float vHead;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;\nuniform float uHeadBone;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nvHem = _hem;\nvHead = 0.0;\n#ifdef USE_SKINNING\nvHead = dot(skinWeight, vec4(equal(skinIndex, vec4(uHeadBone))));\n#endif\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
+    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nvarying float vHem;\nvarying float vHead;\nvarying float vHidden;\nuniform int uHide;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;\nuniform float uHeadBone;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHidden = float((uHide >> int(_region + 0.5)) & 1);\nvHem = _hem;\nvHead = 0.0;\n#ifdef USE_SKINNING\nvHead = dot(skinWeight, vec4(equal(skinIndex, vec4(uHeadBone))));\n#endif\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nuniform int uHide;\nuniform float uTuckAt;\nuniform float uTuckCut;\nuniform vec4 uShirt;\nuniform float uShirtLight;\nuniform float uHeadBone;\nvarying float vHem;\nvarying float vHead;\nflat varying float vRegion;')
+    .replace('#include <common>', '#include <common>\nuniform int uHide;\nuniform float uTuckAt;\nuniform float uTuckCut;\nuniform vec4 uShirt;\nuniform float uShirtLight;\nuniform float uHeadBone;\nvarying float vHem;\nvarying float vHead;\nvarying float vHidden;')
     // (The body's own shirt in the colour of the shirt worn over it, fold for fold: what is grey, with no colour to
     // speak of as skin has (a third of the way to a colour, where skin is half way and more), and lighter than the
     // shorts. Wherever it is on the body but on the head, by the bone that carries it and not by the part it is marked
@@ -329,7 +329,10 @@ function regionPatch(shader: Shader, hide: Hidden) {
         diffuseColor.rgb = mix(own, uShirt.rgb * min(1.5, lit / uShirtLight), cloth);
       }`,
     )
-    .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (((uHide >> int(vRegion + 0.5)) & 1) != 0) discard;\nif (uTuckCut > 0.0 && vHem < uTuckAt - uTuckCut) discard;');
+    // (Hidden by the pixel, half way between a hidden point and a shown one, not by the triangle: a flat region is the
+    // triangle's last point's, and Meshy's long triangles from the nape down the back, last point on the hair or the
+    // face, stood whole through every jacket as grey wedges, 2026-11-11, the owner: "theres tering and sdtratching all over".)
+    .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vHidden > 0.5) discard;\nif (uTuckCut > 0.0 && vHem < uTuckAt - uTuckCut) discard;');
 }
 
 /**

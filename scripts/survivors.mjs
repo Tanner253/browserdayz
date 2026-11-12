@@ -221,6 +221,39 @@ for (const [n, file] of BODIES.entries()) {
     const fit = { crown: r(skull.max.y - head.y), headZ: r((skull.min.z + skull.max.z) / 2 - head.z), headDepth: r(skull.max.z - skull.min.z), chestMin: r(chest.min.z - sp.z), chestMax: r(chest.max.z - sp.z), chestWidth: r(chest.max.x - chest.min.x), ...waistOf(node), ...headOf(node) };
     node.setExtras({ ...node.getExtras(), height: +(hi - lo).toFixed(4), stands: STANDS[n], fit });
   }
+  // (The shirt's collar at the nape marked as the shirt, not the head, 2026-11-11. The head's marking ran down over the
+  // collar of the base layer's shirt behind the neck, and the head is never hidden: under a jacket the grey of that collar
+  // stood out through the jacket's own collar, the owner: "theres tering and sdtratching all over". What is marked as
+  // the head, behind it and no higher than 7 cm over its joint, and painted as this body's own shirt is (within 0.12 of
+  // the middle of the chest's colours), is the chest's; and below the joint, behind it or beside the neck (3 cm before
+  // it), what the neck carries and not the head and is near that colour (within 0.25), marked as the face or the hair
+  // (body 1's nape is "hair"); and behind it, no higher than 3 cm over the joint, what is the shirt's grey (no colour,
+  // within 0.15) though the head carries it (body 0's slivers through the field jacket). Last of all, as it says
+  // only what hides it: marked before the weights, it took the body's in place of the head's, and stretched into shards.)
+  let collar = 0;
+  {
+    const prim = node.getMesh().listPrimitives()[0], reg = prim.getAttribute('_REGION'), uv = prim.getAttribute('TEXCOORD_0'), P = restPoints(node);
+    const J = prim.getAttribute('JOINTS_0'), W = prim.getAttribute('WEIGHTS_0'), headAt = node.getSkin().listJoints().findIndex((j) => j.getName() === 'Head');
+    const onHead = (i) => J.getElement(i, []).reduce((s, k, m) => s + (k === headAt ? W.getElement(i, [])[m] : 0), 0);
+    const { data, info } = await sharp(Buffer.from(prim.getMaterial().getBaseColorTexture().getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const colour = (i) => {
+      const [s, t] = uv.getElement(i, []), x = Math.min(info.width - 1, Math.max(0, Math.round(s * (info.width - 1)))), y = Math.min(info.height - 1, Math.max(0, Math.round(t * (info.height - 1)))), o = (y * info.width + x) * 3;
+      return [data[o] / 255, data[o + 1] / 255, data[o + 2] / 255];
+    };
+    const chest = [0, 1, 2].map((c) => {
+      const v = [];
+      for (let i = 0; i < reg.getCount(); i++) if (reg.getScalar(i) === 3) v.push(colour(i)[c]);
+      return v.sort((x, y) => x - y)[Math.floor(v.length / 2)];
+    });
+    const head = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(node.getSkin().listJoints().find((j) => j.getName() === 'Head').getWorldMatrix()));
+    for (let i = 0; i < reg.getCount(); i++) {
+      const r = reg.getScalar(i);
+      if ((r > 1 && r !== 14) || P[i].y > head.y + 0.07 || P[i].z > head.z + 0.03) continue;
+      const c = colour(i), d = Math.hypot(c[0] - chest[0], c[1] - chest[1], c[2] - chest[2]);
+      const grey = Math.max(...c) - Math.min(...c) < 0.06 && P[i].z < head.z - 0.03 && P[i].y < head.y + 0.03 && d < 0.15;
+      if ((d < 0.12 && r <= 1 && P[i].z <= head.z) || (d < 0.25 && P[i].y < head.y && onHead(i) < 0.5) || grey) reg.setScalar(i, 3), collar++;
+    }
+  }
   // ---- every triangle wound as its points face (2026-11-11). Meshy turned some inside out, 57 to 102 a body, and the
   // skin is drawn from both sides: seen from outside, each was lit as its own inside, a dark slit down body 0's back
   // that opened as it aimed, dark flecks over the hands and the scalp; the owner, "theres tering and sdtratching all
@@ -255,5 +288,5 @@ for (const [n, file] of BODIES.entries()) {
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
   console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}
   ${moved}
-  ${weighted}\n  ${cloth}\n  ${worn}\n  ${turned} triangles turned the right way out`);
+  ${weighted}\n  ${cloth}\n  ${worn}\n  ${turned} triangles turned the right way out; ${collar} points of the shirt's collar at the nape marked as the shirt`);
 }

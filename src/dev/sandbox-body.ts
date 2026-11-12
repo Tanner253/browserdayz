@@ -157,6 +157,10 @@ export async function stageBodies(o: Stage) {
     if ((a as { gait?: { phase: number } }).gait) (a as unknown as { gait: { phase: number } }).gait.phase = 0;
     // (&bare=1: the body and what it wears not drawn, the thing in its hands alone: an attachment judged where it sits)
     if (q.get('bare') === '1') a.root.traverse((m) => void ((m as THREE.SkinnedMesh).isSkinnedMesh && (m.visible = false)));
+    // (&bare=body: the body alone not drawn, &bare=worn what it wears: a fleck through a jacket judged as the jacket's
+    // own or the body's, and the body seen as what is worn leaves it)
+    const bare = q.get('bare');
+    if (bare === 'body' || bare === 'worn') a.root.traverse((m) => void ((m as THREE.SkinnedMesh).isSkinnedMesh && /^survivor_/.test(((m as THREE.Mesh).material as THREE.Material).name) === (bare === 'body') && (m.visible = false)));
     return { a, s, pos: new THREE.Vector3((i % 8) * 12, STANDS_OVER, Math.floor(i / 8) * 12), face: 0, goes: 0, side: 0 };
   }));
   const vel = new THREE.Vector3();
