@@ -1014,15 +1014,27 @@ export class Game {
     // (built behind the menu, begun once the world is up and the menu shown (`buildBehind`, from src/main.ts), and
     // what wants them is done when they are: `loaded`)
     const behind = new Promise<void>((go) => (this.buildBehind = go));
-    const guns = behind.then(() => this.weapons.load((done, total) => this.readied(`Readying the guns ${done}/${total}`)));
+    // (The guns are begun here, at once, on a computer: the world's shaders are made by the card's own workers for the
+    // next twelve seconds and more, with the page's thread free (measured 2026-11-14 on the built site: 12.6 s of
+    // 'preparing graphics' with 0.9 s of work in it), and building the guns is 14 s of that thread's work and nothing
+    // of the card's. Begun after the menu was up, they were 17 s of the loading screen by themselves. A phone starts
+    // as it did: both at once is more held at a time than has been tried there.)
+    const guns = (TOUCH ? behind : Promise.resolve()).then(() => (performance.mark('guns begun'), this.weapons.load((done, total) => this.readied(`Readying the guns ${done}/${total}`)))).then(() => void performance.mark('guns built'));
+    // (a gun that fails is told of where `loaded` waits for them, below: not as a promise nobody has asked after yet)
+    guns.catch(() => {});
     this.gunsIn = guns;
     // (and beside them the world got ready for the lighting it is not lit by, the lamps' (Renderer.warmOther): part of
     // what Deploy waits for, so that the card's last work on it is done in the menu and never in the game, where it
     // was six seconds of a game that stood still, the first night)
-    const other = behind.then(() => r.warmOther(this.garage.warmers(), !TOUCH));
+    // (Begun only when everything the loading screen waits for is done, at the end of `loaded` below, and the world is
+    // up: begun beside the guns and the range it was the page's thread shared three ways, for a thing nobody waits for,
+    // and the range was 34 s in coming where it is a few by itself; begun before the start's last look at the shaders
+    // (src/main.ts), that waited for these as well. Measured 2026-11-14.)
+    const other = () => behind.then(() => r.warmOther(this.garage.warmers(), !TOUCH));
     // (and the bot check's range and figures, beside the guns: much of it is waiting on the card, which the guns' building on
     // the page goes on through)
-    const ranged = behind.then(() => this.range().prepare());
+    // (on a computer begun at once, as the guns are, above)
+    const ranged = (TOUCH ? behind : Promise.resolve()).then(() => this.range().prepare()).then(() => void performance.mark('range ready'));
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
     // (a gun on the ground lies there with what is fitted to it: the copy of it that is seen in the hands)
@@ -1139,7 +1151,9 @@ export class Game {
       .then(async () => {
         this.weapons.setLook(lookFor(playerName()));
         this.readied('Last touches 1/3');
+        performance.mark('touches begun');
         this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
+        performance.mark('hands asked');
         const held = new THREE.Group();
         for (const id of Object.keys(ITEMS)) {
           const m = this.weapons.worldModel(id);
@@ -1150,19 +1164,22 @@ export class Game {
         // in somebody's hands is readied in full as it is shown: RemotePlayer.readyHeld. 2026-10-21, the owner: "my vram
         // got maxed and throttled".)
         await Promise.race([r.ready([held], false, false), new Promise<void>((done) => setTimeout(done, 6000))]);
+        performance.mark('held ready');
         this.readied('Last touches 2/3');
         if (stale.length) Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
         assets.releaseModels();
         // (the bot check's range and figures, so that Play goes straight on to it)
         this.readied('Last touches 3/3');
         await ranged;
-        // (The lamps' lighting goes on being got ready behind: a lamp's light is held back until it is, see
-        // Renderer.readyToLight. Waited for here, it was most of a minute of the loading screen on the dev page.)
-        void other;
+        performance.mark('touches done');
       })
       .catch((e) => console.error('what is built behind the menu', e))
       .then(() => {
         this.isLoaded = true;
+        // (The lamps' lighting is got ready from here on, behind the menu, whatever became of the rest: a lamp's light
+        // is held back until it is, see Renderer.readyToLight. Waited for, it was most of a minute of the loading
+        // screen on the dev page.)
+        void other();
         // (and the inventory's first opening got ready behind the menu: see InventoryUI.warm)
         this.invUI?.warm();
         if (this.wantIn) {
