@@ -47,7 +47,8 @@ import { partyMates } from './party';
 import { perks } from './perks';
 import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
-import { animalsTick, startAnimals } from './animals';
+import { animalGroundNow, animalsTick, startAnimals } from './animals';
+import { npcRows, npcs, npcsTick, startNpcs } from './npcs';
 import { regrowing } from './gather';
 import { keepBases, restoreBases, sighting } from './build';
 import { charges } from './raid';
@@ -649,7 +650,7 @@ function pings() {
 }
 
 setInterval(() => {
-  if (clients.size < 2) return;
+  if (clients.size + npcs.size < 2) return;
   // (where everybody is, each row written once: each page is sent those within its sight, server/sight.ts; the
   // vanished only to admins, who are told of everybody)
   const rows: { id: number; x: number; z: number; hidden: boolean; json: string; body: Body }[] = [];
@@ -670,6 +671,8 @@ setInterval(() => {
     const v = (k: 0 | 2) => (a && b ? Math.max(-12, Math.min(12, (b.p[k] - a.p[k]) / dt)) : 0);
     rows.push({ id: c.id, x: p[0], z: p[2], hidden: !!c.power.hidden, json: JSON.stringify(row), body: { id: c.id, x: p[0], y: p[1], z: p[2], low: p[5] & F_PRONE ? 2 : p[5] & F_CROUCH ? 1 : 0, vx: v(0), vz: v(2), ms: c.ms } });
   }
+  // (and the server's own survivors beside them, seen as a player is)
+  rows.push(...npcRows());
   const shown = rows.filter((r) => !r.hidden);
   for (const c of clients.values()) {
     if (c.ws.readyState !== 1) continue;
@@ -1365,6 +1368,9 @@ setInterval(() => {
   for (const i of hearths.cleared(Date.now() / 1000)) broadcast({ t: 'fire-', i });
 }, 10_000).unref();
 setInterval(() => animalsTick(Date.now()), 200).unref();
+// (the server's own armed survivors, ten times a second: server/npcs.ts)
+startNpcs(animalGroundNow());
+setInterval(() => npcsTick(Date.now(), 0.1), 100).unref();
 
 void loadKept();
 

@@ -12,6 +12,7 @@ import { phaseOf } from '../src/sim/daynight';
 import type { HitZone } from '../src/sim/combat';
 import { type Thrower, newThrower } from '../src/sim/grenades';
 import { BLOOD } from '../src/sim/blood';
+import { npcInfos } from './npcs';
 import { type Pose, type Slung, type Vitals, type S2C, type PlayerInfo, type StoredItem, type C2S, PROTOCOL, F_GROUND, MAX_STAMINA } from '../src/net/protocol';
 import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, tellSeats, vehInfo, vehicles, world, type Veh } from './index';
 import { bunkerDoor, cardSeen, hitsBy, ipOf, seenOf, tagSeen, tagTime } from './tags';
@@ -430,7 +431,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     }
     held = null;
   }
-  const others = [...clients.values()].filter((o) => shown(o, c)).map(info);
+  const others = [...clients.values()].filter((o) => shown(o, c)).map(info).concat(npcInfos());
   clients.set(c.id, c);
   claim();
   send(c, {

@@ -14,7 +14,7 @@ import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
 import { playerName, remoteServer, serverSays } from '../../net/client';
-import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
+import { type S2C, F_DEAD, NPC_FROM, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
 import { bloodOf, bleedOf } from '../../sim/blood';
 import { type Avatar, GEAR_SHOWN, facepiece, DEATH_REST } from '../avatar';
 import { MOCAP_REST } from '../avatar/deeds';
@@ -906,7 +906,8 @@ export const onlineMethods = {
 
   /** everyone connected to the server, this player included */
   updateOnline(this: Game) {
-    this.hud.setOnline(this.online ? this.remotes.size + 1 : null, this.maxPlayers);
+    // (the server's own survivors are no players: not counted, src/net/protocol.ts NPC_FROM)
+    this.hud.setOnline(this.online ? [...this.remotes.keys()].filter((id) => id < NPC_FROM).length + 1 : null, this.maxPlayers);
   },
 
   async addRemote(this: Game, p: PlayerInfo) {

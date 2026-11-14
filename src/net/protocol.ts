@@ -125,6 +125,8 @@ export type ChatChannel = 'global' | 'near' | 'staff' | 'party';
 export const CHAT_RANGE = 50;
 
 /** player state flags */
+/** the numbers the server's own armed survivors go by, from here up (server/npcs.ts): told as players are, and no players */
+export const NPC_FROM = 100000;
 export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16, F_BLEED = 32;
 /** what the body is doing for as long as it is left to (see src/sim/emotes.ts): dancing, hands up */
 export const F_DANCE = 64, F_SURRENDER = 128;

@@ -25,6 +25,8 @@ import { blastFrom, blastWalled, walled } from './solid';
 
 let ground: Ground;
 export let herd: Herd;
+/** the ground as the animals have it, for the server's own survivors too (server/npcs.ts) */
+export const animalGroundNow = () => ground;
 
 /** Made once the world is (server/index.ts): every herd on its ground. ANIMALS=off for none. */
 export function startAnimals() {

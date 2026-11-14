@@ -16,7 +16,7 @@ import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
 import { INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
-import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE, type ZedSpot } from '../src/net/protocol';
+import { type C2S, F_DEAD, F_SEAT, NPC_FROM, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE, type ZedSpot } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { FUEL } from '../src/sim/cooking';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
@@ -34,6 +34,7 @@ import { roleRows } from './roles';
 
 /** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
 const LYING_REACH = 4;
+import { npcHit, npcsHear } from './npcs';
 import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { shotHeard } from '../src/sim/heard';
 import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, pidOf, releaseLock, seatOf } from './acts';
@@ -149,6 +150,7 @@ export function handle(c: Client, m: C2S) {
       broadcastNear({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, m.o[0], m.o[2], shotHeard(m.w, !!m.sup)[1] + 50, c);
       // (and every animal within earshot hears it)
       animalsHear(m.o[0], m.o[2], shotHeard(m.w, !!m.sup));
+      npcsHear(m.o[0], m.o[2], shotHeard(m.w, !!m.sup), c);
       return;
     }
     case 'swing': {
@@ -286,6 +288,8 @@ export function handle(c: Client, m: C2S) {
       return;
     }
     case 'hit': {
+      // (one of the server's own survivors: server/npcs.ts)
+      if (m.to >= NPC_FROM) return void npcHit(c, m);
       const target = clients.get(m.to);
       const rule = WEAPON_RULES[m.w];
       if (!target || !target.alive || !c.alive || !rule || target === c) return;
