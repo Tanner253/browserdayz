@@ -709,7 +709,11 @@ export class Game {
     GunRacks.onMade = (obj) => r.ready(obj).then(() => r.send(obj));
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
-    await this.grenades.preload();
+    // (Asked for, not waited for: a model is handed over only when the card has made its shaders or six seconds have
+    // gone (`onMade`, above), and this, the first of the start, was those six seconds whole with the page's thread free:
+    // all of 'loading loot', 2026-11-14. Its shaders are waited for with the world's, under 'preparing graphics'; a
+    // grenade thrown before its model has come is in the air all the same: Grenades.throw.)
+    void this.grenades.preload().catch((e) => console.error('the grenade', e));
     this.toys = new Toys(r.scene, this.effects, this.lamps);
     this.traps = new Traps({
       scene: r.scene, models: this.loot.models, online: () => this.online, send: (m) => this.net.send(m), pressed: (code) => this.input.pressed(code),
