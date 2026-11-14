@@ -59,10 +59,12 @@ const TROUSERS = { parts: LEGS, core: ['thigh', 'shin'], covers: ['hips', 'thigh
 const BOOTS = { parts: FEET, core: ['foot'], covers: ['foot'], even: 8 };
 const PIECES = {
   m65: { src: 'wear_m65.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
-  telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, plain: true, tex: 2048 },
+  // (what Meshy's figure wore below its hem hung under it before and behind as a dark apron: `apron`, the seat cut both
+  // sides, 2026-11-14. Tried and taken back: nothing of it over the thighs at all, which left gaps to the air at the waist.)
+  telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, plain: true, tex: 2048, seat: 0.2, apron: true },
   // (down over the hips, as the parka: all of it there is the hoodie but what is plainly the body's)
   hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, covers: [...JACKET.covers, 'hips'], peeks: [...JACKET.peeks, 'hips'], plain: true, tex: 2048 },
-  flannel: { src: 'wear_flannel.glb', body: 3, ...JACKET, tex: 2048 },
+  flannel: { src: 'wear_flannel.glb', body: 3, ...JACKET, tex: 2048, bridge: 0.02, rag: 0.07, flap: 0.07, crumbs: 250 },
   leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, plain: true, tex: 2048 },
   parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], plain: true, tex: 2048 },
   field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
@@ -371,7 +373,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // its hem over the trousers' waist as dark lumps, 2026-11-11, the owner: "looks like theres a gap between torso and legs")
   if (piece.seat) {
     const hips = B.P.filter((p, n) => region.getScalar(n) === REGION.hips), mid = hips.reduce((s, p) => s + p.z, 0) / hips.length;
-    const seat = (i) => keep[i] && near[i] >= 0 && region.getScalar(near[i]) === REGION.thigh && D.P[i].z < mid;
+    const seat = (i) => keep[i] && near[i] >= 0 && region.getScalar(near[i]) === REGION.thigh && (piece.apron || D.P[i].z < mid);
     const low = Math.min(...D.P.flatMap((p, i) => (seat(i) ? [p.y] : [])));
     let n = 0;
     keep = keep.map((k, i) => (seat(i) && D.P[i].y < low + piece.seat ? (n++, false) : k));
@@ -391,6 +393,77 @@ for (const [id, piece] of Object.entries(PIECES)) {
     tris = tris.filter((t, k) => ratio[k] < usual * +(process.env.STRETCH ?? 4));
     why.stretched = was - tris.length;
   }
+  // (And a sleeve joined to the side lower down, where the arm hangs against the hip: there the arm as made is nearly
+  // where it rests, nothing is stretched, and the join was kept, a dark strap from each cuff to the waist and a flap at
+  // each elbow behind the flannel's arms on every body, 2026-11-14. No cloth is held by the forearm or the hand and by
+  // the hips, the low back or a thigh at once: a triangle that is, among its three corners, by as much as `bridge` of
+  // each, is such a join.)
+  if (piece.bridge) {
+    const names = dressed.node.getSkin().listJoints().map((j) => j.getName());
+    const ji = D.prim.getAttribute('JOINTS_0'), jw = D.prim.getAttribute('WEIGHTS_0');
+    const held = (re) => D.P.map((_, i) => {
+      const a = ji.getElement(i, []), w = jw.getElement(i, []);
+      return a.reduce((s, j, c) => s + (re.test(names[j]) ? w[c] : 0), 0);
+    });
+    const fore = held(/^(lowerarm|hand|thumb|index|middle|ring|pinky)/), trunk = held(/^(pelvis|spine_01|spine_02|thigh)/);
+    const most = (t, of) => Math.max(...t.map((i) => of[i]));
+    const was = tris.length, wasTris = tris;
+    tris = tris.filter((t) => !(most(t, fore) >= piece.bridge && most(t, trunk) >= piece.bridge));
+    why.bridged = was - tris.length;
+    // (Tried and taken back: the upper arm with the hips as well, which cut the armpits to tatters, the two being held
+    // together there in whole cloth; and whatever stands far off the upper arm, which took the loose sleeve's own outside.)
+    // (and the join's end on the arm's side, a rag hung from the forearm that swung out behind an arm raised to aim: what
+    // the forearm holds stands within 6 cm of the body in nearly all of it, the rag 7 to 13)
+    if (piece.rag) {
+      const far = new Map();
+      const isFar = (i) => {
+        if (!far.has(i)) {
+          const [n, d] = fore[i] > 0.5 ? nearest(D.P[i]) : [0, 0];
+          far.set(i, n < 0 || d > piece.rag);
+        }
+        return far.get(i);
+      };
+      const had = tris.length;
+      tris = tris.filter((t) => !t.some(isFar));
+      console.log(`  a rag left on the forearm left out: ${had - tris.length} triangles`);
+    }
+    // (and its end on the body's side, a rag from the armpit to the waist that hung in the air beside the ribs when the
+    // arm was raised to aim: what the hips and the low back hold lies within the body's width at its height but for the
+    // shirt's own side, 5 to 6 cm out, and the rag is 7 to 17 cm out)
+    if (piece.flap) {
+      const TRUNK = new Set([REGION.chest, REGION.belly, REGION.hips, REGION.thigh]), wide = new Map();
+      B.P.forEach((p, n) => {
+        if (!TRUNK.has(region.getScalar(n))) return;
+        const k = Math.floor(p.y / 0.03);
+        wide.set(k, Math.max(wide.get(k) ?? 0, Math.abs(p.x)));
+      });
+      const out = (i) => trunk[i] > 0.3 && Math.abs(D.P[i].x) - (wide.get(Math.floor(D.P[i].y / 0.03)) ?? Infinity) > piece.flap;
+      const had = tris.length;
+      tris = tris.filter((t) => !t.some(out));
+      console.log(`  a rag left at the side left out: ${had - tris.length} triangles`);
+    }
+    // (and the slivers those cuts leave: round where something was cut, a triangle joined to the rest by one side or
+    // none is taken, and then what that leaves so, until none is. They hung at the cuffs and the waist as black shards.)
+    {
+      const kept = new Set(tris);
+      const cut = new Set(wasTris.filter((t) => !kept.has(t)).flat().map((i) => one[i]));
+      const nextTo = new Map();
+      wasTris.forEach((t) => t.forEach((i) => t.forEach((j) => i !== j && (nextTo.get(one[i]) ?? nextTo.set(one[i], new Set()).get(one[i])).add(one[j]))));
+      let rim = new Set(cut);
+      for (let r = 0; r < 4; r++) rim = new Set([...rim].flatMap((i) => [i, ...(nextTo.get(i) ?? [])]));
+      const had = tris.length;
+      for (let round = 0; round < 40; round++) {
+        const sides = new Map();
+        const side = (a, b) => (one[a] < one[b] ? `${one[a]},${one[b]}` : `${one[b]},${one[a]}`);
+        for (const t of tris) for (let e = 0; e < 3; e++) sides.set(side(t[e], t[(e + 1) % 3]), (sides.get(side(t[e], t[(e + 1) % 3])) ?? 0) + 1);
+        const left = tris.filter((t) => !(t.every((i) => rim.has(one[i])) && [0, 1, 2].filter((e) => sides.get(side(t[e], t[(e + 1) % 3])) > 1).length <= 1));
+        if (left.length === tris.length) break;
+        tris = left;
+      }
+      console.log(`  slivers left by those cuts left out: ${had - tris.length} triangles`);
+    }
+    console.log(`  a sleeve's join to the side left out: ${why.bridged} triangles`);
+  }
   if (process.env.WHY) console.log(JSON.stringify({ own: own.map((c) => +c.toFixed(3)), ...why }));
   // (and no crumbs: a piece of it apart from the rest, of fewer than fifty triangles, is cut away too)
   {
@@ -404,7 +477,9 @@ for (const [id, piece] of Object.entries(PIECES)) {
       for (let h = 0; h < lot.length; h++) for (const i of tris[lot[h]]) for (const k of of.get(one[i])) if (!seen[k]) (seen[k] = 1), lot.push(k);
       lots.push(lot);
     }
-    tris = lots.filter((l) => l.length >= 50).flat().map((k) => tris[k]);
+    if (process.env.WHY) console.log(`  pieces apart: ${lots.map((l) => l.length).sort((x, y) => y - x).slice(0, 12).join(' ')}`);
+    // (`crumbs`: a piece cut about more than most leaves bigger ones, the flannel a shard of some hundreds at the hip)
+    tris = lots.filter((l) => l.length >= (piece.crumbs ?? 50)).flat().map((k) => tris[k]);
   }
 
   // ---- a clean hem (the navigator, 2026-10-25: the M65's hem and the flannel's collar showed "a ragged, light,
