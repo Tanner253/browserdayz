@@ -113,6 +113,7 @@ const CSS = `
 .gd .gd-dots i.on{background:#c9a24a}
 .gd footer .gd-next{background:#c9a24a;color:#111;border-color:#c9a24a;min-width:84px}
 .gd footer .gd-back{min-width:84px}
+.gd footer .gd-back:disabled{opacity:.35;cursor:default}
 @media (max-width:600px){.gd{height:calc(100vh - 32px)}.gd header{flex-wrap:wrap}.gd .gd-tabs{margin-left:0;order:3;width:100%}.gd .gd-tabs button{flex:1}.gd footer{flex-wrap:wrap}.gd footer label{width:100%}.gd .gd-dots{margin-left:0;flex:1}}
 `;
 

@@ -187,9 +187,9 @@ export class Sites {
       }
       if (!this.at(siteSpot(s, s.reader), s.level ? 2.6 : NEAR)) continue;
       const phase = this.phase(id), name = s.card ? ITEMS[s.card].name.toLowerCase() : '';
-      if (phase === 'alarm') return `<small>${s.quiet ? 'It is running' : s.steps ? `${s.steps.name[0].toUpperCase()}${s.steps.name.slice(1)} first` : 'It is running'} · ${this.left(this.state.get(id)?.until)}</small>`;
-      if (phase === 'spent') return `<small>Open · shuts in ${this.left(this.state.get(id)?.until)}</small>`;
-      if (s.card && !this.h.has(s.card)) return `<small>${s.what?.none ?? `Locked. It scans a ${name}, ${PASS_FROM[s.card]}`}</small>`;
+      if (phase === 'alarm') return `<small class="lone">${s.quiet ? 'It is running' : s.steps ? `${s.steps.name[0].toUpperCase()}${s.steps.name.slice(1)} first` : 'It is running'} · ${this.left(this.state.get(id)?.until)}</small>`;
+      if (phase === 'spent') return `<small class="lone">Open · shuts in ${this.left(this.state.get(id)?.until)}</small>`;
+      if (s.card && !this.h.has(s.card)) return `<small class="lone">${s.what?.none ?? `Locked. It scans a ${name}, ${PASS_FROM[s.card]}`}</small>`;
       if (go) {
         if (!s.what) this.scanning(siteSpot(s, s.reader), 2);
         this.h.work(s.what?.doing ?? `Scanning the ${name}`, s.what ? (s.card ? 6 : 3) : 2, s.card, () => {
@@ -202,12 +202,12 @@ export class Sites {
     for (const [id, g] of Object.entries(GATES)) {
       if (!this.at(g.at, 1.8) && !(g.also && this.at(g.also, 1.8))) continue;
       const state = this.gates.get(id), name = g.card ? ITEMS[g.card].name.toLowerCase() : '';
-      if (state?.open) return `<small>Open · ${this.left(state.until)}</small>`;
+      if (state?.open) return `<small class="lone">Open · ${this.left(state.until)}</small>`;
       if (!g.card) {
         if (go) this.h.send({ t: 'gate', g: id });
         return `<kbd>F</kbd>${g.use}`;
       }
-      if (!this.h.has(g.card)) return `<small>Locked. It scans a ${name}, ${PASS_FROM[g.card]}</small>`;
+      if (!this.h.has(g.card)) return `<small class="lone">Locked. It scans a ${name}, ${PASS_FROM[g.card]}</small>`;
       if (go) {
         this.scanning(this.at(g.at, 1.8) ? g.at : g.also!, 2);
         this.h.work(`Scanning the ${name}`, 2, g.card, () => {
@@ -221,10 +221,10 @@ export class Sites {
     if (bolted) return bolted;
     // (you always know when the train is, on a platform and aboard it; and the lift, in its cab)
     const cab = this.h.cab();
-    if (cab) return cab.stop ? `<small>The lift goes ${cab.stop === 1 ? 'down' : 'up'} in ${Math.ceil(cab.left)} s</small>` : `<small>Level ${cab.left < 0 ? 1 : 2}</small>`;
+    if (cab) return cab.stop ? `<small class="lone">The lift goes ${cab.stop === 1 ? 'down' : 'up'} in ${Math.ceil(cab.left)} s</small>` : `<small class="lone">Level ${cab.left < 0 ? 1 : 2}</small>`;
     const me = this.h.feet(), line = this.h.line(), st = stationAt(me.x, me.y, me.z), clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-    if (line.aboard) return line.stop >= 0 ? `<small>${STATIONS[line.stop].name} · leaves in ${clock(line.left)}</small>` : `<small>Next stop ${STATIONS[line.bound].name} · ${clock(line.left)}</small>`;
-    if (st) return line.stop === st.stop ? `<small>The train is in · it leaves in ${clock(line.left)}</small>` : `<small>Next train in ${clock(untilAt(st.stop, line.t))}</small>`;
+    if (line.aboard) return line.stop >= 0 ? `<small class="lone">${STATIONS[line.stop].name} · leaves in ${clock(line.left)}</small>` : `<small class="lone">Next stop ${STATIONS[line.bound].name} · ${clock(line.left)}</small>`;
+    if (st) return line.stop === st.stop ? `<small class="lone">The train is in · it leaves in ${clock(line.left)}</small>` : `<small class="lone">Next train in ${clock(untilAt(st.stop, line.t))}</small>`;
     return null;
   }
 

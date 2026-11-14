@@ -21,6 +21,7 @@ import { GAS, type GasCloud, type GasZone } from '../sim/gas';
  * strip was turned over on its own, and the sky came out in bands, the owner, "the sky was so ugly". It goes the way
  * it is kept, and is read turned over where the sides are drawn.)
  */
+const SKY_SIDE = 1536;
 export async function skyBox(renderer: THREE.WebGLRenderer, eq: THREE.DataTexture): Promise<THREE.Texture> {
   const turned = eq.flipY;
   eq.flipY = false;
@@ -28,7 +29,10 @@ export async function skyBox(renderer: THREE.WebGLRenderer, eq: THREE.DataTextur
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
   // (with no depth to it: one box seen from inside has nothing in front of anything, and three's own kept six sides of
   // depth beside the picture, 96 MB of the card on a computer and 24 on a phone, for the life of the game)
-  const rt = new THREE.WebGLCubeRenderTarget((eq.image as { height: number }).height, { type: eq.type, colorSpace: eq.colorSpace as THREE.ColorSpace, magFilter: eq.magFilter, depthBuffer: false });
+  // (And no bigger than the picture can fill: a side as tall as the picture, 2048 for the 4096 one, has 18 points to a
+  // degree at its middle where the picture has 11 at its sharpest, the horizon. At 1536 it has 13, still more than
+  // there is to show, and the six sides are 108 MB of the card where they were 192: 2026-11-14.)
+  const rt = new THREE.WebGLCubeRenderTarget(Math.min(SKY_SIDE, (eq.image as { height: number }).height), { type: eq.type, colorSpace: eq.colorSpace as THREE.ColorSpace, magFilter: eq.magFilter, depthBuffer: false });
   rt.texture.minFilter = eq.minFilter;
   rt.texture.generateMipmaps = false;
   const box = new THREE.Mesh(
