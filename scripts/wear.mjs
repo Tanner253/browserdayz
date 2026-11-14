@@ -63,10 +63,14 @@ const PIECES = {
   // sides, 2026-11-14. Tried and taken back: nothing of it over the thighs at all, which left gaps to the air at the waist.)
   telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, plain: true, tex: 2048, seat: 0.2, apron: true },
   // (down over the hips, as the parka: all of it there is the hoodie but what is plainly the body's)
-  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, covers: [...JACKET.covers, 'hips'], peeks: [...JACKET.peeks, 'hips'], plain: true, tex: 2048 },
+  // (and over the thighs, where its front hangs: grey as the body's base layer there, it was cut by its colour to a
+  // ragged hole under the pocket, 2026-11-14; and what the figure wore under its hem behind left out, a pale band.
+  // Tried and taken back: what is far darker than it under the hem left out. The dark line left under its front hem is
+  // not its own: it is the gap to the jeans' waist, hidden under any top over the belly, src/game/survivors.ts.)
+  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], plain: true, tex: 2048, seat: 0.08 },
   flannel: { src: 'wear_flannel.glb', body: 3, ...JACKET, tex: 2048, bridge: 0.02, rag: 0.07, flap: 0.07, crumbs: 250 },
   leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, plain: true, tex: 2048 },
-  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], plain: true, tex: 2048 },
+  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], plain: true, tex: 2048, seat: 0.07 },
   field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
   jeans: { src: 'wear_jeans.glb', body: 1, ...TROUSERS, tex: 2048 },
   cargo_pants: { src: 'wear_cargo_pants.glb', body: 2, ...TROUSERS, plain: true, tex: 2048 },
