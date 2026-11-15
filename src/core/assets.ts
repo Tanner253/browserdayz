@@ -595,7 +595,10 @@ export class Assets {
     const name = `${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`, dir = leanDir(DESK ? DESK_CAP : PHONE_FAR);
     // (not one whose pictures are read again and painted over: `keepPictures`)
     const packed = `${dir.slice(0, -1)}k/${name}`;
-    if (this.packed && !this.kept.has(url) && this.versions[packed]) return packed;
+    // (nor the holographic sight: its glass and its ring are fine lines on a clear ground, which the small way of
+    // packing smears. The owner, 2026-11-15: "the compression of textures negativley impacted the holgograpuic weapon
+    // siight in game too harshly")
+    if (this.packed && !this.kept.has(url) && !/holo_sight/.test(url) && this.versions[packed]) return packed;
     return this.versions[`${dir}${name}`] ? `${dir}${name}` : url;
   }
 

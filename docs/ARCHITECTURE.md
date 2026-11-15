@@ -68,9 +68,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `learn.ts` | 101 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
 | `locks.ts` | 148 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
 | `npc-doors.ts` | 86 | The map's doors, to the server's own survivors (2026-11-15). |
+| `npc-mind.ts` | 61 | What kind of fighter each of the server's survivors is (2026-11-15). |
 | `npc-sight.ts` | 63 | What one of the server's survivors can see, and how soon (2026-11-15). |
 | `npc-walk.ts` | 196 | Where one of the server's survivors can stand and walk, by the map's own walls and floors (2026-11-15). |
-| `npcs.ts` | 1130 | The server: armed survivors of its own (2026-11-14). |
+| `npcs.ts` | 1207 | The server: armed survivors of its own (2026-11-14). |
 | `party.ts` | 151 | Parties (2026-10-19), the lite first one: the owner, "players want to be able to team up with eachother, can we do a simple party system, with a very LITE indicator on friendlies ... |
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
@@ -106,7 +107,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `assets.ts` | 1005 |  |
+| `assets.ts` | 1008 |  |
 | `audio.ts` | 2961 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `bones.ts` | 137 |  |
 | `breathe.ts` | 114 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
@@ -255,7 +256,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `guns.ts` | 505 | The game: attachments and magazines. |
 | `hands.ts` | 769 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
-| `interact.ts` | 451 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
+| `interact.ts` | 453 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 802 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
 | `online.ts` | 1122 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 | `reclaim.ts` | 40 | The game: a survivor's gear taken back off their own body at one press (the owner, 2026-10-25: |

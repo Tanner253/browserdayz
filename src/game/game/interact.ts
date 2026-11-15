@@ -13,6 +13,7 @@ import { inPlay } from '../../world/worldgen';
 import { CRATE_RESTOCK } from '../../sim/crates';
 import { POLICE_CAR } from '../../sim/vehicles';
 import type { Player } from '../player';
+import { NPC_FROM } from '../../net/protocol';
 import { bloodOf, bleedOf, BLOOD } from '../../sim/blood';
 import { WorldItem, Stash } from '../loot';
 import { Jeep } from '../vehicle';
@@ -162,7 +163,8 @@ export const interactMethods = {
         if (d < 18 && c.normalize().dot(dir) > 0.992 && !physics.raycast(cam.position, c, d - 0.5, SIGHT_GROUPS)) {
           // (near enough to speak to: asked to your party, or a yes to theirs, with F, as in Rust: server/party.ts)
           const mate = this.party.ids.has(r.id), asked = this.party.askedBy(r.id);
-          if (mate || d > 4) this.prompt = `<small>${r.name}${mate ? ' · party' : ''}</small>`;
+          // (one of the server's own survivors is nobody to ask: the owner, 2026-11-15, "you can ask bandits to your party?")
+          if (mate || d > 4 || r.id >= NPC_FROM) this.prompt = `<small>${r.name}${mate ? ' · party' : ''}</small>`;
           else if (this.party.wasSent(r.id)) this.prompt = `<small>${r.name} · asked to your party</small>`;
           else {
             this.prompt = `<kbd>F</kbd>${asked ? `Join ${r.name}'s party` : `Ask ${r.name} to your party`}`;
