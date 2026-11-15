@@ -31,9 +31,13 @@ export const eyeOf = (p: Pose): Vec3 => [p[0], p[1] + (p[5] & F_PRONE ? 0.35 : p
 
 /** whether nothing stands between two places: no hill, none of the map's walls, no base's, no door */
 export function clear(a: Vec3, b: Vec3, round = false) {
-  for (let k = 1; k < 8; k++) {
-    const t = k / 8;
-    if (world.groundAt(a[0] + (b[0] - a[0]) * t, a[2] + (b[2] - a[2]) * t) > a[1] + (b[1] - a[1]) * t + 0.15) return false;
+  // (the ground looked at every two metres of the line, and the line kept clear of it: at eight places a line, the
+  // crest of a hill between two of them was not there at all. The owner, 2026-11-15: "ais are shooting through the
+  // ground, theyre on the peaks of hills but the player cannot see them")
+  const n = Math.max(8, Math.min(80, Math.ceil(Math.hypot(b[0] - a[0], b[2] - a[2]) / 2)));
+  for (let k = 1; k < n; k++) {
+    const t = k / n;
+    if (world.groundAt(a[0] + (b[0] - a[0]) * t, a[2] + (b[2] - a[2]) * t) > a[1] + (b[1] - a[1]) * t - 0.05) return false;
   }
   return solid.clear(a, b) && (round ? roundClear(a, b) : sightClear(a, b)) && doorAcross(a, b, false) < 0;
 }

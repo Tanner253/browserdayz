@@ -57,7 +57,8 @@ export const NPC = {
    * we should add more the more east we go, maybe 3 in the desert zone, 8 in the middle and 12 in the far east"): the
    * desert to the ridge's crest, the green land to the old square's edge, the square. NPCS=n: n of them, anywhere.
    */
-  zones: [{ to: -2250, n: 3 }, { to: -768, n: 8 }, { to: Infinity, n: 12 }],
+  // (halved, 2026-11-15, the owner: "can we reduce the amount of bandits its too many")
+  zones: [{ to: -2250, n: 2 }, { to: -768, n: 4 }, { to: Infinity, n: 6 }],
   /** how often two come together and keep together ("maybe some of the ai stick together so theres duos") */
   duo: 0.4,
   /** thinks only with a player this near, metres */
@@ -482,7 +483,9 @@ function fire(n: Npc, c: Foe, now: number) {
     else if (y > hip && y <= neck) zone = wide < 0.24 ? 'torso' : wide < 0.36 ? 'arms' : null;
     else if (y >= foot && y <= hip && wide < 0.22) zone = 'legs';
   }
-  const hit = NPC.aim > 0 && !!zone && clear(o, aim, true) && !walled(n.pose, aim);
+  // (from the gun as from the eye: one whose eyes alone are over a crest or a wall has no shot. And it is fired at
+  // their chest: a head it sees over something is seen, not hit)
+  const hit = NPC.aim > 0 && !!zone && clear(o, aim, true) && clear([o[0], o[1] - 0.35, o[2]], aim, true) && !walled(n.pose, aim);
   const side = Math.atan2(aim[0] - o[0], aim[2] - o[2]) + Math.PI / 2;
   const tx = aim[0] + Math.sin(side) * x, ty = aim[1] + y, tz = aim[2] + Math.cos(side) * x;
   const len = Math.max(0.001, Math.hypot(tx - o[0], ty - o[1], tz - o[2]));
