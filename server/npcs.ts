@@ -43,10 +43,9 @@ import { away } from './gate';
 import { mayHit } from './tags';
 import { safe } from './camp';
 import { goneFrom } from './searched';
-import { roundClear, sightClear } from './walls';
-import { solid, walled, zoneAt } from './solid';
-import { ROUTES, indoors, openAir, route, standAt, stepTo, straight, walkOn, type Spot } from './npc-walk';
-import { doorAcross } from './npc-doors';
+import { walled, zoneAt } from './solid';
+import { ROUTES, floorsAt, indoors, openAir, route, standAt, stepTo, straight, walkOn, type Spot } from './npc-walk';
+import { SIGHT, clear, eyeOf, noticeIn, sightOn, wrap, yawTo } from './npc-sight';
 import type { Vec3 } from '../src/sim/grenades';
 
 /** how many there are (NPCS=0 for none), and the numbers they go by */
@@ -62,12 +61,13 @@ export const NPC = {
   duo: 0.4,
   /** thinks only with a player this near, metres */
   near: 260,
-  /** sees a standing player this far in the open in front of it; less of one crouched, lying, or in the trees */
-  sees: 95,
-  /** and knows where a round came from this far, when it is hit or one is fired at it */
-  feels: 220,
-  walk: 1.5,
-  run: 4.4,
+  /** NPC_AWAKE=1: they think with nobody near (a test read in the server's log, with no game) */
+  awake: !!process.env.NPC_AWAKE,
+  /** a player's own paces, so that the legs a game draws fit the ground covered (the owner, 2026-11-15: "the bandits
+   * movement animations dont always look natural"): a walk, the jog a player goes about at, a sprint */
+  walk: 1.7,
+  jog: 4.0,
+  run: 6.0,
   hp: 100,
   /** seconds its body lies before it is gone, and before another comes to the map in its place */
   lies: 300,
@@ -76,21 +76,26 @@ export const NPC = {
   apart: 140,
   /** and nobody is seen or shot at this soon after they come into the world, ms: one may be standing where they wake */
   grace: Number(process.env.NPC_GRACE ?? 30000),
-  /** NPC_AIM=0: never a hit (a test). And how much of a round's harm theirs does: less than a player's, as one meets
-   * them alone and they are many (at full harm two rounds killed a new life in 8 s) */
+  /** NPC_AIM=0: never a hit (a test). And how much of a round's harm theirs does: a quarter of a player's (the owner,
+   * 2026-11-15: "the bandits should do 25% normal damage"), as one meets them alone and they are many */
   aim: Number(process.env.NPC_AIM ?? 1),
-  harm: 0.7,
+  harm: 0.25,
 };
 
-/** what one carries and wears: a gun (and how many rounds a burst is), what is on it */
-const KITS: { w: string; burst: [number, number]; g: string[] }[] = [
-  { w: 'ak', burst: [2, 4], g: ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack'] },
-  { w: 'aks74u', burst: [2, 5], g: ['tracksuit_jacket', 'tracksuit_pants', 'trainers'] },
-  { w: 'mpa', burst: [3, 5], g: ['leather_jacket', 'jeans', 'work_boots', 'beanie'] },
-  { w: 'm9', burst: [1, 3], g: ['hoodie', 'jeans', 'trainers'] },
-  { w: 'colt', burst: [1, 2], g: ['flannel_shirt', 'work_trousers', 'work_boots'] },
-  { w: 'm9', burst: [1, 2], g: ['quilted_jacket', 'combat_trousers', 'hiking_boots', 'beanie'] },
-  { w: 'ar15', burst: [2, 3], g: ['tactical_jacket', 'combat_trousers', 'hiking_boots', 'sack_pack'] },
+/**
+ * What one carries and wears: a gun (and how many rounds a burst is), what is on it, and which of NPC.zones it is met
+ * in (the owner, 2026-11-15: "ai weapons should be scaled from west to east matching loot tiers so desert has pistols
+ * npc and far east has ak npc"): pistols in the desert, pistols and the short guns in the green land, rifles in the east.
+ */
+const KITS: { w: string; burst: [number, number]; g: string[]; in: number[] }[] = [
+  { w: 'ak', burst: [2, 4], g: ['field_jacket', 'cargo_pants', 'hiking_boots', 'sack_pack'], in: [2] },
+  { w: 'ak', burst: [2, 3], g: ['quilted_jacket', 'combat_trousers', 'hiking_boots', 'beanie'], in: [2] },
+  { w: 'ar15', burst: [2, 3], g: ['tactical_jacket', 'combat_trousers', 'hiking_boots', 'sack_pack'], in: [2] },
+  { w: 'aks74u', burst: [2, 5], g: ['tracksuit_jacket', 'tracksuit_pants', 'trainers'], in: [1, 2] },
+  { w: 'mpa', burst: [3, 5], g: ['leather_jacket', 'jeans', 'work_boots', 'beanie'], in: [1] },
+  { w: 'm9', burst: [1, 3], g: ['hoodie', 'jeans', 'trainers'], in: [0, 1] },
+  { w: 'colt', burst: [1, 2], g: ['hoodie', 'work_trousers', 'work_boots'], in: [0, 1] },
+  { w: 'm9', burst: [1, 2], g: ['quilted_jacket', 'combat_trousers', 'hiking_boots', 'beanie'], in: [0] },
 ];
 const FOOD = ['beans', 'bandage', 'rags'];
 
@@ -114,12 +119,13 @@ interface Npc {
   home: { x: number; z: number; r: number };
   state: State;
   /** where it is going, and how fast */
-  to: { x: number; z: number } | null;
+  to: { x: number; z: number; y?: number } | null;
   /** the way there round what stands between, once walking straight at it has failed: which `to` it is for, when it
    * may next be looked for, and how near the end it has got and when (it gives up what it gets no nearer) */
   way: Spot[];
   wayFor: object | null;
   wayAt: number;
+  tries: number;
   /** how many times running it has not got where it was going */
   fails: number;
   progD: number;
@@ -128,10 +134,21 @@ interface Npc {
   waitUntil: number;
   vx: number;
   vz: number;
-  /** who it is fighting, where it last saw them and when */
+  /** who it is fighting, where it last saw them, which way they were going, and when */
   foe: number;
   last: Vec3;
+  lastV: [number, number];
   sawAt: number;
+  /** how nearly it knows of each it has had in view (1: it does), and the way to one it half knows of (it stops and looks) */
+  aware: Map<number, number>;
+  wary: number;
+  /** the way it looks while it stands about: out of a window, down a street */
+  gaze: number;
+  gazeAt: number;
+  /** whether it has gone round for another line since it lost them; the places it has yet to look for one lost, and when it goes on */
+  flanked: boolean;
+  seek: number;
+  seekAt: number;
   /** the fight: its cover (and whether it only has to stand up there to fire), where it fires from, and what it is at */
   cover: (Spot & { low: boolean }) | null;
   peek: Spot | null;
@@ -175,23 +192,12 @@ let nextId = NPC_FROM;
 const owed: { at: number; zone: number }[] = [];
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(l: T[]) => l[Math.floor(Math.random() * l.length)];
-const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
-const yawTo = (ax: number, az: number, bx: number, bz: number) => Math.atan2(-(bx - ax), -(bz - az));
-const eyeOf = (p: Pose): Vec3 => [p[0], p[1] + (p[5] & F_PRONE ? 0.35 : p[5] & F_CROUCH ? 1.0 : 1.58), p[2]];
-
-/** whether nothing stands between two places: no hill, none of the map's walls, no base's */
-function clear(a: Vec3, b: Vec3, round = false) {
-  for (let k = 1; k < 8; k++) {
-    const t = k / 8;
-    if (world.groundAt(a[0] + (b[0] - a[0]) * t, a[2] + (b[2] - a[2]) * t) > a[1] + (b[1] - a[1]) * t + 0.15) return false;
-  }
-  return solid.clear(a, b) && (round ? roundClear(a, b) : sightClear(a, b)) && doorAcross(a, b, false) < 0;
-}
 
 /** Made once the animals' ground is (server/index.ts). */
 export function startNpcs(g: Ground) {
   ground = g;
   walkOn(g);
+  sightOn(g);
   if (!NPC.count) return void log('[npcs] none (NPCS=0)');
   if (NPC.count > 0) for (let k = 0; k < NPC.count; k++) owed.push({ at: Date.now() + k * 400, zone: -1 });
   else NPC.zones.forEach((q, zone) => {
@@ -231,12 +237,13 @@ function spawn(now: number, zone: number, by?: Npc): Npc | null {
     if (ground.open(x, z, 0.7) && !ground.roofed(x, z) && !safe(x, z)) at = { x, z, r: by.home.r };
   }
   if (!at) return null;
-  const kit = pick(KITS), mag = ITEMS[kit.w]?.weapon?.mag, cap = (mag && ITEMS[mag]?.mag?.capacity) || ITEMS[kit.w]?.weapon?.capacity || 30;
+  // (by the land it stands in, whichever it was owed to)
+  const land = NPC.zones.findIndex((q) => at.x < q.to), kit = pick(KITS.filter((k) => k.in.includes(land))), mag = ITEMS[kit.w]?.weapon?.mag, cap = (mag && ITEMS[mag]?.mag?.capacity) || ITEMS[kit.w]?.weapon?.capacity || 30;
   const n: Npc = {
     id: nextId++, zone, mate: by?.id ?? 0, name: 'Bandit', pose: [at.x, ground.height(at.x, at.z), at.z, rnd(-Math.PI, Math.PI), 0, F_GROUND],
     w: kit.w, m: mag ? [mag] : [], g: kit.g.filter((id) => ITEMS[id]), bd: Math.floor(rnd(0, 4)), vo: Math.floor(rnd(0, 4)), burst: kit.burst,
-    hp: NPC.hp, alive: true, diedAt: 0, home: at, state: 'roam', to: null, way: [], wayFor: null, wayAt: 0, fails: 0, progD: Infinity, progAt: 0, pace: NPC.walk, waitUntil: now + rnd(500, 4000), vx: 0, vz: 0,
-    foe: 0, last: [0, 0, 0], sawAt: 0, cover: null, peek: null, act: 'open', until: 0, left: 0, nextShot: 0, mag: cap, coverAt: 0, pushAt: 0, hitAt: 0, ax: 2, ay: 0.5, kick: 0, skill: rnd(0.75, 1.3),
+    hp: NPC.hp, alive: true, diedAt: 0, home: at, state: 'roam', to: null, way: [], wayFor: null, wayAt: 0, tries: 0, fails: 0, progD: Infinity, progAt: 0, pace: NPC.walk, waitUntil: now + rnd(500, 4000), vx: 0, vz: 0,
+    foe: 0, last: [0, 0, 0], lastV: [0, 0], sawAt: 0, aware: new Map(), wary: NaN, gaze: NaN, gazeAt: 0, flanked: false, seek: 0, seekAt: 0, cover: null, peek: null, act: 'open', until: 0, left: 0, nextShot: 0, mag: cap, coverAt: 0, pushAt: 0, hitAt: 0, ax: 2, ay: 0.5, kick: 0, skill: rnd(0.6, 1.05),
     cap, rounds: cap * Math.round(rnd(2, 4)), dry: false, bandages: Math.round(rnd(1, 3)), healAt: 0, pack: [makeItem('beans')], plan: 'walk', lie: false, lootUid: '', lootAt: 0,
   };
   if (by) (n.home = by.home), (by.mate = n.id);
@@ -271,20 +278,17 @@ const isNpc = (f: Foe): f is Npc => f.id >= NPC_FROM;
 const foeOf = (id: number): Foe | undefined => (id >= NPC_FROM ? npcs.get(id) : clients.get(id));
 const okFoe = (f: Foe | undefined): f is Foe => !!f && (isNpc(f) ? f.alive : fair(f));
 
-/** whether it sees them: near enough for how they stand and where, in front of it (or it is already after them), nothing between */
-function sees(n: Npc, c: Foe, after: boolean) {
-  const p = c.pose, d = Math.hypot(p[0] - n.pose[0], p[2] - n.pose[2]);
-  let reach = after ? NPC.feels : NPC.sees;
-  if (!after) {
-    if (p[5] & F_PRONE) reach *= 0.4;
-    else if (p[5] & F_CROUCH) reach *= 0.7;
-    if (ground.cover(p[0], p[2]) > 0.55) reach *= 0.7;
-    if (Math.abs(wrap(yawTo(n.pose[0], n.pose[2], p[0], p[2]) - n.pose[3])) > 1.75) reach *= d < 12 ? 1 : 0.35;
-  }
-  return d <= reach && clear(eyeOf(n.pose), [p[0], p[1] + (p[5] & F_PRONE ? 0.3 : 1.1), p[2]]);
-}
+/**
+ * The floors above a place that it may make for: none in a building where the stairs were looked for and not found (a
+ * loft up a ladder, a roof), by 6 m squares, so that a way which is not there is looked for once.
+ */
+const noStairs = new Set<number>();
+const sq = (x: number, z: number) => Math.floor(x / 6) * 65536 + Math.floor(z / 6);
+const upper = (x: number, z: number) => (noStairs.has(sq(x, z)) ? [] : floorsAt(x, z).filter((y) => y < ground.height(x, z) + 7.5));
 
 const spotOf = (n: Npc): Spot => ({ x: n.pose[0], y: n.pose[1], z: n.pose[2] });
+/** the places on a floor above whose stairs have been looked for from under them */
+const climbed = new WeakSet<object>();
 /** ways that may still be looked for this tick: one, so that no tick is long */
 let routesLeft = 1;
 
@@ -299,11 +303,14 @@ function step(n: Npc, dt: number): boolean {
     n.wayFor = n.to;
     n.way = [];
     n.wayAt = 0;
+    n.tries = 0;
     n.progD = Infinity;
     n.progAt = now;
   }
   const end = Math.hypot(n.to.x - at.x, n.to.z - at.z);
-  if (end < 0.5) return false;
+  // (on another floor: it walks to under it as to anywhere, and from there only a way found, by the stairs, gets it up)
+  const up = n.to.y !== undefined && Math.abs(n.to.y - at.y) > 1.2, climb = up && end < 1.5;
+  if (end < 0.5 && !up) return false;
   while (n.way.length && Math.hypot(n.way[0].x - at.x, n.way[0].z - at.z) < 0.4) {
     n.way.shift();
     n.progAt = now;
@@ -314,7 +321,7 @@ function step(n: Npc, dt: number): boolean {
   }
   const stuck = now - n.progAt > (n.way.length ? 4000 : 2500);
   const goal = n.way[0] ?? n.to, want = Math.atan2(goal.x - at.x, goal.z - at.z), far = Math.min(Math.hypot(goal.x - at.x, goal.z - at.z), n.pace * dt);
-  if (!stuck) for (const turn of n.way.length ? [0, 0.5, -0.5] : [0, 0.6, -0.6, 1.2, -1.2]) {
+  if (!stuck && (!climb || n.way.length)) for (const turn of n.way.length ? [0, 0.5, -0.5] : [0, 0.6, -0.6, 1.2, -1.2]) {
     const a = want + turn, s = stepTo(at, at.x + Math.sin(a) * far, at.z + Math.cos(a) * far, false);
     // (and room for a body half a metre on: it does not walk its face into a wall)
     if (!s || (far < 0.55 && Math.hypot(goal.x - at.x, goal.z - at.z) > 0.6 && !stepTo(at, at.x + Math.sin(a) * 0.55, at.z + Math.cos(a) * 0.55))) continue;
@@ -327,12 +334,17 @@ function step(n: Npc, dt: number): boolean {
   }
   n.vx = n.vz = 0;
   n.way = [];
-  if (now < n.wayAt || end > 70) return false;
+  const first = climb && !climbed.has(n.to);
+  if (end > 70) return false;
+  // (a way it was on and lost a step of: it stands until it may look again, a few times over, before it gives it up)
+  if (now < n.wayAt && !first) return n.tries > 0 && n.tries < 4;
   // (another's turn this tick: it stands a moment)
   if (routesLeft <= 0) return true;
   routesLeft--;
   n.wayAt = now + 3000;
-  const way = route(at, n.to);
+  n.tries++;
+  if (climb) climbed.add(n.to);
+  const way = route(at, climb ? n.to : { x: n.to.x, z: n.to.z }, climb ? 1200 : 450);
   if (SAY) log(`[npc ${n.id}] a way of ${way ? way.length : 'none'} to ${Math.round(end)} m off (${ROUTES.n} ways, ${Math.round(ROUTES.cells / ROUTES.n)} squares and ${(ROUTES.ms / ROUTES.n).toFixed(1)} ms each, ${ROUTES.none} none)`);
   if (!way) return false;
   n.way = way;
@@ -344,43 +356,53 @@ const face = (n: Npc, yaw: number, dt: number, rate = 7) => {
   const d = wrap(yaw - n.pose[3]);
   n.pose[3] = wrap(n.pose[3] + Math.max(-rate * dt, Math.min(rate * dt, d)));
 };
-const flagsOf = (n: Npc, moving: boolean, aim: boolean, crouch: boolean) => F_GROUND | (aim ? F_AIM : 0) | (crouch ? F_CROUCH : 0) | (moving && n.pace > 3 ? F_SPRINT : 0);
+const flagsOf = (n: Npc, moving: boolean, aim: boolean, crouch: boolean) => F_GROUND | (aim ? F_AIM : 0) | (crouch ? F_CROUCH : 0) | (moving && n.pace > 5 ? F_SPRINT : 0);
 
 /**
  * Cover from somebody at `from`: a place it can walk to where nothing of it can be seen from there crouched, and
  * beside it (or at it, stood up: a low wall, a window) a place it can fire from. Under a roof before in the open
  * ("should hide in buildings"), then the nearest.
  */
-function findCover(n: Npc, from: Vec3, about?: { x: number; z: number }): { cover: NonNullable<Npc['cover']>; peek: Spot; way: Spot[] } | null {
+function findCover(n: Npc, from: Vec3, about?: { x: number; z: number }, reach = 160): { cover: NonNullable<Npc['cover']>; peek: Spot; way: Spot[] } | null {
   const at = spotOf(n), mid = about ?? at, found: { cover: NonNullable<Npc['cover']>; peek: Spot; score: number }[] = [];
   for (const r of [2.5, 5, 8, 12, 16, 22]) {
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2 + r, cx = mid.x + Math.cos(a) * r, cz = mid.z + Math.sin(a) * r;
-      const y = standAt(cx, cz, ground.height(cx, cz) + 0.3);
-      if (y === null || Math.abs(y - at.y) > 4) continue;
-      if (clear(from, [cx, y + 0.95, cz]) || clear(from, [cx, y + 0.4, cz])) continue;
-      const score = r - (indoors(cx, cz) ? 9 : 0), c: Spot = { x: cx, y, z: cz };
-      // (a low wall or a window: hidden crouched, and over it stood up)
-      if (clear([cx, y + 1.58, cz], from, true)) {
-        found.push({ cover: { ...c, low: true }, peek: c, score });
-        continue;
-      }
-      // (or a corner, a doorway: a step or two out of it to the side there is a line to them)
-      const side = Math.atan2(from[0] - cx, from[2] - cz) + Math.PI / 2;
-      for (const s of [1.4, -1.4, 2.4, -2.4]) {
-        const p = straight(c, { x: cx + Math.sin(side) * s, z: cz + Math.cos(side) * s });
-        if (!p || !clear([p.x, p.y + 1.58, p.z], from, true)) continue;
-        found.push({ cover: { ...c, low: false }, peek: p, score });
-        break;
+      // (on the ground there; on its own floor if it is up a building; and, in a building near, the floor above: a
+      // window over them is the place a player takes)
+      const gy = ground.height(cx, cz), inb = indoors(cx, cz), ys = [standAt(cx, cz, gy + 0.3)];
+      if (at.y > gy + 1.5) ys.push(standAt(cx, cz, at.y));
+      else if (inb && r <= 12 && k % 2 === 0) ys.push(...upper(cx, cz));
+      let was = -99;
+      for (const y of ys) {
+        if (y === null || Math.abs(y - was) < 0.5 || Math.abs(y - at.y) > 4.5) continue;
+        was = y;
+        if (clear(from, [cx, y + 0.95, cz]) || clear(from, [cx, y + 0.4, cz])) continue;
+        const score = r - (inb ? 9 : 0) - (y > gy + 2 ? 7 : 0) + Math.abs(y - at.y) * 1.5, c: Spot = { x: cx, y, z: cz };
+        // (a low wall or a window: hidden crouched, and over it stood up)
+        if (clear([cx, y + 1.58, cz], from, true)) {
+          found.push({ cover: { ...c, low: true }, peek: c, score });
+          continue;
+        }
+        // (or a corner, a doorway: a step or two out of it to the side there is a line to them)
+        const side = Math.atan2(from[0] - cx, from[2] - cz) + Math.PI / 2;
+        for (const s of [1.4, -1.4, 2.4, -2.4]) {
+          const p = straight(c, { x: cx + Math.sin(side) * s, z: cz + Math.cos(side) * s });
+          if (!p || !clear([p.x, p.y + 1.58, p.z], from, true)) continue;
+          found.push({ cover: { ...c, low: false }, peek: p, score });
+          break;
+        }
       }
     }
   }
   found.sort((a, b) => a.score - b.score);
-  // (the best few it can get to: straight, or by a short way found)
+  // (the best few it can get to: straight, or by a way found, a longer one where there are stairs to climb)
   for (const f of found.slice(0, 2)) {
-    if (straight(at, f.cover)) return { cover: f.cover, peek: f.peek, way: [] };
-    const way = route(at, f.cover, 160);
+    const s = straight(at, f.cover), stairs = Math.abs(f.cover.y - at.y) > 1.2;
+    if (s && Math.abs(s.y - f.cover.y) < 0.6) return { cover: f.cover, peek: f.peek, way: [] };
+    const way = route(at, f.cover, stairs ? 600 : reach);
     if (way) return { cover: f.cover, peek: f.peek, way };
+    if (stairs) noStairs.add(sq(f.cover.x, f.cover.z));
   }
   return null;
 }
@@ -414,8 +436,10 @@ function track(n: Npc, c: Foe, seen: boolean, dt: number, now: number) {
   }
   const [vx, vz] = going(c), lx = (p[2] - n.pose[2]) / d, lz = -(p[0] - n.pose[0]) / d;
   // (across its line: it follows a little behind them)
-  const want = -(vx * lx + vz * lz) * 0.17 / n.skill, k = 1 - Math.exp(-dt / (0.32 / n.skill));
-  const low = n.pose[5] & F_PRONE ? 0.0018 : n.pose[5] & F_CROUCH ? 0.0028 : 0.0042;
+  const want = -(vx * lx + vz * lz) * 0.17 / n.skill, k = 1 - Math.exp(-dt / (0.45 / n.skill));
+  // (the owner, 2026-11-15, of the pass before: 'the npc seem to be "too good" at playing now ... we just want to get
+  // REALISM in here': a hand that wanders half as much again, sights slower onto somebody, a longer look before the first round)
+  const low = n.pose[5] & F_PRONE ? 0.0027 : n.pose[5] & F_CROUCH ? 0.0042 : 0.0063;
   const sway = (low * d * (now - n.hitAt < 900 ? 2.2 : 1) * (Math.hypot(n.vx, n.vz) > 0.5 ? 2 : 1)) / n.skill;
   n.ax += (want - n.ax) * k + rnd(-1, 1) * sway;
   n.ay += (0 - n.ay) * k + rnd(-1, 1) * sway * 0.7;
@@ -484,6 +508,7 @@ function flee(n: Npc, now: number) {
   if (SAY) log(`[npc ${n.id}] out of rounds, away`);
   n.state = 'hunt';
   n.foe = 0;
+  n.seek = 0;
   n.cover = n.peek = null;
   n.lie = false;
   n.to = { x: n.pose[0] + Math.sin(a) * 60, z: n.pose[2] + Math.cos(a) * 60 };
@@ -552,7 +577,7 @@ function onTo(n: Npc, c: Foe, now: number) {
     n.pushAt = now + rnd(12000, 26000);
     if (SAY) log(`[npc ${n.id}] after ${c.name} at ${Math.round(Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]))} m`);
     // (a moment to take them in before the first round)
-    n.nextShot = now + rnd(350, 700) / n.skill;
+    n.nextShot = now + rnd(600, 1200) / n.skill;
     n.left = 0;
     n.ax = rnd(1.2, 2.6) * (Math.random() < 0.5 ? -1 : 1);
     n.ay = rnd(-0.6, 0.6);
@@ -568,17 +593,21 @@ function fight(n: Npc, now: number, dt: number) {
   const c = foeOf(n.foe);
   if (!okFoe(c)) return void calm(n, now);
   if (n.dry) return void flee(n, now);
-  const seen = sees(n, c, true);
+  const seen = noticeIn(n.pose, c.pose, true, 0) < Infinity;
   track(n, c, seen, dt, now);
   if (seen) {
     n.last = [c.pose[0], c.pose[1], c.pose[2]];
+    n.lastV = going(c);
     n.sawAt = now;
-  } else if (now - n.sawAt > 7000) {
-    // (lost: to where they were last, at a run, and a look about there)
+    n.flanked = false;
+  } else if (now - n.sawAt > 11000) {
+    // (lost: to where they were last, sights up, a look about there, and on the way they were going)
     n.state = 'hunt';
     n.to = { x: n.last[0], z: n.last[2] };
-    n.pace = NPC.run;
-    n.until = now + 16000;
+    n.pace = NPC.jog;
+    n.until = now + 30000;
+    n.seek = 2;
+    n.seekAt = 0;
     return;
   }
   const foeAt: Vec3 = [n.last[0], n.last[1] + 1.4, n.last[2]], dist = Math.hypot(n.last[0] - n.pose[0], n.last[2] - n.pose[2]);
@@ -586,17 +615,23 @@ function fight(n: Npc, now: number, dt: number) {
   // (cover looked for once it is in a fight, again when what it has no longer hides it, or it has none and is hit)
   // (and it does not sit behind one wall for ever: after a while it works nearer, or round to a side, cover to cover)
   const push = !!n.cover && n.act === 'hide' && dist > 25 && now > n.pushAt;
-  if (!n.lie && now >= n.coverAt && (!n.cover || push || (n.act === 'hide' && clear(foeAt, [n.cover.x, n.cover.y + 0.95, n.cover.z])))) {
+  // (and with them out of sight a few seconds it goes round for another line on where they were: "move to find angles")
+  const round = !seen && !n.flanked && now - n.sawAt > 3000 && n.act !== 'back' && n.act !== 'out' && dist > 6;
+  if (!n.lie && now >= n.coverAt && (!n.cover || push || round || (n.act === 'hide' && clear(foeAt, [n.cover.x, n.cover.y + 0.95, n.cover.z])))) {
     n.coverAt = now + 2500;
     n.pushAt = now + rnd(12000, 26000);
     const way = Math.atan2(n.last[0] - n.pose[0], n.last[2] - n.pose[2]) + rnd(-0.8, 0.8), far = Math.min(14, dist * 0.35);
-    const found = findCover(n, foeAt, push ? { x: n.pose[0] + Math.sin(way) * far, z: n.pose[2] + Math.cos(way) * far } : undefined) ?? (push && n.cover && n.peek ? { cover: n.cover, peek: n.peek, way: [] } : null);
-    if (SAY) log(`[npc ${n.id}] cover ${found ? `${found.cover.low ? 'low' : 'corner'}${indoors(found.cover.x, found.cover.z) ? ' indoors' : ''} ${Math.round(Math.hypot(found.cover.x - n.pose[0], found.cover.z - n.pose[2]))} m off` : 'none'}`);
+    // (round them: a place off to one side of the line it had, a little nearer)
+    const arc = Math.atan2(n.pose[0] - n.last[0], n.pose[2] - n.last[2]) + (Math.random() < 0.5 ? 1 : -1) * rnd(0.8, 1.3), out = Math.max(8, Math.min(28, dist * 0.75));
+    const about = round ? { x: n.last[0] + Math.sin(arc) * out, z: n.last[2] + Math.cos(arc) * out } : push ? { x: n.pose[0] + Math.sin(way) * far, z: n.pose[2] + Math.cos(way) * far } : undefined;
+    if (round) n.flanked = true;
+    const found = findCover(n, foeAt, about, round ? 400 : 160) ?? ((push || round) && n.cover && n.peek ? { cover: n.cover, peek: n.peek, way: [] } : null);
+    if (SAY) log(`[npc ${n.id}] ${round ? 'round for a line, ' : ''}cover ${found ? `${found.cover.y > ground.height(found.cover.x, found.cover.z) + 2 ? 'upstairs ' : ''}${found.cover.low ? 'low' : 'corner'}${indoors(found.cover.x, found.cover.z) ? ' indoors' : ''} ${Math.round(Math.hypot(found.cover.x - n.pose[0], found.cover.z - n.pose[2]))} m off` : 'none'}`);
     n.cover = found?.cover ?? null;
     n.peek = found?.peek ?? null;
     if (found) {
       n.act = 'back';
-      n.to = { x: found.cover.x, z: found.cover.z };
+      n.to = { x: found.cover.x, z: found.cover.z, y: found.cover.y };
       // (the way it was found by, if it is not a straight one)
       n.wayFor = n.to;
       n.way = found.way;
@@ -645,10 +680,10 @@ function fight(n: Npc, now: number, dt: number) {
         n.until = now + rnd(1800, 3800);
         const side = toFoe + (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2 + (dist > 70 ? 0.9 : 0), far = rnd(3, 6);
         n.to = { x: n.pose[0] - Math.sin(side) * far, z: n.pose[2] - Math.cos(side) * far };
-        n.pace = NPC.run;
+        n.pace = NPC.jog;
         n.act = Math.random() < 0.5 ? 'open' : 'hide';
       }
-    } else face(n, Math.atan2(-n.vx, -n.vz), dt, 10);
+    } else face(n, toFoe, dt);
     n.pose[5] = flagsOf(n, moving, !moving, !moving && n.act === 'hide');
     return;
   }
@@ -685,8 +720,8 @@ function fight(n: Npc, now: number, dt: number) {
         n.until = now + rnd(2000, 3800);
       } else if (n.peek) {
         n.act = 'out';
-        n.to = { x: n.peek.x, z: n.peek.z };
-        n.pace = NPC.walk * 1.6;
+        n.to = { x: n.peek.x, z: n.peek.z, y: n.peek.y };
+        n.pace = NPC.walk;
       }
     }
     return;
@@ -701,7 +736,7 @@ function fight(n: Npc, now: number, dt: number) {
       if (n.mag <= 0) reload(n);
     } else {
       n.act = 'back';
-      n.to = { x: n.cover.x, z: n.cover.z };
+      n.to = { x: n.cover.x, z: n.cover.z, y: n.cover.y };
       n.pace = NPC.run;
     }
   }
@@ -759,6 +794,9 @@ function calm(n: Npc, now: number) {
   n.cover = n.peek = null;
   n.lie = false;
   n.lootAt = 0;
+  n.seek = 0;
+  n.aware.clear();
+  n.gaze = NaN;
   n.pace = NPC.walk;
   n.waitUntil = now + rnd(2000, 6000);
   n.pose[4] = 0;
@@ -793,7 +831,7 @@ export function npcsTick(now: number, dt: number) {
       continue;
     }
     // (nobody near, and no other of them at it: it stands as it is)
-    if (!people.some((c) => Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]) < NPC.near) && now - n.hitAt > 30000 && !(n.state === 'fight' && n.foe >= NPC_FROM)) {
+    if (!NPC.awake && !people.some((c) => Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]) < NPC.near) && now - n.hitAt > 30000 && !(n.state === 'fight' && n.foe >= NPC_FROM)) {
       if (n.state !== 'roam') calm(n, now);
       n.vx = n.vz = 0;
       continue;
@@ -810,21 +848,31 @@ export function npcsTick(now: number, dt: number) {
       if (n.state === 'fight') n.until = Math.max(n.until, now + 3600);
     }
     if (zeds(n, now, dt)) continue;
-    // (whoever it sees, the nearest: it is after them)
+    // (whoever it has had in view long enough to know of, the nearest: it is after them. One it only half knows of it
+    // stops and looks toward, as somebody does who thinks they saw something move)
+    n.wary = NaN;
     if (n.state !== 'fight' && !n.dry) {
-      let best: Foe | null = null, bd = Infinity;
-      for (const c of people) {
-        if (!fair(c)) continue;
+      const seenBy: { c: Foe; d: number }[] = [], keen = n.state !== 'roam';
+      let wd = Infinity;
+      const look = (c: Foe, far: number) => {
         const d = Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]);
-        if (d < bd && sees(n, c, n.state !== 'roam')) (best = c), (bd = d);
-      }
+        if (d > far) return;
+        const [vx, vz] = going(c), t = noticeIn(n.pose, c.pose, keen, Math.hypot(vx, vz));
+        let a = n.aware.get(c.id) ?? 0;
+        if (t === Infinity) {
+          if ((a -= dt / 4) > 0) n.aware.set(c.id, a);
+          else n.aware.delete(c.id);
+          return;
+        }
+        n.aware.set(c.id, (a = Math.min(1, a + dt / (keen ? t * 0.5 : t))));
+        if (a >= 1) seenBy.push({ c, d });
+        else if (a > 0.3 && d < wd) (wd = d), (n.wary = yawTo(n.pose[0], n.pose[2], c.pose[0], c.pose[2]));
+      };
+      for (const c of people) if (fair(c)) look(c, SIGHT.feels);
       // (and any other of them but the one it keeps with)
-      for (const o of npcs.values()) {
-        if (o === n || !o.alive || o.id === n.mate) continue;
-        const d = Math.hypot(o.pose[0] - n.pose[0], o.pose[2] - n.pose[2]);
-        if (d < bd && d < NPC.sees && sees(n, o, n.state !== 'roam')) (best = o), (bd = d);
-      }
-      if (best) onTo(n, best, now);
+      for (const o of npcs.values()) if (o !== n && o.alive && o.id !== n.mate) look(o, SIGHT.sees);
+      seenBy.sort((a, b) => a.d - b.d);
+      if (seenBy[0]) onTo(n, seenBy[0].c, now);
     }
     if (n.state === 'fight') {
       fight(n, now, dt);
@@ -837,25 +885,50 @@ export function npcsTick(now: number, dt: number) {
       else {
         n.to = null;
         n.vx = n.vz = 0;
-        face(n, n.pose[3] + 1.1, dt, 1.4);
+        // (a look this way and that, each held a moment, as a head turns: not a turning on the spot)
+        if (isNaN(n.gaze) || now > n.gazeAt) (n.gaze = n.pose[3] + rnd(-1.7, 1.7)), (n.gazeAt = now + rnd(1200, 2600));
+        face(n, n.gaze, dt, 3);
+        // (nobody where they were: after a look about, on the way they were going, twice, before it gives them up)
+        if (n.state === 'hunt' && n.seek > 0) {
+          if (!n.seekAt) n.seekAt = now + rnd(1500, 3000);
+          else if (now > n.seekAt) {
+            const a = (Math.hypot(n.lastV[0], n.lastV[1]) > 1 ? Math.atan2(n.lastV[0], n.lastV[1]) : rnd(0, Math.PI * 2)) + rnd(-0.6, 0.6), d = rnd(10, 18);
+            const x = n.pose[0] + Math.sin(a) * d, z = n.pose[2] + Math.cos(a) * d;
+            if (standAt(x, z, ground.height(x, z) + 0.3) !== null) n.to = { x, z };
+            n.pace = NPC.walk;
+            n.seek--;
+            n.seekAt = 0;
+            if (SAY) log(`[npc ${n.id}] lost them: looking on`);
+          }
+        }
       }
       n.pose[5] = flagsOf(n, moving, !moving, n.state === 'alert' && !moving);
       if (now > n.until) calm(n, now);
+      continue;
+    }
+    if (!isNaN(n.wary)) {
+      n.vx = n.vz = 0;
+      face(n, n.wary, dt, 3.5);
+      n.pose[5] = n.lie ? F_GROUND | F_PRONE : flagsOf(n, false, false, false);
       continue;
     }
     // (the second of two: by the first, down where it is down)
     const lead = n.mate && n.mate < n.id ? npcs.get(n.mate) : undefined;
     if (lead?.alive) {
       const d = Math.hypot(lead.pose[0] - n.pose[0], lead.pose[2] - n.pose[2]);
-      if (d > 7 && (!n.to || Math.hypot(n.to.x - lead.pose[0], n.to.z - lead.pose[2]) > 6)) {
-        const a = rnd(0, Math.PI * 2);
-        n.to = { x: lead.pose[0] + Math.cos(a) * 3, z: lead.pose[2] + Math.sin(a) * 3 };
-        if (standAt(n.to.x, n.to.z, lead.pose[1]) === null) n.to = { x: lead.pose[0], z: lead.pose[2] };
+      // (up the stairs after it, where it has gone up; and one that finds no way to it waits a while before it looks again)
+      const far = d > 7 || Math.abs(lead.pose[1] - n.pose[1]) > 1.5;
+      if (far && now > n.waitUntil && (!n.to || Math.hypot(n.to.x - lead.pose[0], n.to.z - lead.pose[2]) > 6)) {
+        const a = rnd(0, Math.PI * 2), y = lead.pose[1];
+        n.to = { x: lead.pose[0] + Math.cos(a) * 3, z: lead.pose[2] + Math.sin(a) * 3, y };
+        const s = standAt(n.to.x, n.to.z, y);
+        if (s === null || Math.abs(s - y) > 0.6) n.to = { x: lead.pose[0], z: lead.pose[2], y };
       }
-      n.pace = d > 18 ? NPC.run : NPC.walk * 1.25;
-      const moving = !!n.to && d > 2.5 && step(n, dt);
+      n.pace = d > 14 ? NPC.jog : NPC.walk;
+      const moving = !!n.to && (d > 2.5 || far) && step(n, dt);
       if (moving) face(n, Math.atan2(-n.vx, -n.vz), dt, 6);
       else {
+        if (n.to && far) n.waitUntil = now + rnd(4000, 8000);
         n.to = null;
         n.vx = n.vz = 0;
         if (lead.lie) face(n, lead.pose[3] + 0.5, dt, 2);
@@ -869,7 +942,7 @@ export function npcsTick(now: number, dt: number) {
       n.lootUid = '';
       // (now and then on to another place of its land where none of them is; and far from its place, toward it a stretch at a time)
       const reach = Math.max(30, n.home.r) + 25, off = () => Math.hypot(n.home.x - n.pose[0], n.home.z - n.pose[2]);
-      if (off() <= reach && Math.random() < 0.12) n.home = place(n.zone) ?? n.home;
+      if (off() <= reach && Math.random() < 0.35) n.home = place(n.zone) ?? n.home;
       for (let go = 0; go < 8 && !n.to && off() > reach; go++) {
         const a = Math.atan2(n.home.x - n.pose[0], n.home.z - n.pose[2]) + rnd(-0.6, 0.6), d = rnd(35, 55), x = n.pose[0] + Math.sin(a) * d, z = n.pose[2] + Math.cos(a) * d;
         if (standAt(x, z, ground.height(x, z) + 0.3) !== null) n.to = { x, z };
@@ -882,20 +955,35 @@ export function npcsTick(now: number, dt: number) {
       } else if (n.plan === 'lie') n.to = lieSpot(n);
       if (!n.to) n.plan = 'walk';
       // (as often as not into a building of the place, to stand about in it as somebody looting or lying in wait does)
-      const inside = Math.random() < 0.5;
-      for (let go = 0; go < 12 && !n.to && n.plan === 'walk'; go++) {
+      const inside = Math.random() < 0.5, wantUp = Math.random() < 0.7;
+      let flat: { x: number; z: number } | null = null;
+      for (let go = 0; go < (inside ? 40 : 12) && !n.to && n.plan === 'walk'; go++) {
         const a = rnd(0, Math.PI * 2), d = rnd(inside ? 0 : 8, Math.max(20, n.home.r)), x = n.home.x + Math.cos(a) * d, z = n.home.z + Math.sin(a) * d;
-        if (indoors(x, z) === inside && standAt(x, z, ground.height(x, z) + 0.3) !== null) n.to = { x, z };
+        if (indoors(x, z) !== inside || standAt(x, z, ground.height(x, z) + 0.3) === null) continue;
+        // (and up the stairs more often than not, where a building of the place has a floor above: "go upstairs in
+        // them": the first few places looked at are passed over for one that has)
+        const ups = inside && wantUp ? upper(x, z) : [];
+        if (inside && wantUp && !ups.length && go < 32) {
+          flat ??= { x, z };
+          continue;
+        }
+        n.to = ups.length ? { x, z, y: pick(ups) } : { x, z };
+        if (SAY && ups.length) log(`[npc ${n.id}] for the floor above, ${(n.to.y! - ground.height(x, z)).toFixed(1)} m up`);
       }
-      n.pace = onward ? NPC.walk * 1.9 : NPC.walk;
+      if (!n.to && n.plan === 'walk') n.to = flat;
+      n.gaze = NaN;
+      n.pace = onward || Math.random() < 0.4 ? NPC.jog : NPC.walk;
       n.until = now + 40000;
     }
     const moving = !!n.to && step(n, dt);
     if (moving) face(n, Math.atan2(-n.vx, -n.vz), dt, 6);
     else if (n.to || now > n.until) {
-      const got = !!n.to && Math.hypot(n.to.x - n.pose[0], n.to.z - n.pose[2]) < 2;
-      // (one that gets nowhere time after time is shut in somewhere: with nobody near to see, it is set down afresh)
-      n.fails = got || !n.to ? 0 : n.fails + 1;
+      const got = !!n.to && Math.hypot(n.to.x - n.pose[0], n.to.z - n.pose[2]) < 2 && (n.to.y === undefined || Math.abs(n.to.y - n.pose[1]) < 1.2);
+      // (one that gets nowhere time after time is shut in somewhere: with nobody near to see, it is set down afresh.
+      // A floor above it did not find the stairs to is not that)
+      n.fails = got || !n.to ? 0 : n.to.y !== undefined ? n.fails : n.fails + 1;
+      if (n.to?.y !== undefined && !got) noStairs.add(sq(n.to.x, n.to.z));
+      if (SAY && n.to?.y !== undefined) log(`[npc ${n.id}] ${got ? 'upstairs' : 'did not get upstairs'}`);
       if (n.fails >= 4 && !people.some((c) => Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]) < 150)) {
         const at = place(n.zone);
         if (at) {
@@ -918,7 +1006,11 @@ export function npcsTick(now: number, dt: number) {
       } else if (n.plan === 'loot' && got) {
         n.lootAt = now + rnd(2000, 3500);
         n.waitUntil = n.lootAt + rnd(1500, 5000);
-      } else n.waitUntil = now + (indoors(n.pose[0], n.pose[2]) ? rnd(15000, 50000) : rnd(3000, 12000));
+      } else {
+        n.waitUntil = now + (indoors(n.pose[0], n.pose[2]) ? rnd(15000, 50000) : (Math.hypot(n.home.x - n.pose[0], n.home.z - n.pose[2]) > Math.max(30, n.home.r) + 25 ? rnd(300, 2500) : rnd(3000, 12000)));
+        // (stood about indoors it watches out of a window or a door, not a wall)
+        if (indoors(n.pose[0], n.pose[2])) n.gaze = lookOut(n);
+      }
       n.plan = 'walk';
       n.until = Infinity;
     }
@@ -927,8 +1019,21 @@ export function npcsTick(now: number, dt: number) {
       n.lootAt = 0;
       pickUp(n);
     }
+    if (!moving && !n.lie && !isNaN(n.gaze)) face(n, n.gaze, dt, 2);
     n.pose[5] = n.lie ? F_GROUND | F_PRONE : flagsOf(n, moving, false, !moving && n.lootAt > 0);
   }
+}
+
+/** the way out of where it stands that it can see furthest along: a window, a doorway, a street; NaN where there is none */
+function lookOut(n: Npc): number {
+  const o = eyeOf(n.pose), k0 = Math.floor(rnd(0, 12));
+  for (const far of [40, 18]) {
+    for (let k = 0; k < 12; k++) {
+      const a = ((k + k0) / 12) * Math.PI * 2, x = o[0] + Math.sin(a) * far, z = o[2] + Math.cos(a) * far;
+      if (clear(o, [x, ground.height(x, z) + 1.2, z], true)) return yawTo(o[0], o[2], x, z);
+    }
+  }
+  return NaN;
 }
 
 /** A shot fired by a player: every one within its carry turns to it, takes what cover there is, and goes to see. */
@@ -940,12 +1045,13 @@ export function npcsHear(x: number, z: number, range: [number, number], by: Clie
     if (d > Math.min(range[1], 450) || !fair(by)) continue;
     n.state = 'alert';
     n.until = now + rnd(14000, 24000);
-    n.pace = NPC.run;
+    n.pace = NPC.jog;
     // (some of the way toward it: far enough to see who it was, not into their sights)
     const k = Math.max(0, Math.min(1, (d - 45) / d));
     // (one in a building as often as not stays in it, down, its sights to where the shot was)
     n.to = indoors(n.pose[0], n.pose[2]) && Math.random() < 0.6 ? null : { x: n.pose[0] + (x - n.pose[0]) * k, z: n.pose[2] + (z - n.pose[2]) * k };
-    n.pose[3] = yawTo(n.pose[0], n.pose[2], x, z);
+    n.gaze = yawTo(n.pose[0], n.pose[2], x, z);
+    n.gazeAt = now + 2500;
   }
 }
 
@@ -971,7 +1077,14 @@ export function npcHit(c: Client, m: Extract<C2S, { t: 'hit' }>) {
   n.hp -= amount;
   n.hitAt = now;
   send(c, { t: 'hitok', to: n.id, amount, zone: m.zone });
-  if (n.hp > 0) return void (fair(c) && (n.dry ? ((n.last = [c.pose[0], c.pose[1], c.pose[2]]), flee(n, now)) : onTo(n, c, now)));
+  if (n.hp > 0) {
+    if (!fair(c)) return;
+    if (n.dry) return void ((n.last = [c.pose[0], c.pose[1], c.pose[2]]), flee(n, now));
+    onTo(n, c, now);
+    // (a round from somebody it cannot see tells it about where they are, not where)
+    if (noticeIn(n.pose, c.pose, true, 0) === Infinity) (n.last[0] += rnd(-1, 1) * d * 0.12), (n.last[2] += rnd(-1, 1) * d * 0.12);
+    return;
+  }
   down(n, now, c.pose[0], c.pose[2], { by: c.id, byName: c.name, w: m.w, zone: m.zone as HitZone, dist: Math.round(d) });
   log(`${c.name} killed a ${n.name} (${m.w}, ${Math.round(d)} m)`);
 }

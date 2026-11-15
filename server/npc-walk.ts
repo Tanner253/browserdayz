@@ -43,9 +43,15 @@ export function standAt(x: number, z: number, y: number): number | null {
  * One step from where it stands to a place beside it: where it then stands, or null if something is in the way. A
  * shut door is: `plan` (a way being looked for) goes through one that is not locked; a step taken opens it and waits.
  */
-export function stepTo(a: Spot, x: number, z: number, plan = true): Spot | null {
+export function stepTo(a: Spot, x: number, z: number, plan = true, half = false): Spot | null {
   const y = standAt(x, z, a.y);
-  if (y === null || y - a.y > RISE || a.y - y > DROP) return null;
+  if (y === null || a.y - y > DROP) return null;
+  if (y - a.y > RISE) {
+    // (a stair is steeper than one long step takes: the step in two)
+    if (half || y - a.y > RISE * 2 || Math.hypot(x - a.x, z - a.z) < 0.5) return null;
+    const m = stepTo(a, (a.x + x) / 2, (a.z + z) / 2, plan, true);
+    return m && stepTo(m, x, z, plan, true);
+  }
   for (const h of [0.55, 1.35]) {
     const from: [number, number, number] = [a.x, a.y + h, a.z], to: [number, number, number] = [x, y + h, z];
     if (roundHit(from, to) !== null || !solid.clear(from, to)) return null;
@@ -65,6 +71,28 @@ export function stepTo(a: Spot, x: number, z: number, plan = true): Spot | null 
 
 /** nothing overhead: under the sky */
 export const openAir = (x: number, z: number, y: number) => roundHit([x, y + 0.5, z], [x, y + 40, z]) === null;
+
+/**
+ * The floors over the ground there that a body can stand on under a roof: an upper storey, a landing (the owner,
+ * 2026-11-15: "they should be able to use buildings and go upstairs in them and shoot through windows").
+ */
+export function floorsAt(x: number, z: number): number[] {
+  const g = ground.height(x, z), out: number[] = [];
+  let top = g + 14;
+  for (let go = 0; go < 12 && top > g + 2.2; go++) {
+    const hit = roundHit([x, top, z], [x, g + 2, z]);
+    if (hit === null) break;
+    // (begun inside a slab: on down out of it)
+    if (hit < 0.02) {
+      top -= 0.3;
+      continue;
+    }
+    const y = top - hit, s = standAt(x, z, y + 0.2);
+    if (s !== null && Math.abs(s - y) < 0.3 && !openAir(x, z, s) && !out.some((o) => Math.abs(o - s) < 1)) out.push(s);
+    top = y - 0.35;
+  }
+  return out;
+}
 
 /** whether a body has a hand's room about it there: a way found keeps off the walls */
 function roomy(s: Spot) {
@@ -87,14 +115,17 @@ export const ROUTES = { n: 0, cells: 0, ms: 0, none: 0 };
  * A way on foot from `from` to within a step of `to`, round walls and through doorways: the places to walk to, in
  * order, the last of them the end. Null if none is found within `cap` squares (too far, or shut in).
  */
-export function route(from: Spot, to: { x: number; z: number }, cap = 450): Spot[] | null {
+export function route(from: Spot, to: { x: number; z: number; y?: number }, cap = 450): Spot[] | null {
   const t0 = performance.now();
   interface Node { i: number; j: number; s: Spot; g: number; f: number; back: Node | null; shut: boolean }
-  const key = (i: number, j: number) => i * 4096 + j;
+  // (a square is one place a storey: the floor over a room is not the room)
+  const lvl = (y: number) => Math.floor((y - from.y + 0.75) / 1.5);
+  const key = (i: number, j: number, l: number) => ((l + 32) * 8192 + (i + 4096)) * 8192 + (j + 4096);
+  const up = (s: Spot) => (to.y === undefined ? 0 : Math.abs(to.y - s.y));
   const nodes = new Map<number, Node | null>();
-  const h = (s: Spot) => Math.hypot(to.x - s.x, to.z - s.z) * 1.4;
+  const h = (s: Spot) => (Math.hypot(to.x - s.x, to.z - s.z) + up(s)) * 1.4;
   const start: Node = { i: 0, j: 0, s: from, g: 0, f: h(from), back: null, shut: false };
-  nodes.set(key(0, 0), start);
+  nodes.set(key(0, 0, 0), start);
   const open: Node[] = [start];
   let end: Node | null = null, looked = 0;
   while (open.length && looked < cap) {
@@ -106,22 +137,24 @@ export function route(from: Spot, to: { x: number; z: number }, cap = 450): Spot
     if (cur.shut) continue;
     cur.shut = true;
     looked++;
-    if (Math.hypot(to.x - cur.s.x, to.z - cur.s.z) < CELL) {
+    if (Math.hypot(to.x - cur.s.x, to.z - cur.s.z) < CELL && up(cur.s) < 1) {
       end = cur;
       break;
     }
     for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
       if (!di && !dj) continue;
-      const i = cur.i + di, j = cur.j + dj, k = key(i, j), was = nodes.get(k);
-      if (was === null || was?.shut) continue;
+      const i = cur.i + di, j = cur.j + dj, k0 = key(i, j, lvl(cur.s.y)), was0 = nodes.get(k0);
+      if (was0 === null || (was0?.shut && Math.abs(was0.s.y - cur.s.y) < 0.5)) continue;
       const s = stepTo(cur.s, from.x + i * CELL, from.z + j * CELL);
       if (!s) {
         // (no standing there at all, as against no way to it from this side)
-        if (!was && standAt(from.x + i * CELL, from.z + j * CELL, cur.s.y) === null) nodes.set(k, null);
+        if (!was0 && standAt(from.x + i * CELL, from.z + j * CELL, cur.s.y) === null) nodes.set(k0, null);
         continue;
       }
-      // (hard against a wall: only where it is going may be)
-      if (!was && Math.hypot(to.x - s.x, to.z - s.z) > 1.3 && !roomy(s)) {
+      const k = key(i, j, lvl(s.y)), was = nodes.get(k);
+      if (was === null || was?.shut) continue;
+      // (hard against a wall: only where it is going may be, and a stair, which is no wider than it is)
+      if (!was && Math.hypot(to.x - s.x, to.z - s.z) > 1.3 && Math.abs(s.y - cur.s.y) < 0.15 && !roomy(s)) {
         nodes.set(k, null);
         continue;
       }
