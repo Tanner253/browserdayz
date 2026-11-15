@@ -4,9 +4,10 @@
 // on the card and four more in the page; packed it is one, and the page keeps no second copy. At the spawn the models'
 // pictures were 600 MB of the 730 the scene is painted with (progress/polish-pass/tex-census.js).
 //
-// Made from the lean copy where there is one (pictures already at the size a computer draws them), else from the file
-// itself where every picture in it is that small already. Shapes, movements and every other byte are copied as they
-// lie. Named by the version of the file it was made from, as the lean copies are, in assets/lean/512-256k/.
+// Made from the file itself, each picture brought to the size a computer draws it at (DESK_CAP: the lean copies leave
+// some whole, to be cut on arrival, and a packed picture cannot be cut then), colour kept under clear points. Packed the
+// small way (ETC1S at its best): the exact way (UASTC) made the files two and a half times what they had been to
+// fetch. Shapes, movements and every other byte are copied as they lie. Named by the version of the file it was made from, as the lean copies are, in assets/lean/512-256k/.
 //
 //   node scripts/lean-ktx.mjs [--force] [part of a path ...]      after scripts/lean.mjs
 import { createHash } from 'node:crypto';
@@ -30,7 +31,7 @@ const imageDecoder = async (buffer) => {
 
 /** which pictures hold colour as the eye sees it, and which a surface's lean: the rest are plain numbers */
 function kinds(json) {
-  const srgb = new Set(), normal = new Set();
+  const srgb = new Set(), normal = new Set(), capped = new Map();
   const img = (info) => {
     const t = info && json.textures?.[info.index];
     return t ? (t.extensions?.EXT_texture_webp?.source ?? t.source) : undefined;
@@ -42,8 +43,13 @@ function kinds(json) {
     }
     const n = img(m.normalTexture);
     if (n !== undefined) normal.add(n);
+    // (the size a computer draws each at, by the first place it is used: `shrink` in src/core/assets.ts; one only an extension uses is left whole)
+    for (const [info, cap] of [[m.pbrMetallicRoughness?.baseColorTexture, DESK.colour], [m.emissiveTexture, DESK.colour], [m.normalTexture, DESK.other], [m.pbrMetallicRoughness?.metallicRoughnessTexture, DESK.other], [m.occlusionTexture, DESK.other]]) {
+      const i = img(info);
+      if (i !== undefined && !capped.has(i)) capped.set(i, cap);
+    }
   }
-  return { srgb, normal };
+  return { srgb, normal, capped };
 }
 
 const files = [];
@@ -63,8 +69,7 @@ for (const file of files) {
   const rel = path.relative(ROOT, file).split(path.sep).join('/');
   if (only.length && !only.some((o) => rel.includes(o))) continue;
   const bytes = fs.readFileSync(file), name = `${rel.slice(0, -4)}.${version(bytes)}.glb`;
-  const lean = path.join(LEAN, name), dest = path.join(OUT, name);
-  const src = fs.existsSync(lean) ? fs.readFileSync(lean) : bytes;
+  const dest = path.join(OUT, name), src = bytes;
   if (!force && fs.existsSync(dest)) {
     made.add(path.resolve(dest));
     continue;
@@ -80,7 +85,7 @@ for (const file of files) {
     left++;
     continue;
   }
-  const { srgb, normal } = kinds(json), replaced = new Map();
+  const { srgb, normal, capped } = kinds(json), replaced = new Map();
   let ok = true;
   for (let i = 0; i < json.images.length && ok; i++) {
     const img = json.images[i], view = img.bufferView !== undefined ? json.bufferViews[img.bufferView] : null;
@@ -89,13 +94,19 @@ for (const file of files) {
       break;
     }
     const own = bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength);
-    const meta = await sharp(own).metadata();
-    // (a picture a computer would still cut on arrival: this file has no lean copy, and is left to be loaded as it is)
-    if (Math.max(meta.width, meta.height) > (srgb.has(i) ? DESK.colour : DESK.other) && !fs.existsSync(lean)) {
-      ok = false;
-      break;
+    const meta = await sharp(own).metadata(), cap = capped.get(i), big = Math.max(meta.width, meta.height);
+    let picture = own;
+    if (cap && big > cap) {
+      // (colour and clearness cut apart: cut together, the colour under a clear point goes to black, and shows as a dark rim)
+      const w = Math.max(1, Math.round((meta.width * cap) / big)), h = Math.max(1, Math.round((meta.height * cap) / big));
+      const rgb = await sharp(own).removeAlpha().resize(w, h, { kernel: 'lanczos3' }).raw().toBuffer();
+      const alpha = meta.hasAlpha ? await sharp(own).extractChannel(3).resize(w, h, { kernel: 'lanczos3' }).raw().toBuffer() : null;
+      const flat = sharp(rgb, { raw: { width: w, height: h, channels: 3 } });
+      picture = await (alpha ? flat.joinChannel(alpha, { raw: { width: w, height: h, channels: 1 } }) : flat).png().toBuffer();
     }
-    const ktx = await encodeToKTX2(new Uint8Array(own), { isUASTC: true, isKTX2File: true, uastcLDRQualityLevel: 2, enableRDO: false, needSupercompression: true, generateMipmap: true, isPerceptual: srgb.has(i), isSetKTX2SRGBTransferFunc: srgb.has(i), isNormalMap: normal.has(i), imageDecoder });
+    const ktx = await encodeToKTX2(new Uint8Array(picture), process.argv.includes('--exact')
+      ? { isUASTC: true, isKTX2File: true, uastcLDRQualityLevel: 2, enableRDO: true, rdoQualityLevel: 1.5, needSupercompression: true, generateMipmap: true, isPerceptual: srgb.has(i), isSetKTX2SRGBTransferFunc: srgb.has(i), isNormalMap: normal.has(i), imageDecoder }
+      : { isUASTC: false, isKTX2File: true, qualityLevel: 255, compressionLevel: 2, generateMipmap: true, isPerceptual: srgb.has(i), isSetKTX2SRGBTransferFunc: srgb.has(i), isNormalMap: normal.has(i), imageDecoder });
     replaced.set(view, Buffer.from(ktx));
     img.mimeType = 'image/ktx2';
     pictures++;
