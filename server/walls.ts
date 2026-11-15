@@ -98,3 +98,12 @@ function clear(a: Vec3, b: Vec3, group: number): boolean {
   const ray = new RAPIER.Ray({ x: a[0], y: a[1], z: a[2] }, { x: dx / l, y: dy / l, z: dz / l });
   return world.castRay(ray, l - 0.1, true, undefined, (0xffff << 16) | group) === null;
 }
+
+/** How far along the line from `a` toward `b` the first thing of the map's that stops a round stands, in metres; null where nothing does (or there are no walls). */
+export function roundHit(a: Vec3, b: Vec3): number | null {
+  if (!world) return null;
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], l = Math.hypot(dx, dy, dz);
+  if (l < 0.05) return null;
+  const hit = world.castRay(new RAPIER.Ray({ x: a[0], y: a[1], z: a[2] }, { x: dx / l, y: dy / l, z: dz / l }), l, true, undefined, (0xffff << 16) | ROUND);
+  return hit ? hit.timeOfImpact : null;
+}
