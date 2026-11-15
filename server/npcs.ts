@@ -39,7 +39,8 @@ import { safe } from './camp';
 import { goneFrom } from './searched';
 import { roundClear, sightClear } from './walls';
 import { solid, walled, zoneAt } from './solid';
-import { ROUTES, indoors, route, standAt, stepTo, straight, walkOn, type Spot } from './npc-walk';
+import { ROUTES, indoors, openAir, route, standAt, stepTo, straight, walkOn, type Spot } from './npc-walk';
+import { doorAcross } from './npc-doors';
 import type { Vec3 } from '../src/sim/grenades';
 
 /** how many there are (NPCS=0 for none), and the numbers they go by */
@@ -113,6 +114,8 @@ interface Npc {
   way: Spot[];
   wayFor: object | null;
   wayAt: number;
+  /** how many times running it has not got where it was going */
+  fails: number;
   progD: number;
   progAt: number;
   pace: number;
@@ -174,7 +177,7 @@ function clear(a: Vec3, b: Vec3, round = false) {
     const t = k / 8;
     if (world.groundAt(a[0] + (b[0] - a[0]) * t, a[2] + (b[2] - a[2]) * t) > a[1] + (b[1] - a[1]) * t + 0.15) return false;
   }
-  return solid.clear(a, b) && (round ? roundClear(a, b) : sightClear(a, b));
+  return solid.clear(a, b) && (round ? roundClear(a, b) : sightClear(a, b)) && doorAcross(a, b, false) < 0;
 }
 
 /** Made once the animals' ground is (server/index.ts). */
@@ -198,6 +201,13 @@ function place(zone: number): { x: number; z: number; r: number } | null {
     const q = pick(places), r = Math.min(90, q.radius), a = rnd(0, Math.PI * 2), d = rnd(0, r);
     const x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d;
     if (x < west || x >= east || !ground.open(x, z, 0.7) || ground.roofed(x, z) || safe(x, z)) continue;
+    // (on its feet under the sky, with a way off in most directions: the owner, 2026-11-15, "some ai are spawning in or
+    // getting stuck in some buildings": not every building is a box to the animals' ground)
+    const y = standAt(x, z, ground.height(x, z) + 0.3);
+    if (y === null || !openAir(x, z, y)) continue;
+    let ways = 0;
+    for (let k = 0; k < 6; k++) if (straight({ x, y, z }, { x: x + Math.sin(k * 1.047) * 6, z: z + Math.cos(k * 1.047) * 6 })) ways++;
+    if (ways < 4) continue;
     if ([...clients.values()].some((c) => Math.hypot(c.pose[0] - x, c.pose[2] - z) < NPC.apart)) continue;
     if ([...npcs.values()].some((n) => Math.hypot(n.pose[0] - x, n.pose[2] - z) < 40)) continue;
     return { x, z, r };
@@ -217,7 +227,7 @@ function spawn(now: number, zone: number, by?: Npc): Npc | null {
   const n: Npc = {
     id: nextId++, zone, mate: by?.id ?? 0, name: 'Bandit', pose: [at.x, ground.height(at.x, at.z), at.z, rnd(-Math.PI, Math.PI), 0, F_GROUND],
     w: kit.w, m: mag ? [mag] : [], g: kit.g.filter((id) => ITEMS[id]), bd: Math.floor(rnd(0, 4)), vo: Math.floor(rnd(0, 4)), burst: kit.burst,
-    hp: NPC.hp, alive: true, diedAt: 0, home: at, state: 'roam', to: null, way: [], wayFor: null, wayAt: 0, progD: Infinity, progAt: 0, pace: NPC.walk, waitUntil: now + rnd(500, 4000), vx: 0, vz: 0,
+    hp: NPC.hp, alive: true, diedAt: 0, home: at, state: 'roam', to: null, way: [], wayFor: null, wayAt: 0, fails: 0, progD: Infinity, progAt: 0, pace: NPC.walk, waitUntil: now + rnd(500, 4000), vx: 0, vz: 0,
     foe: 0, last: [0, 0, 0], sawAt: 0, cover: null, peek: null, act: 'open', until: 0, left: 0, nextShot: 0, mag: cap, coverAt: 0, hitAt: 0, ax: 2, ay: 0.5, kick: 0, skill: rnd(0.75, 1.3),
     cap, rounds: cap * Math.round(rnd(2, 4)), dry: false, bandages: Math.round(rnd(1, 3)), healAt: 0, pack: [makeItem('beans')], plan: 'walk', lie: false, lootUid: '', lootAt: 0,
   };
@@ -291,7 +301,7 @@ function step(n: Npc, dt: number): boolean {
   const stuck = now - n.progAt > (n.way.length ? 4000 : 2500);
   const goal = n.way[0] ?? n.to, want = Math.atan2(goal.x - at.x, goal.z - at.z), far = Math.min(Math.hypot(goal.x - at.x, goal.z - at.z), n.pace * dt);
   if (!stuck) for (const turn of n.way.length ? [0, 0.5, -0.5] : [0, 0.6, -0.6, 1.2, -1.2]) {
-    const a = want + turn, s = stepTo(at, at.x + Math.sin(a) * far, at.z + Math.cos(a) * far);
+    const a = want + turn, s = stepTo(at, at.x + Math.sin(a) * far, at.z + Math.cos(a) * far, false);
     // (and room for a body half a metre on: it does not walk its face into a wall)
     if (!s || (far < 0.55 && Math.hypot(goal.x - at.x, goal.z - at.z) > 0.6 && !stepTo(at, at.x + Math.sin(a) * 0.55, at.z + Math.cos(a) * 0.55))) continue;
     n.pose[0] = s.x;
@@ -837,6 +847,19 @@ export function npcsTick(now: number, dt: number) {
     if (moving) face(n, Math.atan2(-n.vx, -n.vz), dt, 6);
     else if (n.to || now > n.until) {
       const got = !!n.to && Math.hypot(n.to.x - n.pose[0], n.to.z - n.pose[2]) < 2;
+      // (one that gets nowhere time after time is shut in somewhere: with nobody near to see, it is set down afresh)
+      n.fails = got || !n.to ? 0 : n.fails + 1;
+      if (n.fails >= 4 && !people.some((c) => Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]) < 150)) {
+        const at = place(n.zone);
+        if (at) {
+          if (SAY) log(`[npc ${n.id}] shut in at ${Math.round(n.pose[0])}, ${Math.round(n.pose[2])}: set down afresh`);
+          n.pose[0] = at.x;
+          n.pose[2] = at.z;
+          n.pose[1] = ground.height(at.x, at.z);
+          n.home = at;
+          n.fails = 0;
+        }
+      }
       n.to = null;
       n.vx = n.vz = 0;
       if (n.plan === 'lie' && got) {

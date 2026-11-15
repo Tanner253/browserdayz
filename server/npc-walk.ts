@@ -8,6 +8,7 @@ import type { Ground } from '../src/sim/animal-ground';
 import { safe } from './camp';
 import { solid } from './solid';
 import { roundHit } from './walls';
+import { doorAcross, doorLocked, openDoor } from './npc-doors';
 
 export interface Spot { x: number; y: number; z: number }
 
@@ -38,16 +39,32 @@ export function standAt(x: number, z: number, y: number): number | null {
   return f;
 }
 
-/** One step from where it stands to a place beside it: where it then stands, or null if something is in the way. */
-export function stepTo(a: Spot, x: number, z: number): Spot | null {
+/**
+ * One step from where it stands to a place beside it: where it then stands, or null if something is in the way. A
+ * shut door is: `plan` (a way being looked for) goes through one that is not locked; a step taken opens it and waits.
+ */
+export function stepTo(a: Spot, x: number, z: number, plan = true): Spot | null {
   const y = standAt(x, z, a.y);
   if (y === null || y - a.y > RISE || a.y - y > DROP) return null;
   for (const h of [0.55, 1.35]) {
     const from: [number, number, number] = [a.x, a.y + h, a.z], to: [number, number, number] = [x, y + h, z];
     if (roundHit(from, to) !== null || !solid.clear(from, to)) return null;
   }
+  // (a little past where it steps to: it does not stand in the leaf)
+  const d = Math.hypot(x - a.x, z - a.z) || 1, k = 1 + 0.35 / d;
+  const door = doorAcross([a.x, a.y + 1, a.z], [a.x + (x - a.x) * k, y + 1, a.z + (z - a.z) * k], true);
+  if (door >= 0) {
+    if (doorLocked(door)) return null;
+    if (!plan) {
+      openDoor(door, [a.x, a.y + 1, a.z]);
+      return null;
+    }
+  }
   return { x, y, z };
 }
+
+/** nothing overhead: under the sky */
+export const openAir = (x: number, z: number, y: number) => roundHit([x, y + 0.5, z], [x, y + 40, z]) === null;
 
 /** whether a body has a hand's room about it there: a way found keeps off the walls */
 function roomy(s: Spot) {
