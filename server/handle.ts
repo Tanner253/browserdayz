@@ -34,7 +34,7 @@ import { roleRows } from './roles';
 
 /** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
 const LYING_REACH = 4;
-import { npcHit, npcsHear } from './npcs';
+import { npcHit, npcsHear, npcBitten } from './npcs';
 import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { shotHeard } from '../src/sim/heard';
 import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, pidOf, releaseLock, seatOf } from './acts';
@@ -498,6 +498,7 @@ export function handle(c: Client, m: C2S) {
       return unfitLock(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
+      if (m.to >= NPC_FROM) return void npcBitten(c, m.i, m.to);
       const target = clients.get(m.to);
       const b = horde.bodies.get(m.i);
       // (Not somebody whose connection has gone, or who has said nothing for a while: the body left standing is there

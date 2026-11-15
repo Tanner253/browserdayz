@@ -29,7 +29,7 @@ import { BODY_GRID, Container } from '../src/sim/inventory';
 import type { Ground } from '../src/sim/animal-ground';
 import { clients, broadcast, broadcastNear, num, send, type Client } from './players';
 import { boxes, economy, horde, issue, log, world } from './index';
-import { I_ATTACK, I_CHASE } from '../src/sim/infected';
+import { INFECTED, I_ATTACK, I_CHASE } from '../src/sim/infected';
 import { infectedBody } from './acts';
 import { bodyInfo, fellWay } from './bodies';
 import { dealt } from './checks';
@@ -902,13 +902,33 @@ export function npcHit(c: Client, m: Extract<C2S, { t: 'hit' }>) {
   n.hitAt = now;
   send(c, { t: 'hitok', to: n.id, amount, zone: m.zone });
   if (n.hp > 0) return void (fair(c) && (n.dry ? ((n.last = [c.pose[0], c.pose[1], c.pose[2]]), flee(n, now)) : onTo(n, c, now)));
-  // (down: its body where it fell with what it had, searched as any body is, and no tag in it)
+  down(n, now, c.pose[0], c.pose[2], { by: c.id, byName: c.name, w: m.w, zone: m.zone as HitZone, dist: Math.round(d) });
+  log(`${c.name} killed a ${n.name} (${m.w}, ${Math.round(d)} m)`);
+}
+
+/**
+ * One of the infected has struck one ('iatk' in server/handle.ts, where the one struck is no player). The owner,
+ * 2026-11-15: "zombies should be able to kill bandits". Believed as a blow on a player is: by the game that moves
+ * that one, within its reach, no sooner than its arm comes round.
+ */
+export function npcBitten(c: Client, i: number, to: number) {
+  const n = npcs.get(to), b = horde.bodies.get(i), now = Date.now();
+  if (!n || !n.alive || !b || !horde.strikes(i, c.id, { id: n.id, x: n.pose[0], z: n.pose[2] }, now)) return;
+  n.hp -= INFECTED.damage + Math.round((Math.random() - 0.5) * 6);
+  n.hitAt = now;
+  if (n.hp > 0) return;
+  down(n, now, b.s[0], b.s[2], { by: null, byName: null, w: 'infected', zone: 'torso', dist: 1 });
+  log(`the infected killed a ${n.name}`);
+}
+
+/** Down: its body where it fell with what it had, searched as any body is, and no tag in it. */
+function down(n: Npc, now: number, fx: number, fz: number, by: Pick<KillInfo, 'by' | 'byName' | 'w' | 'zone' | 'dist'>) {
   n.alive = false;
   n.diedAt = now;
   n.vx = n.vz = 0;
   n.pose[5] = F_GROUND | F_DEAD;
-  const len = Math.max(0.001, Math.hypot(n.pose[0] - c.pose[0], n.pose[2] - c.pose[2]));
-  const way = fellWay(n.pose[3], [(n.pose[0] - c.pose[0]) / len, (n.pose[2] - c.pose[2]) / len]);
+  const len = Math.max(0.001, Math.hypot(n.pose[0] - fx, n.pose[2] - fz));
+  const way = fellWay(n.pose[3], [(n.pose[0] - fx) / len, (n.pose[2] - fz) / len]);
   const uid = `nbody_${n.id}`, box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
   const gun = stockGun(makeItem(n.w), 0);
   if (ITEMS[n.w]?.weapon?.mag) gun.mag = ITEMS[n.w].weapon!.mag!;
@@ -921,7 +941,6 @@ export function npcHit(c: Client, m: Extract<C2S, { t: 'hit' }>) {
   const body = { cid: uid, kind: 'corpse' as const, w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x: r2(n.pose[0]), y: r2(n.pose[1]), z: r2(n.pose[2]), rot: Math.round(n.pose[3] * 1000) / 1000, emptiedAt: -1, name: n.name, expires: economy.time + NPC.lies, v: way, bd: n.bd };
   for (const it of body.items) issue(it);
   boxes.set(uid, body as never);
-  const k: KillInfo = { id: n.id, name: n.name, by: c.id, byName: c.name, w: m.w, zone: m.zone, dist: Math.round(d), v: way };
+  const k: KillInfo = { id: n.id, name: n.name, ...by, v: way };
   broadcast({ t: 'death', k, corpse: bodyInfo(body) } as S2C);
-  log(`${c.name} killed a ${n.name} (${m.w}, ${Math.round(d)} m)`);
 }
