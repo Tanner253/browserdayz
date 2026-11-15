@@ -98,6 +98,12 @@ const KITS: { w: string; burst: [number, number]; g: string[]; in: number[] }[] 
   { w: 'colt', burst: [1, 2], g: ['hoodie', 'work_trousers', 'work_boots'], in: [0, 1] },
   { w: 'm9', burst: [1, 2], g: ['quilted_jacket', 'combat_trousers', 'hiking_boots', 'beanie'], in: [0] },
 ];
+/**
+ * How far off each gun is fired from, metres (the owner, 2026-11-15: "the ai are shooting players from WAY too far
+ * away"): past it one does not fire, it works nearer. A pistol is a gun for across a yard, a rifle for across a field.
+ */
+const REACH: Record<string, number> = { m9: 35, colt: 35, mpa: 50, aks74u: 70, ak: 100, ar15: 110 };
+const reachOf = (n: Npc) => (REACH[n.w] ?? 60) * (n.style === 'marksman' ? 1.3 : 1);
 const FOOD = ['beans', 'bandage', 'rags'];
 
 type State = 'roam' | 'alert' | 'fight' | 'hunt';
@@ -645,7 +651,7 @@ function fight(n: Npc, now: number, dt: number) {
     return;
   }
   if (n.dry) return void flee(n, now);
-  const st = STYLE[n.style];
+  const st = STYLE[n.style], reach = reachOf(n), near = Math.min(st.near, reach * 0.7);
   if (!n.broke && n.hp < st.breaks && now - n.hitAt < 3000 && (n.bandages <= 0 || n.nerve < 0.45)) return void runOff(n, now);
   const seen = noticeIn(n.pose, c.pose, true, 0) < Infinity;
   track(n, c, seen, dt, now);
@@ -669,7 +675,8 @@ function fight(n: Npc, now: number, dt: number) {
   const toFoe = yawTo(n.pose[0], n.pose[2], n.last[0], n.last[2]);
   // (cover looked for once it is in a fight, again when what it has no longer hides it, or it has none and is hit)
   // (and it does not sit behind one wall for ever: after a while it works nearer, or round to a side, cover to cover)
-  const push = !!n.cover && n.act === 'hide' && dist > st.near && now > n.pushAt;
+  // (out of its gun's reach it does not wait behind its cover: it is on toward them at once)
+  const push = !!n.cover && n.act === 'hide' && dist > near && (now > n.pushAt || dist > reach);
   // (one that keeps its distance falls back when they are too near)
   const off = !push && st.far > 0 && seen && !!n.cover && n.act === 'hide' && dist < st.far && now > n.pushAt;
   // (and with them out of sight a few seconds it goes round for another line on where they were: "move to find angles")
@@ -713,6 +720,12 @@ function fight(n: Npc, now: number, dt: number) {
       return;
     }
     if (n.left <= 0) n.left = Math.round(rnd(n.burst[0], n.burst[1]));
+    if (seen && dist > reach) {
+      // (too far off for its gun: it holds its fire)
+      n.left = 0;
+      n.nextShot = now + 400;
+      return;
+    }
     if (seen) fire(n, c, now);
     else if (n.pin && now - n.sawAt < 2800) pinDown(n);
     else {
@@ -747,7 +760,7 @@ function fight(n: Npc, now: number, dt: number) {
       shoot();
       if (now > n.until && n.left <= 0) {
         n.until = now + rnd(1800, 3800);
-        const side = toFoe + (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2 + (dist > st.near * 1.5 ? 0.9 : st.far && dist < st.far ? -0.9 : 0), far = rnd(3, 6);
+        const side = toFoe + (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2 + (dist > near * 1.5 || dist > reach ? 0.9 : st.far && dist < st.far ? -0.9 : 0), far = rnd(3, 6);
         n.to = { x: n.pose[0] - Math.sin(side) * far, z: n.pose[2] - Math.cos(side) * far };
         n.pace = NPC.jog;
         n.act = Math.random() < 0.5 ? 'open' : 'hide';
@@ -1113,15 +1126,17 @@ export function npcsHear(x: number, z: number, range: [number, number], by: Clie
   for (const n of npcs.values()) {
     if (!n.alive || n.state === 'fight' || n.dry) continue;
     const d = Math.hypot(n.pose[0] - x, n.pose[2] - z);
-    if (d > Math.min(range[1], 450) || !fair(by)) continue;
+    if (d > Math.min(range[1], 280) || !fair(by)) continue;
+    // (a shot tells the way it came from and roughly how far, not the spot)
+    const e = d * 0.2, hx = x + rnd(-1, 1) * e, hz = z + rnd(-1, 1) * e;
     n.state = 'alert';
     n.until = now + rnd(14000, 24000);
     n.pace = NPC.jog;
     // (some of the way toward it: far enough to see who it was, not into their sights)
     const k = Math.max(0, Math.min(1, (d - 45) / d));
     // (one in a building as often as not stays in it, down, its sights to where the shot was)
-    n.to = indoors(n.pose[0], n.pose[2]) && Math.random() < 0.6 ? null : { x: n.pose[0] + (x - n.pose[0]) * k, z: n.pose[2] + (z - n.pose[2]) * k };
-    n.gaze = yawTo(n.pose[0], n.pose[2], x, z);
+    n.to = indoors(n.pose[0], n.pose[2]) && Math.random() < 0.6 ? null : { x: n.pose[0] + (hx - n.pose[0]) * k, z: n.pose[2] + (hz - n.pose[2]) * k };
+    n.gaze = yawTo(n.pose[0], n.pose[2], hx, hz);
     n.gazeAt = now + 2500;
   }
 }

@@ -17,9 +17,9 @@ export const sightOn = (g: Ground) => void (ground = g);
 
 export const SIGHT = {
   /** sees a standing player this far in the open in front of it; less of one crouched, lying, or in the trees */
-  sees: 95,
+  sees: 75,
   /** and this far once it is looking for somebody: it has heard a shot, taken a round, or is in a fight */
-  feels: 220,
+  feels: 130,
   /** in front of it, radians either side; past that the corner of its eye, to `edge`; past that its back */
   cone: 1.05,
   edge: 1.75,
@@ -46,10 +46,9 @@ export function noticeIn(me: Pose, them: Pose, keen: boolean, speed: number): nu
   const d = Math.hypot(them[0] - me[0], them[2] - me[2]), off = Math.abs(wrap(yawTo(me[0], me[2], them[0], them[2]) - me[3]));
   const low = them[5] & F_PRONE ? 2 : them[5] & F_CROUCH ? 1 : 0;
   let reach = keen ? SIGHT.feels : SIGHT.sees, slow = 1;
-  if (!keen) {
-    reach *= low === 2 ? 0.4 : low === 1 ? 0.7 : 1;
-    if (ground.cover(them[0], them[2]) > 0.55) reach *= 0.7;
-  }
+  // (looking for somebody it still sees less of one who is down or in the trees: it does not know where they are)
+  reach *= low === 2 ? (keen ? 0.55 : 0.4) : low === 1 ? (keen ? 0.8 : 0.7) : 1;
+  if (ground.cover(them[0], them[2]) > 0.55) reach *= keen ? 0.75 : 0.7;
   // (behind it: only one near enough to be heard walking)
   if (off > SIGHT.edge) {
     if (d > (keen ? 15 : 6)) return Infinity;
