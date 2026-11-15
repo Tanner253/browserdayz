@@ -62,13 +62,14 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `forge.ts` | 52 | The server: forges (2026-10-25, plan-crafting; the rules are src/sim/craft/forge.ts). |
 | `gate.ts` | 794 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 143 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 1180 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 1181 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1429 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 835 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `learn.ts` | 101 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
 | `locks.ts` | 148 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
-| `npc-walk.ts` | 146 | Where one of the server's survivors can stand and walk, by the map's own walls and floors (2026-11-15). |
-| `npcs.ts` | 928 | The server: armed survivors of its own (2026-11-14). |
+| `npc-doors.ts` | 86 | The map's doors, to the server's own survivors (2026-11-15). |
+| `npc-walk.ts` | 163 | Where one of the server's survivors can stand and walk, by the map's own walls and floors (2026-11-15). |
+| `npcs.ts` | 1017 | The server: armed survivors of its own (2026-11-14). |
 | `party.ts` | 151 | Parties (2026-10-19), the lite first one: the owner, "players want to be able to team up with eachother, can we do a simple party system, with a very LITE indicator on friendlies ... |
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
@@ -104,7 +105,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `assets.ts` | 987 |  |
+| `assets.ts` | 1005 |  |
 | `audio.ts` | 2961 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `bones.ts` | 137 |  |
 | `breathe.ts` | 114 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
@@ -149,7 +150,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `sandbox-infected.ts` | 117 | The infected in the sandbox as the game draws them (src/dev/sandbox.ts, &infected=): made by the game's own Avatar, with their kind's movements and the look their number gives them, and stepped by the game's own pose... |
 | `sandbox-inventory.ts` | 302 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
-| `sandbox.ts` | 391 | The sandbox (the stage until 2026-10-24, the owner: |
+| `sandbox.ts` | 392 | The sandbox (the stage until 2026-10-24, the owner: |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
 | `stance.ts` | 553 | Development-only measure of how a gun is held by a body seen from outside (window.ST), beside the harness that drives the game (window.T). |
 | `sweep.ts` | 313 | Development-only numbers for every animation (window.S), beside the harness that drives the game (window.T) and the tools that photograph it (window.D). |
@@ -323,7 +324,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 392 | (first of all: three.js's inspector hook is taken away before three loads, src/net/hook-trap.ts) |
+| `main.ts` | 393 | (first of all: three.js's inspector hook is taken away before three loads, src/net/hook-trap.ts) |
 
 ## src/net/
 

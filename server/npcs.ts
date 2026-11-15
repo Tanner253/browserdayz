@@ -16,6 +16,12 @@
 // and a doorway or a window is fired from (2026-11-15, the owner: "should hide in buildings"). How one walks through the
 // map's own walls and floors, and finds its way round them, is server/npc-walk.ts.
 //
+// They are no friends of one another (the owner, 2026-11-15: "the bandits shouldnt all be friendly to eachother, they
+// should operate like real people. sometimes they group up but most the time theyre hostile ... especially 2 groups
+// coming into contact"): one fights any other it sees but the one it keeps with, as it fights a player, and a round of
+// its is as hard on them. And they do not keep to one place ("can move freely in their map zones but avoid bunching
+// them up"): now and then one makes for another place of its land, none where another already is.
+//
 // And what one has is counted (the owner, 2026-11-15: "play like a real player ... proning in spots nearby roads to
 // hunt players etc looting etc.... managing their inventories properly"): the rounds it carries go down as it fires
 // and it runs when they are gone; it dresses a wound behind cover; it lies up by a road; it picks up what lies about
@@ -136,6 +142,8 @@ interface Npc {
   mag: number;
   /** when it may next look for cover, and when it was last hit */
   coverAt: number;
+  /** when it next leaves the cover it has for cover nearer them */
+  pushAt: number;
   hitAt: number;
   /** its sights: how far off their chest they are, across and up, metres where they stand; how many rounds of climb
    * are in the gun; and how good a shot it is (1: middling) */
@@ -209,7 +217,7 @@ function place(zone: number): { x: number; z: number; r: number } | null {
     for (let k = 0; k < 6; k++) if (straight({ x, y, z }, { x: x + Math.sin(k * 1.047) * 6, z: z + Math.cos(k * 1.047) * 6 })) ways++;
     if (ways < 4) continue;
     if ([...clients.values()].some((c) => Math.hypot(c.pose[0] - x, c.pose[2] - z) < NPC.apart)) continue;
-    if ([...npcs.values()].some((n) => Math.hypot(n.pose[0] - x, n.pose[2] - z) < 40)) continue;
+    if ([...npcs.values()].some((n) => n.alive && (Math.hypot(n.pose[0] - x, n.pose[2] - z) < 90 || Math.hypot(n.home.x - x, n.home.z - z) < 90))) continue;
     return { x, z, r };
   }
   return null;
@@ -228,7 +236,7 @@ function spawn(now: number, zone: number, by?: Npc): Npc | null {
     id: nextId++, zone, mate: by?.id ?? 0, name: 'Bandit', pose: [at.x, ground.height(at.x, at.z), at.z, rnd(-Math.PI, Math.PI), 0, F_GROUND],
     w: kit.w, m: mag ? [mag] : [], g: kit.g.filter((id) => ITEMS[id]), bd: Math.floor(rnd(0, 4)), vo: Math.floor(rnd(0, 4)), burst: kit.burst,
     hp: NPC.hp, alive: true, diedAt: 0, home: at, state: 'roam', to: null, way: [], wayFor: null, wayAt: 0, fails: 0, progD: Infinity, progAt: 0, pace: NPC.walk, waitUntil: now + rnd(500, 4000), vx: 0, vz: 0,
-    foe: 0, last: [0, 0, 0], sawAt: 0, cover: null, peek: null, act: 'open', until: 0, left: 0, nextShot: 0, mag: cap, coverAt: 0, hitAt: 0, ax: 2, ay: 0.5, kick: 0, skill: rnd(0.75, 1.3),
+    foe: 0, last: [0, 0, 0], sawAt: 0, cover: null, peek: null, act: 'open', until: 0, left: 0, nextShot: 0, mag: cap, coverAt: 0, pushAt: 0, hitAt: 0, ax: 2, ay: 0.5, kick: 0, skill: rnd(0.75, 1.3),
     cap, rounds: cap * Math.round(rnd(2, 4)), dry: false, bandages: Math.round(rnd(1, 3)), healAt: 0, pack: [makeItem('beans')], plan: 'walk', lie: false, lootUid: '', lootAt: 0,
   };
   if (by) (n.home = by.home), (by.mate = n.id);
@@ -257,8 +265,14 @@ export function npcRows() {
 /** a player one may know of and shoot at: alive, there, not an admin unseen or unhurt, not at the traders' */
 const fair = (c: Client | undefined): c is Client => !!c && c.alive && !c.power.hidden && !c.power.god && !away(c) && !safe(c.pose[0], c.pose[2]) && Date.now() - (c.lifeAt ?? 0) > NPC.grace;
 
+/** whoever one may fight: a player, or another of them */
+type Foe = Client | Npc;
+const isNpc = (f: Foe): f is Npc => f.id >= NPC_FROM;
+const foeOf = (id: number): Foe | undefined => (id >= NPC_FROM ? npcs.get(id) : clients.get(id));
+const okFoe = (f: Foe | undefined): f is Foe => !!f && (isNpc(f) ? f.alive : fair(f));
+
 /** whether it sees them: near enough for how they stand and where, in front of it (or it is already after them), nothing between */
-function sees(n: Npc, c: Client, after: boolean) {
+function sees(n: Npc, c: Foe, after: boolean) {
   const p = c.pose, d = Math.hypot(p[0] - n.pose[0], p[2] - n.pose[2]);
   let reach = after ? NPC.feels : NPC.sees;
   if (!after) {
@@ -337,11 +351,11 @@ const flagsOf = (n: Npc, moving: boolean, aim: boolean, crouch: boolean) => F_GR
  * beside it (or at it, stood up: a low wall, a window) a place it can fire from. Under a roof before in the open
  * ("should hide in buildings"), then the nearest.
  */
-function findCover(n: Npc, from: Vec3): { cover: NonNullable<Npc['cover']>; peek: Spot; way: Spot[] } | null {
-  const at = spotOf(n), found: { cover: NonNullable<Npc['cover']>; peek: Spot; score: number }[] = [];
+function findCover(n: Npc, from: Vec3, about?: { x: number; z: number }): { cover: NonNullable<Npc['cover']>; peek: Spot; way: Spot[] } | null {
+  const at = spotOf(n), mid = about ?? at, found: { cover: NonNullable<Npc['cover']>; peek: Spot; score: number }[] = [];
   for (const r of [2.5, 5, 8, 12, 16, 22]) {
     for (let k = 0; k < 10; k++) {
-      const a = (k / 10) * Math.PI * 2 + r, cx = at.x + Math.cos(a) * r, cz = at.z + Math.sin(a) * r;
+      const a = (k / 10) * Math.PI * 2 + r, cx = mid.x + Math.cos(a) * r, cz = mid.z + Math.sin(a) * r;
       const y = standAt(cx, cz, ground.height(cx, cz) + 0.3);
       if (y === null || Math.abs(y - at.y) > 4) continue;
       if (clear(from, [cx, y + 0.95, cz]) || clear(from, [cx, y + 0.4, cz])) continue;
@@ -372,7 +386,8 @@ function findCover(n: Npc, from: Vec3): { cover: NonNullable<Npc['cover']>; peek
 }
 
 /** how fast they are going, across the ground, from the last two places their game told of */
-function going(c: Client): [number, number] {
+function going(c: Foe): [number, number] {
+  if (isNpc(c)) return [c.vx, c.vz];
   const tr = c.trail, a = tr && tr.length > 1 ? tr[tr.length - 2] : null, b = tr?.[tr.length - 1];
   if (!a || !b) return [0, 0];
   const dt = Math.max(0.05, (b.t - a.t) / 1000);
@@ -390,7 +405,7 @@ const chestOf = (p: Pose): Vec3 => [p[0], p[1] + (p[5] & F_PRONE ? 0.3 : p[5] & 
  * sight they are lost and have to be brought on again. So one who stands still in the open is hit, and one who runs
  * across, breaks the line or shoots first is not.
  */
-function track(n: Npc, c: Client, seen: boolean, dt: number, now: number) {
+function track(n: Npc, c: Foe, seen: boolean, dt: number, now: number) {
   const p = c.pose, d = Math.max(1, Math.hypot(p[0] - n.pose[0], p[2] - n.pose[2]));
   if (!seen) {
     n.ax = rnd(-1, 1) * (0.8 + d * 0.03);
@@ -408,7 +423,7 @@ function track(n: Npc, c: Client, seen: boolean, dt: number, now: number) {
 }
 
 /** One round at them: heard and seen by every game near, and gone where its sights were, with the gun's own climb. */
-function fire(n: Npc, c: Client, now: number) {
+function fire(n: Npc, c: Foe, now: number) {
   const rule = WEAPON_RULES[n.w], p = c.pose, o = eyeOf(n.pose), aim = chestOf(p);
   const d = Math.hypot(aim[0] - o[0], aim[1] - o[1], aim[2] - o[2]);
   const x = n.ax + rnd(-1, 1) * d * 0.0025 * (1 + n.kick), y = n.ay + rnd(-1, 1) * d * 0.0025 + d * 0.0012 * n.kick, wide = Math.abs(x);
@@ -436,6 +451,19 @@ function fire(n: Npc, c: Client, now: number) {
   if (amount <= 0) return;
   // (never `lastHitBy`: see the head of this file)
   if (SAY) log(`[npc ${n.id}] hit ${c.name} ${zone} ${amount.toFixed(0)} at ${Math.round(d)} m`);
+  if (isNpc(c)) {
+    // (another of them: down, or it turns on whoever hit it)
+    c.hp -= amount;
+    c.hitAt = now;
+    if (c.hp <= 0) {
+      down(c, now, n.pose[0], n.pose[2], { by: n.id, byName: n.name, w: n.w, zone, dist: Math.round(d) });
+      log(`a ${n.name} killed a ${c.name} (${n.w}, ${Math.round(d)} m)`);
+    } else if (c.dry) {
+      c.last = [n.pose[0], n.pose[1], n.pose[2]];
+      flee(c, now);
+    } else if (c.id !== n.mate) onTo(c, n, now);
+    return;
+  }
   dealt(c, amount, zone, n.w);
   const flat = Math.max(0.001, Math.hypot(p[0] - o[0], p[2] - o[2]));
   send(c, { t: 'dmg', from: n.id, amount, zone, w: n.w, dir: [(p[0] - o[0]) / flat, 0, (p[2] - o[2]) / flat] });
@@ -514,13 +542,14 @@ function roadYaw(n: Npc) {
   return best;
 }
 
-function onTo(n: Npc, c: Client, now: number) {
+function onTo(n: Npc, c: Foe, now: number) {
   if (n.state !== 'fight' || n.foe !== c.id) {
     n.state = 'fight';
     n.foe = c.id;
     n.act = 'open';
     n.cover = n.peek = null;
     n.coverAt = 0;
+    n.pushAt = now + rnd(12000, 26000);
     if (SAY) log(`[npc ${n.id}] after ${c.name} at ${Math.round(Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]))} m`);
     // (a moment to take them in before the first round)
     n.nextShot = now + rnd(350, 700) / n.skill;
@@ -532,12 +561,12 @@ function onTo(n: Npc, c: Client, now: number) {
   n.sawAt = now;
   // (and the one it keeps with knows of them as it does)
   const m = npcs.get(n.mate);
-  if (m?.alive && m.state !== 'fight' && !m.dry && Math.hypot(m.pose[0] - n.pose[0], m.pose[2] - n.pose[2]) < 80) onTo(m, c, now);
+  if (m?.alive && m !== c && m.state !== 'fight' && !m.dry && Math.hypot(m.pose[0] - n.pose[0], m.pose[2] - n.pose[2]) < 80) onTo(m, c, now);
 }
 
 function fight(n: Npc, now: number, dt: number) {
-  const c = clients.get(n.foe);
-  if (!fair(c)) return void calm(n, now);
+  const c = foeOf(n.foe);
+  if (!okFoe(c)) return void calm(n, now);
   if (n.dry) return void flee(n, now);
   const seen = sees(n, c, true);
   track(n, c, seen, dt, now);
@@ -555,9 +584,13 @@ function fight(n: Npc, now: number, dt: number) {
   const foeAt: Vec3 = [n.last[0], n.last[1] + 1.4, n.last[2]], dist = Math.hypot(n.last[0] - n.pose[0], n.last[2] - n.pose[2]);
   const toFoe = yawTo(n.pose[0], n.pose[2], n.last[0], n.last[2]);
   // (cover looked for once it is in a fight, again when what it has no longer hides it, or it has none and is hit)
-  if (!n.lie && now >= n.coverAt && (!n.cover || (n.act === 'hide' && clear(foeAt, [n.cover.x, n.cover.y + 0.95, n.cover.z])))) {
+  // (and it does not sit behind one wall for ever: after a while it works nearer, or round to a side, cover to cover)
+  const push = !!n.cover && n.act === 'hide' && dist > 25 && now > n.pushAt;
+  if (!n.lie && now >= n.coverAt && (!n.cover || push || (n.act === 'hide' && clear(foeAt, [n.cover.x, n.cover.y + 0.95, n.cover.z])))) {
     n.coverAt = now + 2500;
-    const found = findCover(n, foeAt);
+    n.pushAt = now + rnd(12000, 26000);
+    const way = Math.atan2(n.last[0] - n.pose[0], n.last[2] - n.pose[2]) + rnd(-0.8, 0.8), far = Math.min(14, dist * 0.35);
+    const found = findCover(n, foeAt, push ? { x: n.pose[0] + Math.sin(way) * far, z: n.pose[2] + Math.cos(way) * far } : undefined) ?? (push && n.cover && n.peek ? { cover: n.cover, peek: n.peek, way: [] } : null);
     if (SAY) log(`[npc ${n.id}] cover ${found ? `${found.cover.low ? 'low' : 'corner'}${indoors(found.cover.x, found.cover.z) ? ' indoors' : ''} ${Math.round(Math.hypot(found.cover.x - n.pose[0], found.cover.z - n.pose[2]))} m off` : 'none'}`);
     n.cover = found?.cover ?? null;
     n.peek = found?.peek ?? null;
@@ -759,7 +792,8 @@ export function npcsTick(now: number, dt: number) {
       }
       continue;
     }
-    if (!people.some((c) => Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]) < NPC.near)) {
+    // (nobody near, and no other of them at it: it stands as it is)
+    if (!people.some((c) => Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]) < NPC.near) && now - n.hitAt > 30000 && !(n.state === 'fight' && n.foe >= NPC_FROM)) {
       if (n.state !== 'roam') calm(n, now);
       n.vx = n.vz = 0;
       continue;
@@ -778,11 +812,17 @@ export function npcsTick(now: number, dt: number) {
     if (zeds(n, now, dt)) continue;
     // (whoever it sees, the nearest: it is after them)
     if (n.state !== 'fight' && !n.dry) {
-      let best: Client | null = null, bd = Infinity;
+      let best: Foe | null = null, bd = Infinity;
       for (const c of people) {
         if (!fair(c)) continue;
         const d = Math.hypot(c.pose[0] - n.pose[0], c.pose[2] - n.pose[2]);
         if (d < bd && sees(n, c, n.state !== 'roam')) (best = c), (bd = d);
+      }
+      // (and any other of them but the one it keeps with)
+      for (const o of npcs.values()) {
+        if (o === n || !o.alive || o.id === n.mate) continue;
+        const d = Math.hypot(o.pose[0] - n.pose[0], o.pose[2] - n.pose[2]);
+        if (d < bd && d < NPC.sees && sees(n, o, n.state !== 'roam')) (best = o), (bd = d);
       }
       if (best) onTo(n, best, now);
     }
@@ -827,7 +867,14 @@ export function npcsTick(now: number, dt: number) {
     if (!n.to && now > n.waitUntil) {
       n.lie = false;
       n.lootUid = '';
-      const r = Math.random();
+      // (now and then on to another place of its land where none of them is; and far from its place, toward it a stretch at a time)
+      const reach = Math.max(30, n.home.r) + 25, off = () => Math.hypot(n.home.x - n.pose[0], n.home.z - n.pose[2]);
+      if (off() <= reach && Math.random() < 0.12) n.home = place(n.zone) ?? n.home;
+      for (let go = 0; go < 8 && !n.to && off() > reach; go++) {
+        const a = Math.atan2(n.home.x - n.pose[0], n.home.z - n.pose[2]) + rnd(-0.6, 0.6), d = rnd(35, 55), x = n.pose[0] + Math.sin(a) * d, z = n.pose[2] + Math.cos(a) * d;
+        if (standAt(x, z, ground.height(x, z) + 0.3) !== null) n.to = { x, z };
+      }
+      const onward = !!n.to, r = onward ? 1 : Math.random();
       n.plan = r < 0.25 ? 'lie' : r < 0.6 ? 'loot' : 'walk';
       if (n.plan === 'loot') {
         const l = lootNear(n);
@@ -840,7 +887,7 @@ export function npcsTick(now: number, dt: number) {
         const a = rnd(0, Math.PI * 2), d = rnd(inside ? 0 : 8, Math.max(20, n.home.r)), x = n.home.x + Math.cos(a) * d, z = n.home.z + Math.sin(a) * d;
         if (indoors(x, z) === inside && standAt(x, z, ground.height(x, z) + 0.3) !== null) n.to = { x, z };
       }
-      n.pace = NPC.walk;
+      n.pace = onward ? NPC.walk * 1.9 : NPC.walk;
       n.until = now + 40000;
     }
     const moving = !!n.to && step(n, dt);
