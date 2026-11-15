@@ -193,6 +193,7 @@ async function boot() {
     /* a browser that will not say */
   }
   assets.maxAnisotropy = Math.min(16, r.maxAnisotropy);
+  assets.usePacked(r.renderer);
   assets.strips = new Strips(r.renderer);
   assets.onProgress = (d, t) => screen.files(d, t);
   stage('assets');

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { LEAN, TOUCH } from './device';
 import { STRIP_OVER, Strips } from './strips';
 import { breathe } from './breathe';
@@ -573,12 +574,29 @@ export class Assets {
   /** development: the files themselves, as before the copies, to compare (`?whole`; progress/lean/proof.js) */
   whole = typeof location !== 'undefined' && new URLSearchParams(location.search).has('whole');
 
+  /**
+   * Pictures packed as the card keeps them (KTX2: scripts/lean-ktx.mjs), on a computer whose card takes them. The
+   * owner, 2026-11-14, on memory: "yes if it doesnt degrade quality super bad". A quarter of the card's memory a
+   * picture, and no second copy of it in the page. `?ktx=0` loads the pictures as they were, to tell the two apart.
+   */
+  private packed = false;
+  usePacked(renderer: THREE.WebGLRenderer) {
+    if (!DESK || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('ktx') === '0')) return;
+    // (a card with neither of the two good ways of packing would be handed the pictures unpacked again: nothing gained)
+    if (!renderer.extensions.has('EXT_texture_compression_bptc') && !renderer.extensions.has('WEBGL_compressed_texture_astc')) return;
+    this.gltf.setKTX2Loader(new KTX2Loader().setTranscoderPath(`${BASE}basis/`).detectSupport(renderer));
+    this.packed = true;
+  }
+
   /** a computer's copy of a model's file, where there is one made from the file as it is now (see leanDir); a phone's, for what it draws at PHONE_FAR */
   private leanOf(url: string) {
     const v = this.versions[url];
     if ((!DESK && !this.far.has(url)) || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
-    const lean = `${leanDir(DESK ? DESK_CAP : PHONE_FAR)}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
-    return this.versions[lean] ? lean : url;
+    const name = `${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`, dir = leanDir(DESK ? DESK_CAP : PHONE_FAR);
+    // (not one whose pictures are read again and painted over: `keepPictures`)
+    const packed = `${dir.slice(0, -1)}k/${name}`;
+    if (this.packed && !this.kept.has(url) && this.versions[packed]) return packed;
+    return this.versions[`${dir}${name}`] ? `${dir}${name}` : url;
   }
 
   /** a model whose pictures are read again after they have been drawn with (one that is repainted for another thing made of it): they are not let go of */

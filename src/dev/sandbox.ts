@@ -65,6 +65,7 @@ const blockRows = Math.ceil(bodies / bodyCols);
 const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : bodies ? blockRows * bodyCols * blocks : strip > 0 ? strip : views.length;
 const cols = bodies ? bodyCols * across : Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = bodies ? blockRows * Math.ceil(blocks / across) : Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+assets.usePacked(renderer);
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
